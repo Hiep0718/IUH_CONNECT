@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # =============================================
+  # MESSAGE BROKER - Zookeeper + Kafka
+  # =============================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: iuh-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    networks:
+      - iuh-connect-network
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: iuh-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - iuh-connect-network
+    restart: unless-stopped
+
+  # =============================================
+  # DATABASES
+  # =============================================
+  mariadb:
+    image: mariadb:11
+    container_name: iuh-mariadb
+    ports:
+      - "3307:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: root123
+      MARIADB_DATABASE: auth_db
+      MARIADB_USER: iuh_user
+      MARIADB_PASSWORD: iuh_pass
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    networks:
+      - iuh-connect-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7.0
+    container_name: iuh-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: iuh_admin
+      MONGO_INITDB_ROOT_PASSWORD: iuh_mongo_pass
+      MONGO_INITDB_DATABASE: iuh_connect_db
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - iuh-connect-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: iuh-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass iuh_redis_pass
+    volumes:
+      - redis-data:/data
+    networks:
+      - iuh-connect-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "iuh_redis_pass", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# =============================================
+# VOLUMES
+# =============================================
+volumes:
+  zookeeper-data:
+  zookeeper-logs:
+  kafka-data:
+  mariadb-data:
+  mongodb-data:
+  redis-data:
+
+# =============================================
+# NETWORKS
+# =============================================
+networks:
+  iuh-connect-network:
+    driver: bridge

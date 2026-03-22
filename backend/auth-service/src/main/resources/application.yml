@@ -1,0 +1,33 @@
+# =============================================
+# Auth Service - Application Configuration
+# =============================================
+
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+
+  # ---------- MariaDB Datasource ----------
+  datasource:
+    url: jdbc:mariadb://localhost:3307/auth_db
+    username: iuh_user
+    password: iuh_pass
+    driver-class-name: org.mariadb.jdbc.Driver
+
+  # ---------- JPA / Hibernate ----------
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MariaDBDialect
+        format_sql: true
+
+# ---------- JWT Configuration ----------
+jwt:
+  secret: IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!
+  access-expiration-ms: 900000       # 15 minutes
+  refresh-expiration-ms: 604800000   # 7 days

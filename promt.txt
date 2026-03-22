@@ -1,0 +1,97 @@
+You are an expert Software Architect and Full-Stack Developer. I am building a project called "IUH Connect" based strictly on a Microservices + Event-Driven architecture.
+
+Tech Stack to strictly follow:
+- Frontend: React Native (v0.73)
+- Backend: Java Spring Boot (v3.2.0), Maven
+- Message Broker: Apache Kafka 3.6 & Zookeeper
+- Polyglot Databases: MariaDB, Redis 7.2, MongoDB 7.0
+- Infrastructure: Docker & Docker Compose
+
+I need to set up a clean, bug-free foundational project structure from scratch to push to Git. Do NOT write any business logic or endpoints yet. I only need the barebones folder structure and base configuration files.
+
+For STEP 1, please generate:
+1. A comprehensive root directory tree showing both `frontend/` (React Native) and `backend/` (Polyrepo setup for microservices). Include a root `.gitignore` suitable for a full-stack Java/React project.
+2. A complete `docker-compose.yml` file in the root directory that spins up the ENTIRE infrastructure exactly as specified (Kafka, Zookeeper, MySQL, MongoDB, Redis). 
+3. The skeleton folder tree for our first service: `backend/auth-service/` (include empty folders for `config/`, `controller/`, `dto/`, `model/`, `repository/`, `security/`, `service/`).
+4. The base `pom.xml` for `auth-service` including dependencies for Spring Web, Spring Data JPA, MySQL Driver, Spring Security, and JWT.
+5. The exact CLI command to initialize the React Native bare project inside the `frontend/` folder.
+
+Wait for my explicit confirmation before moving to Step 2.
+
+
+
+Awesome, the foundational structure from Step 1 looks great. Now, let's move to STEP 2: Implementing the Core Authentication Flow in `auth-service`.
+
+Based on the architecture, the `auth-service` uses MariaDB for ACID compliance, BCrypt for password hashing, and JWT for stateless authentication.
+
+Please generate the specific Java code for the following files inside `backend/auth-service/`:
+
+1. `pom.xml` updates: Ensure you include the `mariadb-java-client` dependency instead of MySQL.
+2. `src/main/resources/application.yml`: Configuration to connect to the MariaDB database defined in our Docker compose (use standard environment variables like spring.datasource.url=jdbc:mariadb://...).
+3. `model/User.java`: JPA Entity mapped to a `users` table. Include fields: `id`, `username`, `password_hash`, and `avatar_url`.
+4. `repository/UserRepository.java`: Spring Data JPA interface.
+5. `security/JwtTokenProvider.java`: A utility class to generate, parse, and validate JWT access and refresh tokens.
+6. `config/SecurityConfig.java`: Spring Security 6.x configuration (stateless session, disable CSRF, permit all requests to `/api/v1/auth/**`).
+7. `controller/AuthController.java`: REST controller implementing the `POST /api/v1/auth/login` endpoint that accepts `{username, password}` and returns `{accessToken, refreshToken}`.
+
+Please provide the code file-by-file. Let me know when you are ready for Step 3.
+
+
+
+
+Excellent! Step 2 is complete. Now let's move to STEP 3: Registration and API Gateway setup.
+
+First, update the `auth-service`:
+1. Add a `POST /api/v1/auth/register` endpoint in `AuthController.java` to create a new user. It should hash the password using BCrypt before saving it to MariaDB.
+2. Ensure the `User` entity has a unique constraint on the `username` field.
+
+Second, let's create the API Gateway (the central router):
+1. Initialize a new Spring Boot project in `backend/api-gateway/`.
+2. Provide the `pom.xml` with dependencies for Spring Cloud Gateway and Spring Boot Actuator.
+3. Write the `application.yml` for the Gateway to route requests starting with `/api/v1/auth/**` to the `auth-service` container (assume its Docker hostname is `auth-service`).
+
+Provide the code for these specific files. Let me know when you are done.
+
+
+
+
+Great job. Now for the core of the Event-Driven Architecture: STEP 4 - The Chat Service (WebSocket & Producer).
+
+Inside `backend/chat-service/`, generate the code for handling incoming real-time messages:
+1. `pom.xml`: Include Spring Boot WebSocket, Spring Kafka, and Jackson dependencies.
+2. `config/WebSocketConfig.java`: Configure a WebSocket endpoint at `/ws/chat` allowing all origins.
+3. `dto/ChatMessageDto.java`: A payload class containing `senderId`, `receiverId`, `content`, `type`, and `conversationId`.
+4. `handler/ChatWebSocketHandler.java`: Extend `TextWebSocketHandler`. When `handleTextMessage` is triggered, it should parse the JSON to `ChatMessageDto` and send an event to the Kafka topic named "chat-events". Use `conversationId` as the Kafka message key.
+
+Please provide the code for these files. Focus on the Producer logic for now. We will handle the Consumer and Database in the next step.
+
+
+
+
+Awesome. Now let's handle the background processing in STEP 5: Kafka Consumer and MongoDB Persistence for `chat-service`.
+
+Please generate the following files:
+1. `pom.xml` updates: Add Spring Data MongoDB dependency.
+2. `src/main/resources/application.yml`: Configuration for Kafka Consumer (group-id: `chat-group-1`) and MongoDB connection URI (pointing to the mongo container).
+3. `model/MessageEntity.java`: A MongoDB Document mapping to the `messages` collection. Include an index on `timestamp` and structure it to use `conversation_id` effectively for sharding.
+4. `repository/MessageRepository.java`: Spring Data MongoDB interface.
+5. `consumer/ChatConsumerWorker.java`: A `@KafkaListener` that listens to the "chat-events" topic. It should parse the message, save the `MessageEntity` to MongoDB asynchronously, and prepare to send it to the receiver's active WebSocket session (you can mock the active session map for now).
+
+Provide the code file-by-file.
+
+
+
+
+
+
+The backend core is taking shape! Now let's connect the dots with the Frontend in STEP 6: React Native Chat Screen.
+
+Inside the `frontend/` directory (React Native v0.73), please generate:
+1. The terminal command to install `react-native-gifted-chat`.
+2. A `ChatScreen.tsx` functional component. It should:
+   - Establish a WebSocket connection to `ws://localhost:8080/ws/chat` when the component mounts.
+   - Use `GiftedChat` to render the UI.
+   - Listen for incoming messages on the socket and append them to the UI state.
+   - When the user sends a message, construct a JSON payload with `event: 'SEND_MESSAGE'` and `receiverId` (hardcode a dummy receiver for now), and send it over the WebSocket.
+
+Keep the code clean and focused on the socket integration.
