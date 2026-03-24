@@ -11,7 +11,7 @@ spring:
 
   # ---------- MariaDB Datasource ----------
   datasource:
-    url: jdbc:mariadb://localhost:3307/auth_db
+    url: jdbc:mariadb://mariadb:3306/auth_db
     username: iuh_user
     password: iuh_pass
     driver-class-name: org.mariadb.jdbc.Driver
@@ -25,6 +25,13 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MariaDBDialect
         format_sql: true
+
+  # ---------- Kafka Producer ----------
+  kafka:
+    bootstrap-servers: kafka:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 # ---------- JWT Configuration ----------
 jwt:

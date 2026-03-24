@@ -102,6 +102,68 @@ services:
       timeout: 5s
       retries: 5
 
+  # =============================================
+  # BACKEND SERVICES
+  # =============================================
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    container_name: iuh-auth-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mariadb://mariadb:3306/auth_db
+      SPRING_DATASOURCE_USERNAME: iuh_user
+      SPRING_DATASOURCE_PASSWORD: iuh_pass
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - iuh-connect-network
+    restart: unless-stopped
+
+  chat-service:
+    build:
+      context: ./backend/chat-service
+      dockerfile: Dockerfile
+    container_name: iuh-chat-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://iuh_admin:iuh_mongo_pass@mongodb:27017/iuh_connect_db?authSource=admin
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: iuh_redis_pass
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - iuh-connect-network
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: iuh-api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - chat-service
+    networks:
+      - iuh-connect-network
+    restart: unless-stopped
+
 # =============================================
 # VOLUMES
 # =============================================

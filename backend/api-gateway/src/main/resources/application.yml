@@ -1,0 +1,41 @@
+# =============================================
+# API Gateway - Application Configuration
+# =============================================
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      # ---------- Route Definitions ----------
+      routes:
+        # -------- Auth Service (HTTP) --------
+        - id: auth-service
+          uri: http://auth-service:8081
+          predicates:
+            - Path=/api/v1/auth/**
+
+        # -------- Chat Service (WebSocket) --------
+        - id: chat-service-ws
+          uri: ws://chat-service:8082
+          predicates:
+            - Path=/ws/chat/**
+
+# ---------- Actuator ----------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    gateway:
+      enabled: true
+
+# ---------- Logging ----------
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
