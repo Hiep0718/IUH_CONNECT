@@ -39,59 +39,74 @@ Please provide the code file-by-file. Let me know when you are ready for Step 3.
 
 
 
-Excellent! Step 2 is complete. Now let's move to STEP 3: Registration and API Gateway setup.
+Prompt cho STEP 3: API Gateway & Đồng bộ dữ liệu User qua Kafka
 
-First, update the `auth-service`:
-1. Add a `POST /api/v1/auth/register` endpoint in `AuthController.java` to create a new user. It should hash the password using BCrypt before saving it to MariaDB.
-2. Ensure the `User` entity has a unique constraint on the `username` field.
+"Chúng ta tiếp tục với STEP 3: Hoàn thiện Registration, Event-Driven cho User Profile và thiết lập API Gateway.
 
-Second, let's create the API Gateway (the central router):
-1. Initialize a new Spring Boot project in `backend/api-gateway/`.
-2. Provide the `pom.xml` with dependencies for Spring Cloud Gateway and Spring Boot Actuator.
-3. Write the `application.yml` for the Gateway to route requests starting with `/api/v1/auth/**` to the `auth-service` container (assume its Docker hostname is `auth-service`).
+Trong auth-service (AuthController.java), thêm endpoint POST /api/v1/auth/register. Nó hash password, lưu vào MariaDB. Quan trọng: Ngay sau khi lưu thành công, hãy publish một event chứa {userId, username, avatarUrl} vào Kafka topic tên là user-events. Cung cấp code update cho AuthController và Kafka Producer Config tương ứng.
 
-Provide the code for these specific files. Let me know when you are done.
+Khởi tạo Spring Boot project cho api-gateway/. Cung cấp file pom.xml (Spring Cloud Gateway, Actuator).
 
+Cung cấp file application.yml cho Gateway. Cấu hình routing:
 
+HTTP Requests bắt đầu bằng /api/v1/auth/** trỏ tới container auth-service.
 
+WebSocket Requests bắt đầu bằng /ws/chat/** trỏ tới container chat-service (sử dụng giao thức ws://).
 
-Great job. Now for the core of the Event-Driven Architecture: STEP 4 - The Chat Service (WebSocket & Producer).
+Hãy cung cấp code chi tiết từng file. Chờ xác nhận của tôi trước khi qua Step 4."
 
-Inside `backend/chat-service/`, generate the code for handling incoming real-time messages:
-1. `pom.xml`: Include Spring Boot WebSocket, Spring Kafka, and Jackson dependencies.
-2. `config/WebSocketConfig.java`: Configure a WebSocket endpoint at `/ws/chat` allowing all origins.
-3. `dto/ChatMessageDto.java`: A payload class containing `senderId`, `receiverId`, `content`, `type`, and `conversationId`.
-4. `handler/ChatWebSocketHandler.java`: Extend `TextWebSocketHandler`. When `handleTextMessage` is triggered, it should parse the JSON to `ChatMessageDto` and send an event to the Kafka topic named "chat-events". Use `conversationId` as the Kafka message key.
+Prompt cho STEP 4: Chat Service - WebSocket Security & Consumer Đồng bộ User
 
-Please provide the code for these files. Focus on the Producer logic for now. We will handle the Consumer and Database in the next step.
+"Rất tốt. Chuyển sang STEP 4: Xây dựng nền tảng cho chat-service với WebSocket Security và CQRS (Đồng bộ User).
 
+Trong backend/chat-service/, hãy sinh code cho:
 
+pom.xml: Spring WebSocket, Spring Kafka, Spring Data MongoDB, và thư viện JWT (để validate token).
 
+model/ChatUser.java & repository/ChatUserRepository.java: Collection MongoDB lưu bản sao thông tin user (id, username, avatar_url) để read-optimize.
 
-Awesome. Now let's handle the background processing in STEP 5: Kafka Consumer and MongoDB Persistence for `chat-service`.
+consumer/UserEventConsumer.java: Lắng nghe topic user-events từ Kafka, parse payload và lưu/cập nhật vào MongoDB thông qua ChatUserRepository.
 
-Please generate the following files:
-1. `pom.xml` updates: Add Spring Data MongoDB dependency.
-2. `src/main/resources/application.yml`: Configuration for Kafka Consumer (group-id: `chat-group-1`) and MongoDB connection URI (pointing to the mongo container).
-3. `model/MessageEntity.java`: A MongoDB Document mapping to the `messages` collection. Include an index on `timestamp` and structure it to use `conversation_id` effectively for sharding.
-4. `repository/MessageRepository.java`: Spring Data MongoDB interface.
-5. `consumer/ChatConsumerWorker.java`: A `@KafkaListener` that listens to the "chat-events" topic. It should parse the message, save the `MessageEntity` to MongoDB asynchronously, and prepare to send it to the receiver's active WebSocket session (you can mock the active session map for now).
+security/JwtHandshakeInterceptor.java: Interceptor chặn kết nối WebSocket. Nó phải lấy JWT từ query parameter ?token=..., validate chữ ký (dùng chung secret key với auth-service), và từ chối kết nối nếu token sai.
 
-Provide the code file-by-file.
+config/WebSocketConfig.java: Đăng ký endpoint /ws/chat, add JwtHandshakeInterceptor và set AllowedOrigins là *.
 
+Cung cấp code chi tiết file-by-file. Chờ xác nhận của tôi trước khi qua Step 5."
 
+Prompt cho STEP 5: Trái tim của Chat Service - Xử lý tin nhắn với Kafka & Redis Pub/Sub
 
+"Đã xong Step 4. Bây giờ là STEP 5: Xử lý luồng tin nhắn (Message Flow) giải quyết bài toán Scale Multi-node bằng Redis Pub/Sub và Kafka.
 
+Trong chat-service/, hãy cung cấp code cho:
 
+Cập nhật pom.xml thêm dependency cho Spring Data Redis.
 
-The backend core is taking shape! Now let's connect the dots with the Frontend in STEP 6: React Native Chat Screen.
+model/MessageEntity.java & repository/MessageRepository.java (MongoDB): Lưu log tin nhắn. Đánh index trên conversationId và timestamp.
 
-Inside the `frontend/` directory (React Native v0.73), please generate:
-1. The terminal command to install `react-native-gifted-chat`.
-2. A `ChatScreen.tsx` functional component. It should:
-   - Establish a WebSocket connection to `ws://localhost:8080/ws/chat` when the component mounts.
-   - Use `GiftedChat` to render the UI.
-   - Listen for incoming messages on the socket and append them to the UI state.
-   - When the user sends a message, construct a JSON payload with `event: 'SEND_MESSAGE'` and `receiverId` (hardcode a dummy receiver for now), and send it over the WebSocket.
+handler/ChatWebSocketHandler.java: Khi nhận JSON payload từ client, đóng gói thành ChatMessageDto và chỉ produce vào Kafka topic chat-messages (dùng conversationId làm routing key).
 
-Keep the code clean and focused on the socket integration.
+consumer/ChatMessageKafkaConsumer.java: Lắng nghe topic chat-messages, lưu message vào MongoDB (MessageRepository), sau đó publish chính message này lên Redis Pub/Sub channel tên là chat-channel.
+
+redis/RedisMessageSubscriber.java: Lắng nghe channel chat-channel của Redis. Khi nhận được tin nhắn, tìm trong danh sách WebSocket sessions của node hiện tại xem người nhận (receiver) có đang kết nối không. Nếu có, đẩy tin nhắn qua WebSocket.
+
+Thiết kế này đảm bảo dù có 10 node chat-service, user vẫn nhận được tin nhắn. Hãy cung cấp code chi tiết!"
+
+Prompt cho STEP 6: Frontend React Native Integration
+
+"Tuyệt vời, backend đã hoàn thiện kiến trúc phân tán! Hãy chốt hạ bằng STEP 6: React Native Chat Screen.
+
+Trong thư mục frontend/, hãy sinh code cho:
+
+Lệnh cài đặt react-native-gifted-chat.
+
+Component ChatScreen.tsx:
+
+Lấy JWT Token từ storage (mock tạm một biến string).
+
+Khởi tạo WebSocket kết nối đến API Gateway: ws://localhost:8080/ws/chat?token={JWT_TOKEN}.
+
+Lắng nghe event onmessage để parse JSON và hiển thị lên UI thông qua GiftedChat.
+
+Hàm onSend: Khi user gõ tin nhắn, gửi JSON payload {senderId, receiverId, content, conversationId} qua connection WebSocket.
+
+Đảm bảo code clean, quản lý vòng đời (lifecycle) của WebSocket (đóng kết nối khi unmount component) chuẩn xác trong React Native."
