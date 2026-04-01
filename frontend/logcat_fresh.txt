@@ -1,0 +1,393 @@
+﻿--------- beginning of main
+04-01 17:20:40.734  8623  8623 W dumpsys : Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: package
+04-01 17:20:40.804  2824  2719 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/base.odex) is kOatUpToDate with filter 'speed-profile' executable 'false'
+04-01 17:20:40.805  2824  2719 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_AdsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:40.807  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_CronetDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:40.808  2824  2719 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_DynamiteLoader_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:40.809  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_DynamiteModulesA_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:40.811  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_DynamiteModulesC_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:40.813  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_GoogleCertificates_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:40.816  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_MapsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:40.818  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_MeasurementDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:40.819  2824  2825 I artd    : GetBestInfo: /data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/split_maps_core_dynamite_ondemand.apk has no usable artifacts
+04-01 17:20:40.821  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000c/dl-Appsearch.optional_250834100800.apk has no usable artifacts
+04-01 17:20:40.823  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000004/DynamiteModulesC.apk has no usable artifacts
+04-01 17:20:40.824  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000001/CronetDynamite.apk has no usable artifacts
+04-01 17:20:40.825  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000015/dl-MlkitOcrCommon.optional_261133100800.apk has no usable artifacts
+04-01 17:20:40.827  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000002/DynamiteLoader.apk has no usable artifacts
+04-01 17:20:40.827  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000005/GoogleCertificates.apk has no usable artifacts
+04-01 17:20:40.829  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000012/dl-Appsearch.optional_261133100800.apk has no usable artifacts
+04-01 17:20:40.830  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000009/dl-TfliteDynamiteDynamite.integ_252130102100800.apk has no usable artifacts
+04-01 17:20:40.831  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000011/dl-PlayCloudSearch.optional_261133100000.apk has no usable artifacts
+04-01 17:20:40.832  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000013/dl-MlkitBarcodeUi.optional_261133100800.apk has no usable artifacts
+04-01 17:20:40.834  2824  2825 I artd    : GetBestInfo: vdex next to the dex file (/data/user/0/com.google.android.gms/app_dg_cache/E054CA794C125F959C88D4849C82AB3F226237E6/oat/x86_64/the.vdex) is kOatUpToDate with filter 'verify' executable 'false'
+04-01 17:20:40.836  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000010/dl-VisionOcr.optional_261133100000.apk has no usable artifacts
+04-01 17:20:40.838  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000d/dl-MlkitOcrCommon.optional_250834100800.apk has no usable artifacts
+04-01 17:20:40.839  2824  2825 I artd    : GetBestInfo: vdex next to the dex file (/data/user/0/com.google.android.gms/app_dg_cache/BB2AE5A47BB198AF36C19CFD2B6407061A1BAF30/oat/x86_64/the.vdex) is kOatUpToDate with filter 'verify' executable 'false'
+04-01 17:20:40.841  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000a/dl-MlkitBarcodeUi.optional_250834100800.apk has no usable artifacts
+04-01 17:20:40.843  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000b/dl-VisionOcr.optional_250834100000.apk has no usable artifacts
+04-01 17:20:40.845  2824  2825 I artd    : GetBestInfo: vdex next to the dex file (/data/user/0/com.google.android.gms/app_dg_cache/492BB24C67899DCD3E45A896813896109D71DC84/oat/x86_64/the.vdex) is kOatUpToDate with filter 'verify' executable 'false'
+04-01 17:20:40.846  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000007/MeasurementDynamite.apk has no usable artifacts
+04-01 17:20:41.717  1474  1474 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+--------- beginning of system
+04-01 17:20:45.671   727  1909 W ActivityTaskManager: callingPackage for (uid=2000, pid=8628) has no WPC
+04-01 17:20:45.672   727  1909 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@fbfae7f1 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+04-01 17:20:45.673   727  1909 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE
+04-01 17:20:45.673   727  1909 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_FULLSCREEN_OVERRIDE
+04-01 17:20:45.673   727  1909 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_RESIZEABLE_ACTIVITY_OVERRIDES
+04-01 17:20:45.673   727  1909 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE
+04-01 17:20:45.678   727  1909 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE
+04-01 17:20:45.682   566   578 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+04-01 17:20:45.685  4005  4029 V WindowManagerShell: Transition requested (#104): android.os.BinderProxy@a6347ab TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=41 effectiveUid=10217 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.iuhconnect/.MainActivity } baseActivity=ComponentInfo{com.iuhconnect/com.iuhconnect.MainActivity} topActivity=ComponentInfo{com.iuhconnect/com.iuhconnect.MainActivity} origActivity=null realActivity=ComponentInfo{com.iuhconnect/com.iuhconnect.MainActivity} numActivities=1 lastActiveTime=13945948 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@55dce08} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 142 - 0, 0) topActivityInfo=ActivityInfo{fe759a1 com.iuhconnect.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(278, 711 - 803, 1791) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 142 - 1080, 2361) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 104 }
+04-01 17:20:45.685  4005  4029 D ShellSplitScreen: logExit: no-op, mLoggerSessionId is null
+04-01 17:20:45.686   727  1909 I ActivityTaskManager: START u0 {flg=0x10000000 xflg=0x5 cmp=com.iuhconnect/.MainActivity} with LAUNCH_SINGLE_TASK from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+04-01 17:20:45.688   727   756 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@fbfae7f1 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+04-01 17:20:45.689  2574  2574 W SplitSelectStateCtor: Missing session instanceIds
+04-01 17:20:45.689  2574  2574 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+04-01 17:20:45.692   727  2159 I AppsFilter: interaction: PackageSetting{7e1c81e com.android.microdroid.empty_payload/10197} -> PackageSetting{4c7578a com.iuhconnect/10217} BLOCKED
+04-01 17:20:45.696  4005  4029 D WindowManagerShell: setLauncherKeepClearAreaHeight: visible=false, height=527
+04-01 17:20:45.696   566   566 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+04-01 17:20:45.697  4005  4038 W HWUI    : Image decoding logging dropped!
+04-01 17:20:45.702   489   489 D Zygote  : Forked child process 8631
+04-01 17:20:45.706   727   764 I ActivityManager: Start proc 8631:com.iuhconnect/u0a217 for next-top-activity {com.iuhconnect/com.iuhconnect.MainActivity}
+04-01 17:20:45.708   727  1185 D BackgroundInstallControlService: Package event received: 0
+04-01 17:20:45.720   727  2160 D CoreBackPreview: Window{ac4fc30 u0 Splash Screen com.iuhconnect}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@fb5ab5c, mPriority=0, mIsAnimationCallback=false, mOverrideBehavior=0}
+04-01 17:20:45.726   727   764 I ActivityManager: ProcessObserver broadcast disabled
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.727   727   756 W IPCThreadState: Sending oneway calls to frozen process.
+04-01 17:20:45.743  8631  8631 I com.iuhconnect: Late-enabling -Xcheck:jni
+04-01 17:20:45.758  2574  2574 W Choreographer: Frame time is 0.741999 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:45.792  8631  8631 I com.iuhconnect: Using CollectorTypeCMC GC.
+04-01 17:20:45.794  8631  8631 W com.iuhconnect: Unexpected CPU variant for x86: x86_64.
+04-01 17:20:45.794  8631  8631 W com.iuhconnect: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, goldmont-without-sha-xsaves, tremont, kabylake, alderlake, default
+04-01 17:20:45.818  1537  1564 I adbd    : jdwp connection from 8631
+04-01 17:20:45.839  8631  8631 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+04-01 17:20:45.883   727  1185 D BackgroundInstallControlService: Package event received: 0
+04-01 17:20:45.896  8631  8631 D CompatChangeReporter: Compat change id reported: 242716250; UID 10217; state: ENABLED
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.911   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.912   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.912   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.912   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.912   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.912   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.912   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.912   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:45.974  4005  4218 V WindowManagerShell: onTransitionReady(transaction=3122441232459)
+04-01 17:20:45.976  4005  4029 V WindowManagerShell: onTransitionReady (#104) android.os.BinderProxy@a6347ab: {id=104 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[
+04-01 17:20:45.976  4005  4029 V WindowManagerShell:         {m=OPEN f=NONE leash=Surface(name=Task=41)/@0x499c87c sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1},
+04-01 17:20:45.976  4005  4029 V WindowManagerShell:         {m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xc785505 sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1},
+04-01 17:20:45.976  4005  4029 V WindowManagerShell:         {m=TO_BACK f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{70d297a showWhenLocked=false})/@0x1e95a sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0}
+04-01 17:20:45.976  4005  4029 V WindowManagerShell:     ]}
+04-01 17:20:45.978   727   753 V WindowManager: Sent Transition (#104) createdAt=04-01 17:20:45.673 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=41 effectiveUid=10217 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.iuhconnect/.MainActivity } baseActivity=ComponentInfo{com.iuhconnect/com.iuhconnect.MainActivity} topActivity=ComponentInfo{com.iuhconnect/com.iuhconnect.MainActivity} origActivity=null realActivity=ComponentInfo{com.iuhconnect/com.iuhconnect.MainActivity} numActivities=1 lastActiveTime=13945948 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{9806163 Task{8e6a17e #41 type=standard A=10217:com.iuhconnect}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 142 - 0, 0) topActivityInfo=ActivityInfo{ee7d160 com.iuhconnect.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(278, 711 - 803, 1791) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 142 - 1080, 2361) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 104 }
+04-01 17:20:45.978   727   753 V WindowManager:     startWCT=WindowContainerTransaction { changes= {} hops= [] errorCallbackToken=null taskFragmentOrganizer=null }
+04-01 17:20:45.978   727   753 V WindowManager:     info={id=104 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[
+04-01 17:20:45.978   727   753 V WindowManager:         {WCT{RemoteToken{9806163 Task{8e6a17e #41 type=standard A=10217:com.iuhconnect}}} m=OPEN f=NONE leash=Surface(name=Task=41)/@0xd024be1 sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1},
+04-01 17:20:45.978   727   753 V WindowManager:         {WCT{RemoteToken{677a3e4 Task{613f6a0 #1 type=home}}} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x5a7f54f sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1},
+04-01 17:20:45.978   727   753 V WindowManager:         {m=TO_BACK f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{70d297a showWhenLocked=false})/@0x2f36b1e sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0}
+04-01 17:20:45.978   727   753 V WindowManager:     ]}
+04-01 17:20:45.977  4005  4029 V WindowManagerShell: Playing animation for (#104) android.os.BinderProxy@a6347ab@0
+04-01 17:20:45.977  4005  4029 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+04-01 17:20:45.982  4005  4029 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=104 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{m=OPEN f=NONE leash=Surface(name=Task=41)/@0x499c87c sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1},{m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xc785505 sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1},{m=TO_BACK f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{70d297a showWhenLocked=false})/@0x1e95a sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0}]}
+04-01 17:20:45.982  4005  4029 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null taskFragmentToken=android.os.BinderProxy@5bfadde windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@14adbbf, appThread = android.app.IApplicationThread$Stub$Proxy@8df28c, debugName = overlayBackTransition }}
+04-01 17:20:45.982  4005  4029 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@9f1dd5, appThread = android.app.IApplicationThread$Stub$Proxy@694c9ea, debugName = LauncherToDream }}
+04-01 17:20:45.982  4005  4029 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null windowingMode=undefined},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined},{NOT atype=undefined independent=true modes=[] flags=NONE mustBeTask=true order=ANY topActivity=null launchCookie=null customAnim=true windowingMode=undefined}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@7db74db, appThread = android.app.IApplicationThread$Stub$Proxy@26dab78, debugName = QuickstepLaunchHome }}
+04-01 17:20:45.982  4005  4029 V WindowManagerShell:  Delegate animation for (#104) to null
+04-01 17:20:45.982  4005  4029 V WindowManagerShell: start default transition animation, info = {id=104 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{m=OPEN f=NONE leash=Surface(name=Task=41)/@0x499c87c sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1},{m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xc785505 sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1},{m=TO_BACK f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{70d297a showWhenLocked=false})/@0x1e95a sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0}]}
+04-01 17:20:45.983  4005  4029 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@9f8f068 animAttr=0x13 type=OPEN isEntrance=false
+04-01 17:20:45.983  4005  4029 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@ae3c81 animAttr=0x12 type=OPEN isEntrance=true
+04-01 17:20:45.984  4005  4029 V WindowManagerShell:  animated by com.android.wm.shell.transition.DefaultTransitionHandler@e934e5b
+04-01 17:20:46.009  4005  4034 W Choreographer: Frame time is 0.468912 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:46.075  4005  4034 W Choreographer: Frame time is 0.320389 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:46.092  4005  4034 W Choreographer: Frame time is 0.831306 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:46.109  4005  4034 W Choreographer: Frame time is 0.332646 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:46.201  8631  8631 D nativeloader: Configuring clns-9 for other apk /data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/base.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/lib/x86_64:/data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.iuhconnect
+04-01 17:20:46.220  8631  8631 I com.iuhconnect: AssetManager2(0x7c25e5857a78) locale list changing from [] to [en-US]
+04-01 17:20:46.228  8631  8631 V GraphicsEnvironment: Currently set values for:
+04-01 17:20:46.229  8631  8631 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+04-01 17:20:46.229  8631  8631 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+04-01 17:20:46.229  8631  8631 V GraphicsEnvironment: com.iuhconnect is not listed in per-application setting
+04-01 17:20:46.229  8631  8631 V GraphicsEnvironment: ANGLE allowlist from config: com.dreamgames.royalmatch com.dts.freefiremax com.dxx.firenow com.gramgames.mergedragons com.ludo.king com.mojang.minecraftpe com.my.defense com.nintendo.zaka com.os.airforce com.playrix.fishdomdd.gplay io.teslatech.callbreak jp.konami.prospia net.peakgames.toonblast
+04-01 17:20:46.229  8631  8631 V GraphicsEnvironment: com.iuhconnect is not listed in ANGLE allowlist or settings, returning default
+04-01 17:20:46.229  8631  8631 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+04-01 17:20:46.265  1414  1689 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+04-01 17:20:46.267  8631  8631 V SoLoader: Init System Loader delegate
+04-01 17:20:46.284  4005  4029 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#104) android.os.BinderProxy@a6347ab@0
+04-01 17:20:46.299  2574  2574 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=true newVisibility=false
+04-01 17:20:46.301   727   753 V WindowManager: Finish Transition (#104): created at 04-01 17:20:45.673 collect-started=0.025ms request-sent=10.591ms started=11.678ms ready=290.872ms sent=297.247ms commit=26.426ms finished=623.981ms
+04-01 17:20:46.302  4005  4029 V WindowManagerShell: Track 0 became idle
+04-01 17:20:46.302  4005  4029 V WindowManagerShell: All active transition animations finished
+04-01 17:20:46.310  2574  2574 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+04-01 17:20:46.394  8631  8631 D nativeloader: Load /data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/lib/x86_64/libhermes.so using class loader ns clns-9 (caller=/data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/base.apk): ok
+04-01 17:20:46.430  8631  8631 D nativeloader: Load /data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/lib/x86_64/libhermes_executor.so using class loader ns clns-9 (caller=/data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/base.apk): ok
+04-01 17:20:46.493   727  2159 D CompatChangeReporter: Compat change id reported: 161145287; UID 10217; state: ENABLED
+04-01 17:20:46.506  8631  8654 D nativeloader: Load /data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/lib/x86_64/libfbjni.so using class loader ns clns-9 (caller=/data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/base.apk): ok
+04-01 17:20:46.537  8631  8654 D nativeloader: Load /data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/lib/x86_64/libflipper.so using class loader ns clns-9 (caller=/data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/base.apk): ok
+04-01 17:20:46.568  8631  8631 I com.iuhconnect: hiddenapi: Accessing hidden field Landroid/view/View;->mKeyedTags:Landroid/util/SparseArray; (runtime_flags=0, domain=platform, api=unsupported) from Lcom/facebook/flipper/plugins/inspector/descriptors/ViewDescriptor; (domain=app) using reflection: allowed
+04-01 17:20:46.568  8631  8631 I com.iuhconnect: hiddenapi: Accessing hidden field Landroid/view/View;->mListenerInfo:Landroid/view/View$ListenerInfo; (runtime_flags=0, domain=platform, api=unsupported) from Lcom/facebook/flipper/plugins/inspector/descriptors/ViewDescriptor; (domain=app) using reflection: allowed
+04-01 17:20:46.569  8631  8631 I com.iuhconnect: hiddenapi: Accessing hidden field Landroid/view/View$ListenerInfo;->mOnClickListener:Landroid/view/View$OnClickListener; (runtime_flags=0, domain=platform, api=unsupported) from Lcom/facebook/flipper/plugins/inspector/descriptors/ViewDescriptor; (domain=app) using reflection: allowed
+04-01 17:20:46.571  8631  8631 I flipper : flipper: FlipperClient::addPlugin Inspector
+04-01 17:20:46.573  8631  8631 I flipper : flipper: FlipperClient::addPlugin Databases
+04-01 17:20:46.574  8631  8631 I flipper : flipper: FlipperClient::addPlugin Preferences
+04-01 17:20:46.575  8631  8631 I flipper : flipper: FlipperClient::addPlugin CrashReporter
+04-01 17:20:46.576  8631  8631 I flipper : flipper: FlipperClient::addPlugin Network
+04-01 17:20:46.577   727  2159 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS
+04-01 17:20:46.583   727  1185 D BackgroundInstallControlService: Package event received: 0
+04-01 17:20:46.583   727  1185 D BackgroundInstallControlService: Package event received: 0
+04-01 17:20:46.584  8631  8665 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+04-01 17:20:46.585  8631  8654 W System.err: SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+04-01 17:20:46.586  8631  8654 W System.err: SLF4J: Defaulting to no-operation (NOP) logger implementation
+04-01 17:20:46.586  8631  8654 W System.err: SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+04-01 17:20:46.589  8631  8631 I com.iuhconnect: AssetManager2(0x7c25e5854558) locale list changing from [] to [en-US]
+04-01 17:20:46.618  8631  8631 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+04-01 17:20:46.619  8631  8631 I com.iuhconnect: AssetManager2(0x7c25e585c578) locale list changing from [] to [en-US]
+04-01 17:20:46.625  8631  8631 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+04-01 17:20:46.663  8631  8631 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+04-01 17:20:46.666  8631  8665 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+04-01 17:20:46.668  8631  8665 I EGL_emulation: Opening libGLESv2_emulation.so
+04-01 17:20:46.704  8631  8665 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+04-01 17:20:46.705  8631  8665 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+04-01 17:20:46.714  8631  8631 I com.iuhconnect: hiddenapi: Accessing hidden method Landroid/view/View;->computeFitSystemWindows(Landroid/graphics/Rect;Landroid/graphics/Rect;)Z (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app) using reflection: allowed
+04-01 17:20:46.714  8631  8631 I com.iuhconnect: hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app) using reflection: allowed
+04-01 17:20:46.799  8631  8631 W HWUI    : Unknown dataspace 0
+04-01 17:20:46.893  8631  8631 W unknown:ReactNative: Packager connection already open, nooping.
+04-01 17:20:46.901   727  2162 D CoreBackPreview: Window{e5a47af u0 com.iuhconnect/com.iuhconnect.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@c0c345, mPriority=0, mIsAnimationCallback=false, mOverrideBehavior=0}
+04-01 17:20:47.157   727   753 I ActivityTaskManager: Displayed com.iuhconnect/.MainActivity for user 0: +1s484ms
+04-01 17:20:47.184   727  1909 D CoreBackPreview: Window{da115fd u0 PopupWindow:f30fd7a}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@6424d43, mPriority=0, mIsAnimationCallback=false, mOverrideBehavior=0}
+04-01 17:20:47.226  4005  4037 W Choreographer: Frame time is 0.206032 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.259  4005  4037 W Choreographer: Frame time is 0.013805 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.275  4005  4037 W Choreographer: Frame time is 1.131835 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.305  2574  2574 D BaseDepthController: setSurface:
+04-01 17:20:47.305  2574  2574 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+04-01 17:20:47.305  2574  2574 D BaseDepthController: 	mBaseSurface: null
+04-01 17:20:47.307  2574  2574 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+04-01 17:20:47.308  2574  2574 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+04-01 17:20:47.308  2574  2574 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:4)
+04-01 17:20:47.308  2574  2574 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:1)
+04-01 17:20:47.308  2574  2574 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:34)
+04-01 17:20:47.308  2574  2574 D StatsLog: LAUNCHER_ONSTOP
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.309   727   893 W JobScheduler.JobStatus: Exempted app com.android.vending considered buggy
+04-01 17:20:47.310  2744  2765 I FontLog : (REDACTED) Received query %s, URI %s
+04-01 17:20:47.312  2744  2765 I FontLog : (REDACTED) Query [%s] resolved to %s
+04-01 17:20:47.313  2744  2765 I FontLog : (REDACTED) Fetch %s end status %s
+04-01 17:20:47.315  2574  2574 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+04-01 17:20:47.323  2744  2765 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+04-01 17:20:47.326  4005  4037 W Choreographer: Frame time is 0.185576 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.333  2744  2765 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+04-01 17:20:47.342  4005  4037 W Choreographer: Frame time is 0.485134 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.345   727  1185 D BackgroundInstallControlService: Package event received: 0
+04-01 17:20:47.346  2574  2583 W System  : A resource failed to call release. 
+04-01 17:20:47.346  2574  2583 W System  : A resource failed to call release. 
+04-01 17:20:47.346  2574  2583 W System  : A resource failed to call release. 
+04-01 17:20:47.358  4005  4037 W Choreographer: Frame time is 1.590552 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.392  4005  4037 W Choreographer: Frame time is 0.159515 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.408  4005  4037 W Choreographer: Frame time is 1.181315 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.441  4005  4037 W Choreographer: Frame time is 1.043569 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.475  4005  4037 W Choreographer: Frame time is 0.92958 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.508  2574  2574 W Choreographer: Frame time is 1.063955 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.508  4005  4037 W Choreographer: Frame time is 0.820845 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.526  2574  2574 W Choreographer: Frame time is 0.213076 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.542  4005  4037 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda13@b3e494d
+04-01 17:20:47.542   727  2159 D CoreBackPreview: Window{ac4fc30 u0 Splash Screen com.iuhconnect EXITING}: Setting back callback null
+04-01 17:20:47.572  8631  8657 D nativeloader: Load /data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/lib/x86_64/libreactnativejni.so using class loader ns clns-9 (caller=/data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/base.apk): ok
+04-01 17:20:47.591   727   758 W Choreographer: Frame time is 1.428064 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:47.608   727   758 W Choreographer: Frame time is 1.121965 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:48.151  8631  8635 I com.iuhconnect: Compiler allocated 5042KB to compile void android.view.ViewRootImpl.performTraversals()
+04-01 17:20:48.585  8631  8631 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda13@3417746
+04-01 17:20:48.584   727  2159 D CoreBackPreview: Window{da115fd u0 PopupWindow:f30fd7a}: Setting back callback null
+04-01 17:20:48.617  8631  8631 W unknown:ReactNative: Packager connection already open, nooping.
+04-01 17:20:48.636  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.traceupdateoverlay.TraceUpdateOverlayManager
+04-01 17:20:48.639  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.uimanager.LayoutShadowNode
+04-01 17:20:48.641  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.drawer.ReactDrawerLayoutManager
+04-01 17:20:48.642  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactHorizontalScrollViewManager
+04-01 17:20:48.644  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactHorizontalScrollContainerViewManager
+04-01 17:20:48.644  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.progressbar.ReactProgressBarViewManager
+04-01 17:20:48.645  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.progressbar.ProgressBarShadowNode
+04-01 17:20:48.646  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactScrollViewManager
+04-01 17:20:48.648  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.switchview.ReactSwitchManager
+04-01 17:20:48.649  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.switchview.ReactSwitchManager$ReactSwitchShadowNode
+04-01 17:20:48.649  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.swiperefresh.SwipeRefreshLayoutManager
+04-01 17:20:48.650  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.frescosupport.FrescoBasedReactTextInlineImageViewManager
+04-01 17:20:48.650  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.frescosupport.FrescoBasedReactTextInlineImageShadowNode
+04-01 17:20:48.650  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.image.ReactImageManager
+04-01 17:20:48.651  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.modal.ReactModalHostManager
+04-01 17:20:48.652  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.modal.ModalHostShadowNode
+04-01 17:20:48.652  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactRawTextManager
+04-01 17:20:48.652  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactRawTextShadowNode
+04-01 17:20:48.652  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.textinput.ReactTextInputManager
+04-01 17:20:48.654  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.textinput.ReactTextInputShadowNode
+04-01 17:20:48.655  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactTextViewManager
+04-01 17:20:48.656  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactTextShadowNode
+04-01 17:20:48.656  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.view.ReactViewManager
+04-01 17:20:48.657  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactVirtualTextViewManager
+04-01 17:20:48.657  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactVirtualTextShadowNode
+04-01 17:20:48.658  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.unimplementedview.ReactUnimplementedViewManager
+04-01 17:20:48.658  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.gesturehandler.react.RNGestureHandlerRootViewManager
+04-01 17:20:48.658  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.gesturehandler.react.RNGestureHandlerButtonViewManager
+04-01 17:20:48.659  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.BV.LinearGradient.LinearGradientManager
+04-01 17:20:48.660  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaProviderManager
+04-01 17:20:48.660  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaViewManager
+04-01 17:20:48.660  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaViewShadowNode
+04-01 17:20:48.661  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenContainerViewManager
+04-01 17:20:48.661  8631  8680 E unknown:UIManagerModuleConstantsHelper: Direct event name for 'RNSScreen' doesn't correspond to the naming convention, expected 'topEventName'->'onEventName', got 'topHeaderBackButtonClickedEvent'->'onHeaderBackButtonClicked'
+04-01 17:20:48.662  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenViewManager
+04-01 17:20:48.662  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackViewManager
+04-01 17:20:48.663  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackHeaderConfigViewManager
+04-01 17:20:48.663  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackHeaderSubviewManager
+04-01 17:20:48.664  8631  8680 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.SearchBarManager
+04-01 17:20:48.668  8631  8680 I com.iuhconnect: hiddenapi: Accessing hidden field Ljava/lang/reflect/Field;->accessFlags:I (runtime_flags=0, domain=core-platform, api=unsupported) from Lcom/swmansion/reanimated/layoutReanimation/ReanimatedNativeHierarchyManager; (domain=app) using reflection: allowed
+04-01 17:20:48.670  8631  8680 D nativeloader: Load /data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/lib/x86_64/libyoga.so using class loader ns clns-9 (caller=/data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/base.apk): ok
+04-01 17:20:48.695  8631  8680 I flipper : flipper: FlipperClient::addPlugin Fresco
+04-01 17:20:48.776  8631  8679 D nativeloader: Load /data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/lib/x86_64/libreactnativeblob.so using class loader ns clns-9 (caller=/data/app/~~yLJzSrWJm7rm6ngaztwe-Q==/com.iuhconnect-f-BpRX-slZNRpvBI1oNuYA==/base.apk): ok
+04-01 17:20:48.789  8631  8680 I com.iuhconnect: AssetManager2(0x7c25e5884f78) locale list changing from [] to [en-US]
+04-01 17:20:48.790  8631  8680 I WebViewFactory: Loading com.google.android.webview version 133.0.6943.137 (code 694313738)
+04-01 17:20:48.791  8631  8680 I com.iuhconnect: AssetManager2(0x7c25e588f1f8) locale list changing from [] to [en-US]
+04-01 17:20:48.791  8631  8680 I com.iuhconnect: AssetManager2(0x7c25e5874f38) locale list changing from [] to [en-US]
+04-01 17:20:48.794  8631  8680 I com.iuhconnect: AssetManager2(0x7c25e5875bb8) locale list changing from [] to [en-US]
+04-01 17:20:48.795  8631  8680 I com.iuhconnect: AssetManager2(0x7c25e5877e18) locale list changing from [] to [en-US]
+04-01 17:20:48.795  8631  8680 V ResourcesManager: The following library key has been added: ResourcesKey{ mHash=7803b795 mResDir=null mSplitDirs=[] mOverlayDirs=[] mLibDirs=[/data/app/~~d6qaSty4g-WXhjCZgs7K7g==/com.google.android.webview-CycxWW0yQ0vpmLtjQza9ZA==/WebViewGoogle.apk,/data/app/~~B-EYAyZ_16o3PQyQTsw1Jg==/com.google.android.trichromelibrary_694313738-iGwmUcx18Q4madtOkgiNeQ==/TrichromeLibrary.apk,/system_ext/framework/androidx.window.extensions.jar] mDisplayId=0 mOverrideConfig=v36 mCompatInfo={420dpi always-compat} mLoaders=[]}
+04-01 17:20:48.798  8631  8680 W com.iuhconnect: Failed to find entry 'classes.dex': Entry not found
+04-01 17:20:48.799  8631  8680 D nativeloader: Configuring clns-10 for other apk /data/app/~~B-EYAyZ_16o3PQyQTsw1Jg==/com.google.android.trichromelibrary_694313738-iGwmUcx18Q4madtOkgiNeQ==/TrichromeLibrary.apk. target_sdk_version=34, uses_libraries=ALL, library_path=/data/app/~~d6qaSty4g-WXhjCZgs7K7g==/com.google.android.webview-CycxWW0yQ0vpmLtjQza9ZA==/lib/x86_64:/data/app/~~d6qaSty4g-WXhjCZgs7K7g==/com.google.android.webview-CycxWW0yQ0vpmLtjQza9ZA==/WebViewGoogle.apk!/lib/x86_64:/data/app/~~B-EYAyZ_16o3PQyQTsw1Jg==/com.google.android.trichromelibrary_694313738-iGwmUcx18Q4madtOkgiNeQ==/TrichromeLibrary.apk!/lib/x86_64, permitted_path=/data:/mnt/expand
+04-01 17:20:48.804  8631  8680 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+04-01 17:20:48.807  8631  8680 D nativeloader: Configuring clns-11 for other apk /data/app/~~d6qaSty4g-WXhjCZgs7K7g==/com.google.android.webview-CycxWW0yQ0vpmLtjQza9ZA==/WebViewGoogle.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~d6qaSty4g-WXhjCZgs7K7g==/com.google.android.webview-CycxWW0yQ0vpmLtjQza9ZA==/lib/x86_64:/data/app/~~d6qaSty4g-WXhjCZgs7K7g==/com.google.android.webview-CycxWW0yQ0vpmLtjQza9ZA==/WebViewGoogle.apk!/lib/x86_64:/data/app/~~B-EYAyZ_16o3PQyQTsw1Jg==/com.google.android.trichromelibrary_694313738-iGwmUcx18Q4madtOkgiNeQ==/TrichromeLibrary.apk!/lib/x86_64, permitted_path=/data:/mnt/expand
+04-01 17:20:48.832  8631  8680 I cr_WVCFactoryProvider: version=133.0.6943.137 (694313738) minSdkVersion=29 isBundle=false multiprocess=true packageId=2
+04-01 17:20:48.851  8631  8680 D nativeloader: Load /data/app/~~B-EYAyZ_16o3PQyQTsw1Jg==/com.google.android.trichromelibrary_694313738-iGwmUcx18Q4madtOkgiNeQ==/TrichromeLibrary.apk!/lib/x86_64/libmonochrome_64.so using class loader ns clns-11 (caller=/data/app/~~d6qaSty4g-WXhjCZgs7K7g==/com.google.android.webview-CycxWW0yQ0vpmLtjQza9ZA==/WebViewGoogle.apk): ok
+04-01 17:20:48.854  8631  8680 D nativeloader: Load /system/lib64/libwebviewchromium_plat_support.so using class loader ns clns-11 (caller=/data/app/~~d6qaSty4g-WXhjCZgs7K7g==/com.google.android.webview-CycxWW0yQ0vpmLtjQza9ZA==/WebViewGoogle.apk): ok
+04-01 17:20:48.858  8631  8686 E chromium: [0401/172048.858153:ERROR:variations_seed_loader.cc(39)] Seed missing signature.
+04-01 17:20:48.859  8631  8686 I chromium: [0401/172048.858965:INFO:variations_seed_loader.cc(67)] Failed to open file for reading.: No such file or directory (2)
+04-01 17:20:48.864  8631  8680 I cr_LibraryLoader: Successfully loaded native library
+04-01 17:20:48.865  8631  8680 I cr_CachingUmaRecorder: Flushed 6 samples from 6 histograms, 0 samples were dropped.
+04-01 17:20:48.938  8631  8679 I ReactNativeJS: Running "IUHConnect" with {"rootTag":11}
+04-01 17:20:49.193   727  3783 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+04-01 17:20:49.651  1474  1474 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+04-01 17:20:50.749  8696  8696 W dumpsys : Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: package
+04-01 17:20:50.855  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/base.odex) is kOatUpToDate with filter 'speed-profile' executable 'false'
+04-01 17:20:50.857  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_AdsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:50.858  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_CronetDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:50.860  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_DynamiteLoader_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:50.861  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_DynamiteModulesA_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:50.864  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_DynamiteModulesC_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:50.866  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_GoogleCertificates_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:50.867  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_MapsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:50.869  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_MeasurementDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:20:50.870  2824  2825 I artd    : GetBestInfo: /data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/split_maps_core_dynamite_ondemand.apk has no usable artifacts
+04-01 17:20:50.871  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000c/dl-Appsearch.optional_250834100800.apk has no usable artifacts
+04-01 17:20:50.873  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000004/DynamiteModulesC.apk has no usable artifacts
+04-01 17:20:50.873  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000001/CronetDynamite.apk has no usable artifacts
+04-01 17:20:50.874  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000015/dl-MlkitOcrCommon.optional_261133100800.apk has no usable artifacts
+04-01 17:20:50.876  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000002/DynamiteLoader.apk has no usable artifacts
+04-01 17:20:50.877  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000005/GoogleCertificates.apk has no usable artifacts
+04-01 17:20:50.879  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000012/dl-Appsearch.optional_261133100800.apk has no usable artifacts
+04-01 17:20:50.880  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000009/dl-TfliteDynamiteDynamite.integ_252130102100800.apk has no usable artifacts
+04-01 17:20:50.881  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000011/dl-PlayCloudSearch.optional_261133100000.apk has no usable artifacts
+04-01 17:20:50.882  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000013/dl-MlkitBarcodeUi.optional_261133100800.apk has no usable artifacts
+04-01 17:20:50.884  2824  2825 I artd    : GetBestInfo: vdex next to the dex file (/data/user/0/com.google.android.gms/app_dg_cache/E054CA794C125F959C88D4849C82AB3F226237E6/oat/x86_64/the.vdex) is kOatUpToDate with filter 'verify' executable 'false'
+04-01 17:20:50.886  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000010/dl-VisionOcr.optional_261133100000.apk has no usable artifacts
+04-01 17:20:50.887  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000d/dl-MlkitOcrCommon.optional_250834100800.apk has no usable artifacts
+04-01 17:20:50.888  2824  2825 I artd    : GetBestInfo: vdex next to the dex file (/data/user/0/com.google.android.gms/app_dg_cache/BB2AE5A47BB198AF36C19CFD2B6407061A1BAF30/oat/x86_64/the.vdex) is kOatUpToDate with filter 'verify' executable 'false'
+04-01 17:20:50.890  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000a/dl-MlkitBarcodeUi.optional_250834100800.apk has no usable artifacts
+04-01 17:20:50.891  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000b/dl-VisionOcr.optional_250834100000.apk has no usable artifacts
+04-01 17:20:50.893  2824  2825 I artd    : GetBestInfo: vdex next to the dex file (/data/user/0/com.google.android.gms/app_dg_cache/492BB24C67899DCD3E45A896813896109D71DC84/oat/x86_64/the.vdex) is kOatUpToDate with filter 'verify' executable 'false'
+04-01 17:20:50.894  2824  2825 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000007/MeasurementDynamite.apk has no usable artifacts
+04-01 17:20:50.909   727   740 I system_server: Background concurrent mark compact GC freed 25MB AllocSpace bytes, 18(360KB) LOS objects, 43% free, 31MB/55MB, paused 641us,1.426ms total 146.791ms
+04-01 17:20:50.914   727   742 W System  : A resource failed to call release. 
+04-01 17:20:51.899  8631  8699 D ProfileInstaller: Installing profile for com.iuhconnect
+04-01 17:20:56.260  1414  1689 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+04-01 17:20:57.059  8631  8631 W Choreographer: Frame time is 0.01433 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:20:57.588  1474  1474 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+04-01 17:20:58.893  8631  8680 D CompatChangeReporter: Compat change id reported: 289878283; UID 10217; state: ENABLED
+04-01 17:21:00.076  8631  8631 W Choreographer: Frame time is 0.103977 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:21:00.735  8710  8710 W dumpsys : Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: package
+04-01 17:21:00.825  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/base.odex) is kOatUpToDate with filter 'speed-profile' executable 'false'
+04-01 17:21:00.825  8631  8631 W Choreographer: Frame time is 0.47858 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:21:00.829  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_AdsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:21:00.831  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_CronetDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:21:00.832  2824  2825 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_DynamiteLoader_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:21:00.837  2824  2719 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_DynamiteModulesA_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:21:00.839  2824  2719 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_DynamiteModulesC_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:21:00.841  2824  2719 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_GoogleCertificates_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:21:00.843  2824  2719 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_MapsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:21:00.845  2824  2719 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/oat/x86_64/split_MeasurementDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+04-01 17:21:00.847  2824  2719 I artd    : GetBestInfo: /data/app/~~muGr5bquQvEmDfNvaxw80Q==/com.google.android.gms-EZtLWbKCGIwscFO3u3KSRA==/split_maps_core_dynamite_ondemand.apk has no usable artifacts
+04-01 17:21:00.848  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000c/dl-Appsearch.optional_250834100800.apk has no usable artifacts
+04-01 17:21:00.850  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000004/DynamiteModulesC.apk has no usable artifacts
+04-01 17:21:00.850  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000001/CronetDynamite.apk has no usable artifacts
+04-01 17:21:00.852  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000015/dl-MlkitOcrCommon.optional_261133100800.apk has no usable artifacts
+04-01 17:21:00.853  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000002/DynamiteLoader.apk has no usable artifacts
+04-01 17:21:00.853  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000005/GoogleCertificates.apk has no usable artifacts
+04-01 17:21:00.854  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000012/dl-Appsearch.optional_261133100800.apk has no usable artifacts
+04-01 17:21:00.856  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000009/dl-TfliteDynamiteDynamite.integ_252130102100800.apk has no usable artifacts
+04-01 17:21:00.858  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000011/dl-PlayCloudSearch.optional_261133100000.apk has no usable artifacts
+04-01 17:21:00.860  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000013/dl-MlkitBarcodeUi.optional_261133100800.apk has no usable artifacts
+04-01 17:21:00.862  2824  2719 I artd    : GetBestInfo: vdex next to the dex file (/data/user/0/com.google.android.gms/app_dg_cache/E054CA794C125F959C88D4849C82AB3F226237E6/oat/x86_64/the.vdex) is kOatUpToDate with filter 'verify' executable 'false'
+04-01 17:21:00.865  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000010/dl-VisionOcr.optional_261133100000.apk has no usable artifacts
+04-01 17:21:00.866  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000d/dl-MlkitOcrCommon.optional_250834100800.apk has no usable artifacts
+04-01 17:21:00.868  2824  2719 I artd    : GetBestInfo: vdex next to the dex file (/data/user/0/com.google.android.gms/app_dg_cache/BB2AE5A47BB198AF36C19CFD2B6407061A1BAF30/oat/x86_64/the.vdex) is kOatUpToDate with filter 'verify' executable 'false'
+04-01 17:21:00.869  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000a/dl-MlkitBarcodeUi.optional_250834100800.apk has no usable artifacts
+04-01 17:21:00.871  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000b/dl-VisionOcr.optional_250834100000.apk has no usable artifacts
+04-01 17:21:00.873  2824  2719 I artd    : GetBestInfo: vdex next to the dex file (/data/user/0/com.google.android.gms/app_dg_cache/492BB24C67899DCD3E45A896813896109D71DC84/oat/x86_64/the.vdex) is kOatUpToDate with filter 'verify' executable 'false'
+04-01 17:21:00.874  2824  2719 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000007/MeasurementDynamite.apk has no usable artifacts
+04-01 17:21:00.892  8631  8631 W Choreographer: Frame time is 0.381991 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:21:00.908  8631  8631 W Choreographer: Frame time is 0.741137 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:21:00.942  8631  8631 W Choreographer: Frame time is 0.393889 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:21:01.808  8631  8631 W Choreographer: Frame time is 0.870104 ms in the future!  Check that graphics HAL is generating vsync timestamps using the correct timebase.
+04-01 17:21:05.779  1474  1474 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+04-01 17:21:06.261  1414  1689 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+04-01 17:21:07.838  2802  3184 I bbax    : (REDACTED) getHotwordActive::active query: %s, watch: %s, devices connected: %s
