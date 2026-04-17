@@ -222,9 +222,11 @@ const tabStyles = StyleSheet.create({
 // ============================================================
 const MainTabs = ({
   currentUser,
+  token,
   onLogout,
 }: {
   currentUser: string;
+  token: string | null;
   onLogout: () => void;
 }) => (
   <Tab.Navigator
@@ -296,6 +298,7 @@ const MainTabs = ({
         <ContactsScreen
           {...props}
           currentUser={currentUser}
+          token={token}
         />
       )}
     </Tab.Screen>
@@ -386,6 +389,7 @@ export default function App() {
                 {() => (
                   <MainTabs
                     currentUser={currentUser}
+                    token={token}
                     onLogout={handleLogout}
                   />
                 )}

@@ -46,49 +46,7 @@ interface ExtendedMessage extends IMessage {
 
 const QUICK_REACTIONS = ['❤️', '😂', '👍', '😮', '😢', '🙏'];
 
-const createMockMessages = (recipientName: string, recipientId: string, lecturerStatus?: LecturerStatus): ExtendedMessage[] => {
-  const messages: ExtendedMessage[] = [
-    {
-      _id: '6',
-      text: 'Dạ em gửi rồi thầy ạ, thầy kiểm tra giúp em nhé!',
-      createdAt: new Date(Date.now() - 1 * 60000),
-      user: { _id: 'me', name: 'Me' },
-      status: 'read',
-    },
-    {
-      _id: '5',
-      text: 'Em gửi báo cáo qua email giúp thầy nhé',
-      createdAt: new Date(Date.now() - 2 * 60000),
-      user: { _id: recipientId, name: recipientName },
-    },
-    {
-      _id: '4',
-      text: 'Dạ thầy/cô ơi, em muốn hỏi về đồ án tốt nghiệp ạ',
-      createdAt: new Date(Date.now() - 5 * 60000),
-      user: { _id: 'me', name: 'Me' },
-      status: 'read',
-    },
-    {
-      _id: '3',
-      text: 'Chào em, thầy có thể giúp gì cho em?',
-      createdAt: new Date(Date.now() - 8 * 60000),
-      user: { _id: recipientId, name: recipientName },
-    },
-  ];
-
-  if (lecturerStatus === 'busy') {
-    messages.unshift({
-      _id: 'auto-1',
-      text: '⏰ Tự động phản hồi: Giảng viên hiện đang bận. Tin nhắn sẽ được phản hồi sớm.',
-      createdAt: new Date(Date.now() - 30000),
-      user: { _id: recipientId, name: recipientName },
-      system: true,
-      isAutoReply: true,
-    });
-  }
-
-  return messages;
-};
+// Removed createMockMessages
 
 const ChatScreen: React.FC<ChatScreenProps> = ({
   navigation,
@@ -124,16 +82,47 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   }, []);
 
   useEffect(() => {
-    const mockMsgs = createMockMessages(recipientName, recipientId, lecturerStatus);
-    setMessages(mockMsgs);
+    const fetchHistory = async () => {
+      try {
+        const serverUrl = Platform.select({
+          android: 'http://10.0.2.2:8080',
+          default: 'http://localhost:8080',
+        });
+        const res = await fetch(`${serverUrl}/api/v1/chat/history/${conversationId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const historyMsgs: ExtendedMessage[] = data.map((msg: any) => ({
+            _id: msg.id,
+            text: msg.content,
+            createdAt: new Date(msg.timestamp),
+            user: {
+              _id: msg.senderId === currentUser ? 'me' : msg.senderId,
+              name: msg.senderId === currentUser ? 'Me' : msg.senderId,
+            },
+            status: 'read',
+          }));
+          
+          if (lecturerStatus === 'busy') {
+             historyMsgs.unshift({
+               _id: 'auto-1',
+               text: '⏰ Tự động phản hồi: Giảng viên hiện đang bận. Tin nhắn sẽ được phản hồi sớm.',
+               createdAt: new Date(),
+               user: { _id: recipientId, name: recipientName },
+               system: true,
+               isAutoReply: true,
+             });
+          }
+          setMessages(historyMsgs);
+        }
+      } catch (error) {
+        console.error('Failed to fetch history', error);
+      }
+    };
 
-    const typingTimer = setTimeout(() => {
-      setIsTyping(true);
-      setTimeout(() => setIsTyping(false), 3000);
-    }, 5000);
-
-    return () => clearTimeout(typingTimer);
-  }, []);
+    fetchHistory();
+  }, [conversationId, token, currentUser, recipientId, recipientName, lecturerStatus]);
 
   // WebSocket connection
   useEffect(() => {

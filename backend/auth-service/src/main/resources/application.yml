@@ -3,7 +3,7 @@
 # =============================================
 
 server:
-  port: 8081
+  port: 8085
 
 spring:
   application:
@@ -11,8 +11,8 @@ spring:
 
   # ---------- MariaDB Datasource ----------
   datasource:
-    url: jdbc:mariadb://mariadb:3306/auth_db
-    username: iuh_user
+    url: ${SPRING_DATASOURCE_URL:jdbc:mariadb://localhost:3307/auth_db}
+    username: ${SPRING_DATASOURCE_USERNAME:iuh_user}
     password: iuh_pass
     driver-class-name: org.mariadb.jdbc.Driver
 
@@ -28,7 +28,7 @@ spring:
 
   # ---------- Kafka Producer ----------
   kafka:
-    bootstrap-servers: kafka:29092
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer

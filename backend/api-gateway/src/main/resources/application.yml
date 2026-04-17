@@ -15,13 +15,19 @@ spring:
       routes:
         # -------- Auth Service (HTTP) --------
         - id: auth-service
-          uri: http://auth-service:8081
+          uri: ${AUTH_SERVICE_URL:http://localhost:8085}
           predicates:
-            - Path=/api/v1/auth/**
+            - Path=/api/v1/auth/**,/api/v1/contacts/**
+
+        # -------- Chat Service (HTTP) --------
+        - id: chat-service-http
+          uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/chat/**
 
         # -------- Chat Service (WebSocket) --------
         - id: chat-service-ws
-          uri: ws://chat-service:8082
+          uri: ${CHAT_SERVICE_WS_URL:ws://localhost:8082}
           predicates:
             - Path=/ws/chat/**
 

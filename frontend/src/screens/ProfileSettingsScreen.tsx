@@ -159,10 +159,21 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
   const handleLogout = () => {
     Alert.alert(
       'Đăng xuất',
-      'Bạn có chắc muốn đăng xuất khỏi IUH Connect?',
+      'Bạn có chắc chắn muốn đăng xuất?',
       [
         { text: 'Hủy', style: 'cancel' },
-        { text: 'Đăng xuất', style: 'destructive', onPress: onLogout },
+        { 
+          text: 'Đăng xuất', 
+          onPress: () => {
+            // Thêm độ trễ nhỏ để Dialog Alert đóng hoàn toàn trước khi hủy cây Navigation
+            // Tránh lỗi văng App/treo máy ảo trên một số dòng Android
+            setTimeout(() => {
+              if (onLogout) {
+                onLogout();
+              }
+            }, 100);
+          } 
+        },
       ],
     );
   };

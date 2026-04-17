@@ -40,117 +40,7 @@ const MOCK_ACTIVE_USERS = [
   { id: 'u6', name: 'CLB Tin', isOnline: false },
 ];
 
-// Mock conversations
-const MOCK_CONVERSATIONS: Conversation[] = [
-  {
-    id: '1',
-    name: 'TS. Nguyễn Văn An',
-    isGroup: false,
-    participants: [],
-    lastMessage: {
-      text: 'Em gửi báo cáo qua email giúp thầy nhé',
-      timestamp: new Date(Date.now() - 2 * 60000),
-      senderId: 'lecturer1',
-    },
-    unreadCount: 2,
-    isOnline: true,
-    lecturerStatus: 'available',
-  },
-  {
-    id: '2',
-    name: 'Nhóm KTPM - Đồ án HK2',
-    isGroup: true,
-    participants: [],
-    lastMessage: {
-      text: 'Minh: Tối nay họp nhóm online nhé mọi người 🎉',
-      timestamp: new Date(Date.now() - 15 * 60000),
-      senderId: 'user3',
-    },
-    unreadCount: 5,
-    isOnline: true,
-  },
-  {
-    id: '3',
-    name: 'ThS. Trần Thị Bình',
-    isGroup: false,
-    participants: [],
-    lastMessage: {
-      text: '[Tự động] Tôi đang bận, sẽ phản hồi sau.',
-      timestamp: new Date(Date.now() - 30 * 60000),
-      senderId: 'lecturer2',
-    },
-    unreadCount: 0,
-    isOnline: true,
-    lecturerStatus: 'busy',
-  },
-  {
-    id: '4',
-    name: 'Lê Hoàng Minh',
-    isGroup: false,
-    participants: [],
-    lastMessage: {
-      text: 'Ê mai đi học chung không?',
-      timestamp: new Date(Date.now() - 2 * 3600000),
-      senderId: 'user4',
-    },
-    unreadCount: 0,
-    isOnline: true,
-  },
-  {
-    id: '5',
-    name: 'Phòng Đào Tạo IUH',
-    isGroup: true,
-    participants: [],
-    lastMessage: {
-      text: '📋 Thông báo: Lịch thi HK2 đã được cập nhật',
-      timestamp: new Date(Date.now() - 5 * 3600000),
-      senderId: 'admin',
-    },
-    unreadCount: 1,
-    isOnline: false,
-    isPinned: true,
-  },
-  {
-    id: '6',
-    name: 'Phạm Thị Lan',
-    isGroup: false,
-    participants: [],
-    lastMessage: {
-      text: 'Cảm ơn bạn nhiều nha! 😊',
-      timestamp: new Date(Date.now() - 8 * 3600000),
-      senderId: 'user5',
-    },
-    unreadCount: 0,
-    isOnline: false,
-  },
-  {
-    id: '7',
-    name: 'CLB Tin Học IUH',
-    isGroup: true,
-    participants: [],
-    lastMessage: {
-      text: '🚀 Workshop React Native tuần sau, ai đăng ký?',
-      timestamp: new Date(Date.now() - 24 * 3600000),
-      senderId: 'user6',
-    },
-    unreadCount: 0,
-    isOnline: false,
-  },
-  {
-    id: '8',
-    name: 'TS. Hoàng Minh Đức',
-    isGroup: false,
-    participants: [],
-    lastMessage: {
-      text: 'Bài tập tuần 8 nộp trước thứ 6 nhé các em',
-      timestamp: new Date(Date.now() - 48 * 3600000),
-      senderId: 'lecturer3',
-    },
-    unreadCount: 0,
-    isOnline: false,
-    lecturerStatus: 'available',
-  },
-];
+// Removed MOCK_CONVERSATIONS
 
 const formatTimeAgo = (date: Date): string => {
   const now = new Date();
@@ -172,7 +62,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
   onLogout,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [conversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -195,10 +85,48 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
     ]).start();
   }, []);
 
+  const loadConversations = useCallback(async () => {
+    try {
+      const serverUrl = Platform.select({
+        android: 'http://10.0.2.2:8080',
+        default: 'http://localhost:8080',
+      });
+      const res = await fetch(`${serverUrl}/api/v1/chat/conversations/${currentUser}`);
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = data.map((msg: any) => {
+          const otherUserId = msg.senderId === currentUser ? msg.receiverId : msg.senderId;
+          return {
+            id: msg.conversationId,
+            name: otherUserId, // TODO: Fetch real name if needed
+            isGroup: false,
+            participants: [],
+            lastMessage: {
+              text: msg.content,
+              timestamp: new Date(msg.timestamp),
+              senderId: msg.senderId,
+            },
+            unreadCount: 0,
+            isOnline: false,
+          } as Conversation;
+        });
+        setConversations(mapped);
+      }
+    } catch (e) {
+      console.log('Error loading conversations', e);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    loadConversations();
+    const interval = setInterval(loadConversations, 5000); // Polling for demo, or rely on WS
+    return () => clearInterval(interval);
+  }, [loadConversations]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1500);
-  }, []);
+    loadConversations().then(() => setRefreshing(false));
+  }, [loadConversations]);
 
   const toggleSearch = () => {
     if (showSearch) {

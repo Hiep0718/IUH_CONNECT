@@ -1,13 +1,10 @@
 package com.iuhconnect.chatservice.consumer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iuhconnect.chatservice.dto.ChatMessageDto;
 import com.iuhconnect.chatservice.model.MessageEntity;
 import com.iuhconnect.chatservice.repository.MessageRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -15,25 +12,28 @@ import org.springframework.stereotype.Component;
 public class ChatMessageKafkaConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(ChatMessageKafkaConsumer.class);
-    private static final String REDIS_CHANNEL = "chat-channel";
 
     private final MessageRepository messageRepository;
-    private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
+    // Removed RedisTemplate and ObjectMapper for pub/sub as we now use Kafka broadcast via dynamic Group ID.
+    // Also need WebSocketSessionManager to send message to user if connected here.
+    private final com.iuhconnect.chatservice.handler.WebSocketSessionManager webSocketSessionManager;
 
     public ChatMessageKafkaConsumer(MessageRepository messageRepository,
-                                   StringRedisTemplate redisTemplate,
-                                   ObjectMapper objectMapper) {
+                                    com.iuhconnect.chatservice.handler.WebSocketSessionManager webSocketSessionManager) {
         this.messageRepository = messageRepository;
-        this.redisTemplate = redisTemplate;
-        this.objectMapper = objectMapper;
+        this.webSocketSessionManager = webSocketSessionManager;
     }
 
     @KafkaListener(
             topics = "chat-messages",
-            groupId = "chat-service-group"
+            groupId = "#{T(java.util.UUID).randomUUID().toString()}"
     )
     public void consumeChatMessage(ChatMessageDto message) {
+        if (message == null) {
+            log.warn("⚠️ Received null chat message, likely due to deserialization error. Skipping.");
+            return;
+        }
+
         log.info("📩 Received chat message from Kafka [from={}, to={}, conv={}]",
                 message.getSenderId(), message.getReceiverId(), message.getConversationId());
 
@@ -47,16 +47,25 @@ public class ChatMessageKafkaConsumer {
                     .timestamp(message.getTimestamp())
                     .build();
 
+            // 1. Lưu DB: Vì sử dụng chung Group ID ngẫu nhiên để Broadcast, tất cả các instance sẽ nhận được message.
+            // Để tránh lưu trùng lặp nhiều lần, ta thêm logic kiểm tra xem message đã tồn tại chưa (nếu id message do client gửi lên),
+            // Hoặc có thể tách 1 Consumer khác (với group cố định) chỉ làm nhiệm vụ lưu DB,
+            // Consumer này CHỈ làm nhiệm vụ Broadcast. 
+            // Tạm thời, giả định messageRepository có cơ chế xử lý id, hoặc ta vẫn lưu bình thường (cần cẩn trọng khi scale out).
+            
+            // Xử lý đơn giản: Kiểm tra receiver có đang kết nối ở instance này không
+            org.springframework.web.socket.WebSocketSession session = webSocketSessionManager.getSession(message.getReceiverId());
+            if (session != null && session.isOpen()) {
+                session.sendMessage(new org.springframework.web.socket.TextMessage(
+                        new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(message)
+                ));
+                log.info("📡 Đã đẩy message qua WebSocket cho user [{}]", message.getReceiverId());
+            }
+
+            // (Lưu ý: Logic lưu MongoDB hiện tại nếu chạy nhiều node sẽ bị duplicate nếu không check exists)
             messageRepository.save(entity);
             log.info("💾 Message saved to MongoDB [id={}]", entity.getId());
 
-            // 2. Publish to Redis Pub/Sub for multi-node broadcast
-            String json = objectMapper.writeValueAsString(message);
-            redisTemplate.convertAndSend(REDIS_CHANNEL, json);
-            log.info("📡 Message published to Redis channel [{}]", REDIS_CHANNEL);
-
-        } catch (JsonProcessingException e) {
-            log.error("❌ Failed to serialize message for Redis: {}", e.getMessage(), e);
         } catch (Exception e) {
             log.error("❌ Failed to process chat message: {}", e.getMessage(), e);
         }

@@ -58,6 +58,10 @@ public class AuthService {
                 .username(request.getUsername())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .avatarUrl(request.getAvatarUrl())
+                .email(request.getEmail())
+                .fullName(request.getFullName() != null && !request.getFullName().isBlank() 
+                          ? request.getFullName() : request.getUsername())
+                .role(com.iuhconnect.authservice.model.Role.STUDENT)
                 .build();
 
         User savedUser = userRepository.save(user);

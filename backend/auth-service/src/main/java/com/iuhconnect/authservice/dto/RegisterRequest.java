@@ -18,5 +18,10 @@ public class RegisterRequest {
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
 
+    private String fullName;
+
+    @jakarta.validation.constraints.Email(message = "Invalid email format")
+    private String email;
+
     private String avatarUrl;
 }

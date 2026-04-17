@@ -24,7 +24,14 @@ public class UserEventConsumer {
             groupId = "chat-service-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void consumeUserEvent(UserEventDto event) {
+    public void consumeUserEvent(org.springframework.messaging.Message<UserEventDto> message) {
+        UserEventDto event = message.getPayload();
+        
+        if (event == null) {
+            log.warn("⚠️ Received null user event, likely due to deserialization error. Skipping.");
+            return;
+        }
+
         log.info("📩 Received user event from Kafka [userId={}, username={}]",
                 event.getUserId(), event.getUsername());
 

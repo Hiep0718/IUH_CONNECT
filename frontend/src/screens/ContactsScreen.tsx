@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   FlatList,
   Animated,
   TextInput,
+  Modal,
+  Alert,
+  Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -19,21 +22,36 @@ import SectionHeader from '../components/SectionHeader';
 interface ContactsScreenProps {
   navigation: any;
   currentUser: string;
+  token: string | null;
 }
 
-const MOCK_CONTACTS = [
-  { id: '1', name: 'TS. Nguyễn Văn An', role: 'Giảng viên', dept: 'Khoa CNTT', isOnline: true },
-  { id: '2', name: 'ThS. Trần Thị Bình', role: 'Giảng viên', dept: 'Khoa CNTT', isOnline: true },
-  { id: '3', name: 'Lê Hoàng Minh', role: 'Sinh viên', dept: '20DHTH01', isOnline: true },
-  { id: '4', name: 'Phạm Thị Lan', role: 'Sinh viên', dept: '20DHTH02', isOnline: false },
-  { id: '5', name: 'TS. Hoàng Minh Đức', role: 'Giảng viên', dept: 'Khoa CNTT', isOnline: false },
-  { id: '6', name: 'Nguyễn Thị Thu', role: 'Sinh viên', dept: '20DHTH01', isOnline: false },
-  { id: '7', name: 'Trần Văn Nam', role: 'Sinh viên', dept: '21DHTH03', isOnline: false },
-  { id: '8', name: 'PGS.TS Lê Văn Cường', role: 'Giảng viên', dept: 'Khoa CNTT', isOnline: true },
-];
-
-const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser }) => {
+const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser, token }) => {
   const headerAnim = useRef(new Animated.Value(0)).current;
+  const [friends, setFriends] = useState<any[]>([]);
+  const [pendings, setPendings] = useState<any[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [targetUsername, setTargetUsername] = useState('');
+
+  const serverUrl = Platform.select({
+    android: 'http://10.0.2.2:8080',
+    default: 'http://localhost:8080',
+  });
+
+  const loadContacts = useCallback(async () => {
+    try {
+      const pRes = await fetch(`${serverUrl}/api/v1/contacts/pending`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (pRes.ok) setPendings(await pRes.json());
+
+      const fRes = await fetch(`${serverUrl}/api/v1/contacts/list`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (fRes.ok) setFriends(await fRes.json());
+    } catch (e) {
+      console.log('Load contacts error', e);
+    }
+  }, [token, serverUrl]);
 
   useEffect(() => {
     Animated.timing(headerAnim, {
@@ -41,35 +59,83 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
       duration: 400,
       useNativeDriver: true,
     }).start();
-  }, []);
 
-  const lecturers = MOCK_CONTACTS.filter(c => c.role === 'Giảng viên');
-  const students = MOCK_CONTACTS.filter(c => c.role === 'Sinh viên');
+    loadContacts();
+  }, [loadContacts]);
 
-  const renderContact = ({ item, index }: { item: any; index: number }) => {
-    const itemAnim = new Animated.Value(0);
-    Animated.timing(itemAnim, {
-      toValue: 1,
-      duration: 300,
-      delay: index * 50,
-      useNativeDriver: true,
-    }).start();
+  const handleSendRequest = async () => {
+    if (!targetUsername) return;
+    try {
+      const res = await fetch(`${serverUrl}/api/v1/contacts/request?targetUsername=${targetUsername}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        Alert.alert('Thành công', 'Đã gửi lời mời kết bạn');
+        setShowAddModal(false);
+        setTargetUsername('');
+      } else {
+        const err = await res.text();
+        Alert.alert('Lỗi', err);
+      }
+    } catch {
+      Alert.alert('Lỗi', 'Không thể kết nối đến máy chủ');
+    }
+  };
 
+  const handleAcceptRequest = async (senderUsername: string) => {
+    try {
+      const res = await fetch(`${serverUrl}/api/v1/contacts/accept?senderUsername=${senderUsername}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        Alert.alert('Thành công', 'Đã thêm bạn');
+        loadContacts();
+      } else {
+        Alert.alert('Lỗi', 'Không thể chấp nhận');
+      }
+    } catch {
+      Alert.alert('Lỗi', 'Không thể kết nối đến máy chủ');
+    }
+  };
+
+  const startChat = (contact: any) => {
+      navigation.navigate('Chat', {
+          conversationId: `${currentUser}-${contact.username}`,
+          recipientName: contact.fullName || contact.username,
+          recipientId: contact.username,
+          isOnline: true,
+      });
+  };
+
+  const renderItem = ({ item }: { item: any }) => {
     return (
-      <Animated.View style={{ opacity: itemAnim, transform: [{ translateY: itemAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
-        <TouchableOpacity style={styles.contactItem} activeOpacity={0.6}>
-          <Avatar name={item.name} size="large" isOnline={item.isOnline} showOnlineStatus />
-          <View style={styles.contactInfo}>
-            <Text style={styles.contactName}>{item.name}</Text>
-            <Text style={styles.contactRole}>{item.dept}</Text>
-          </View>
-          <TouchableOpacity style={styles.chatButton}>
+      <View style={styles.contactItem}>
+        <Avatar name={item.fullName || item.username} size="large" isOnline={true} showOnlineStatus />
+        <View style={styles.contactInfo}>
+          <Text style={styles.contactName}>{item.fullName || item.username}</Text>
+          <Text style={styles.contactRole}>{item.role}</Text>
+        </View>
+        {item.status === 'PENDING' ? (
+          <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptRequest(item.username)}>
+            <Text style={styles.acceptButtonText}>Xác nhận</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.chatButton} onPress={() => startChat(item)}>
             <Icon name="chat-outline" size={20} color={Colors.primary} />
           </TouchableOpacity>
-        </TouchableOpacity>
-      </Animated.View>
+        )}
+      </View>
     );
   };
+
+  const data = [
+    ...(pendings.length > 0 ? [{ isHeader: true, title: `Lời mời kết bạn (${pendings.length})`, color: Colors.warning }] : []),
+    ...pendings,
+    ...(friends.length > 0 ? [{ isHeader: true, title: `Danh bạ (${friends.length})`, color: Colors.primary }] : []),
+    ...friends
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -78,51 +144,61 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
       <Animated.View style={{ opacity: headerAnim }}>
         <LinearGradient colors={['#004A82', '#0066B3']} style={styles.header}>
           <Text style={styles.headerTitle}>Danh bạ</Text>
-          <Text style={styles.headerSubtitle}>{MOCK_CONTACTS.length} liên hệ</Text>
+          <Text style={styles.headerSubtitle}>{friends.length} liên hệ</Text>
         </LinearGradient>
       </Animated.View>
 
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Icon name="magnify" size={20} color={Colors.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Tìm kiếm liên hệ..."
-            placeholderTextColor={Colors.textMuted}
-          />
-        </View>
-      </View>
-
       <FlatList
-        data={[...lecturers, ...students]}
-        renderItem={renderContact}
-        keyExtractor={(item) => item.id}
+        data={data as any[]}
+        renderItem={({ item }) => {
+          if (item.isHeader) return <SectionHeader title={item.title} accentColor={item.color} />;
+          return renderItem({ item });
+        }}
+        keyExtractor={(item, idx) => item.username || `header-${idx}`}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <>
-            {/* Quick Actions */}
-            <View style={styles.quickActions}>
-              {[
-                { icon: 'account-plus', label: 'Thêm bạn', color: '#4CAF50' },
-                { icon: 'account-group-outline', label: 'Tạo nhóm', color: '#2196F3' },
-                { icon: 'qrcode-scan', label: 'Mã QR', color: '#FF9800' },
-              ].map((action, i) => (
-                <TouchableOpacity key={i} style={styles.quickActionItem} activeOpacity={0.7}>
-                  <View style={[styles.quickActionIcon, { backgroundColor: `${action.color}15` }]}>
-                    <Icon name={action.icon} size={24} color={action.color} />
-                  </View>
-                  <Text style={styles.quickActionLabel}>{action.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <SectionHeader title={`Giảng viên (${lecturers.length})`} accentColor="#FF9800" />
-          </>
+          <View style={styles.quickActions}>
+            <TouchableOpacity style={styles.quickActionItem} onPress={() => setShowAddModal(true)}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#4CAF5015' }]}>
+                <Icon name="account-plus" size={24} color="#4CAF50" />
+              </View>
+              <Text style={styles.quickActionLabel}>Thêm bạn</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickActionItem}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#2196F315' }]}>
+                <Icon name="account-group-outline" size={24} color="#2196F3" />
+              </View>
+              <Text style={styles.quickActionLabel}>Tạo nhóm</Text>
+            </TouchableOpacity>
+          </View>
         }
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        stickyHeaderIndices={[]}
+        ItemSeparatorComponent={({ leadingItem }) => !leadingItem.isHeader ? <View style={styles.separator} /> : null}
       />
+
+      {/* Add Friend Modal */}
+      <Modal visible={showAddModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Thêm bạn bè</Text>
+                  <TextInput
+                      style={styles.modalInput}
+                      placeholder="Nhập tên tài khoản (Username)"
+                      value={targetUsername}
+                      onChangeText={setTargetUsername}
+                      autoCapitalize="none"
+                  />
+                  <View style={styles.modalActions}>
+                      <TouchableOpacity onPress={() => setShowAddModal(false)} style={styles.modalButton}>
+                          <Text style={styles.modalCancel}>Hủy</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handleSendRequest} style={[styles.modalButton, styles.modalButtonPrimary]}>
+                          <Text style={styles.modalSend}>Gửi lời mời</Text>
+                      </TouchableOpacity>
+                  </View>
+              </View>
+          </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -132,10 +208,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, paddingBottom: Spacing.xl },
   headerTitle: { fontSize: Typography.h2, fontWeight: Typography.extraBold, color: Colors.white },
   headerSubtitle: { fontSize: Typography.bodySmall, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
-  searchContainer: { paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, backgroundColor: Colors.white },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.lg, height: 42 },
-  searchInput: { flex: 1, fontSize: Typography.bodySmall, color: Colors.textPrimary, marginLeft: Spacing.sm, padding: 0 },
-  quickActions: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: Spacing.xl, paddingHorizontal: Spacing.lg, backgroundColor: Colors.white, marginBottom: Spacing.xs },
+  quickActions: { flexDirection: 'row', justifyContent: 'center', gap: 40, paddingVertical: Spacing.xl, paddingHorizontal: Spacing.lg, backgroundColor: Colors.white, marginBottom: Spacing.xs },
   quickActionItem: { alignItems: 'center', gap: Spacing.sm },
   quickActionIcon: { width: 52, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   quickActionLabel: { fontSize: Typography.caption, color: Colors.textSecondary, fontWeight: Typography.medium },
@@ -145,7 +218,18 @@ const styles = StyleSheet.create({
   contactName: { fontSize: Typography.body, fontWeight: Typography.medium, color: Colors.textPrimary },
   contactRole: { fontSize: Typography.caption, color: Colors.textSecondary, marginTop: 2 },
   chatButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.primaryGhost, justifyContent: 'center', alignItems: 'center' },
+  acceptButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, backgroundColor: Colors.primary },
+  acceptButtonText: { color: Colors.white, fontSize: 13, fontWeight: 'bold' },
   separator: { height: 1, backgroundColor: Colors.borderLight, marginLeft: 88 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '80%', backgroundColor: Colors.white, borderRadius: 16, padding: 24 },
+  modalTitle: { fontSize: Typography.h3, fontWeight: Typography.bold, marginBottom: 16 },
+  modalInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 8, padding: 12, marginBottom: 20 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
+  modalButton: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  modalButtonPrimary: { backgroundColor: Colors.primary },
+  modalCancel: { color: Colors.textSecondary, fontWeight: 'bold' },
+  modalSend: { color: Colors.white, fontWeight: 'bold' },
 });
 
 export default ContactsScreen;
