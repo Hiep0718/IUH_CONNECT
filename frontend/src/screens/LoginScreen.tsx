@@ -188,7 +188,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
           {/* Logo Section */}
           <Animated.View style={[styles.logoContainer, { transform: [{ scale: logoScale }, { translateY: logoFloat }] }]}>
             <View style={styles.logoWrapper}>
-              <Icon name="school-outline" size={48} color={Colors.white} style={styles.logoIcon} />
+              <Image source={require('../logo.png')} style={styles.logoImage} resizeMode="contain" />
             </View>
             <Text style={styles.appName}>IUH Connect</Text>
             <Text style={styles.appTagline}>Cộng đồng sinh viên & Giảng viên Đại học Công Nghiệp</Text>
@@ -298,8 +298,8 @@ const styles = StyleSheet.create({
   keyboardView: { flex: 1 },
   scrollContent: { flexGrow: 1, justifyContent: 'center', padding: Spacing.xl },
   logoContainer: { alignItems: 'center', marginBottom: Spacing.huge, marginTop: Platform.OS === 'ios' ? 40 : 20 },
-  logoWrapper: { width: 90, height: 90, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', ...Shadows.lg },
-  logoIcon: { opacity: 0.95 },
+  logoWrapper: { width: 90, height: 90, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.95)', justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', ...Shadows.lg },
+  logoImage: { width: 70, height: 70 },
   appName: { fontSize: 32, fontWeight: Typography.extraBold, color: Colors.white, letterSpacing: 1, marginBottom: Spacing.xs, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   appTagline: { fontSize: Typography.bodySmall, color: 'rgba(255,255,255,0.85)', fontWeight: Typography.medium, textAlign: 'center' },
   formCard: { backgroundColor: Colors.white, borderRadius: BorderRadius.xxl, padding: Spacing.xl, ...Shadows.xl, elevation: 8, zIndex: 10 },

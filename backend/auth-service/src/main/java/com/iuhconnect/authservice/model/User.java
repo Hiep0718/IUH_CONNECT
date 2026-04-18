@@ -44,6 +44,22 @@ public class User {
     @Column(name = "bio", length = 500)
     private String bio;
 
+    @Column(name = "phone", length = 20)
+    private String phone;
+
+    @Column(name = "student_id", length = 50)
+    private String studentId;
+
+    @Column(name = "lecturer_id", length = 50)
+    private String lecturerId;
+
+    @Column(name = "department", length = 100)
+    private String department;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lecturer_status")
+    private LecturerStatus lecturerStatus;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private Role role = Role.STUDENT;

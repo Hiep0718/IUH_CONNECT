@@ -333,6 +333,7 @@ const MainTabs = ({
         <ProfileSettingsScreen
           {...props}
           currentUser={currentUser}
+          token={token}
           onLogout={onLogout}
         />
       )}

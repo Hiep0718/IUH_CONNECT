@@ -5,7 +5,7 @@ import { Colors, BorderRadius, Shadows } from '../theme/theme';
 
 interface AvatarProps {
   uri?: string;
-  name: string;
+  name?: string;
   size?: 'small' | 'medium' | 'large' | 'xlarge' | 'xxlarge';
   isOnline?: boolean;
   showOnlineStatus?: boolean;
@@ -44,12 +44,13 @@ const RING_WIDTHS = {
   xxlarge: 4,
 };
 
-const getInitials = (name: string): string => {
-  const parts = name.trim().split(/\s+/);
+const getInitials = (name?: string): string => {
+  const safeName = name || '?';
+  const parts = safeName.trim().split(/\s+/);
   if (parts.length >= 2) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
-  return name.substring(0, 2).toUpperCase();
+  return safeName.substring(0, 2).toUpperCase();
 };
 
 const AVATAR_GRADIENTS: [string, string][] = [
@@ -67,10 +68,11 @@ const AVATAR_GRADIENTS: [string, string][] = [
   ['#D4FC79', '#96E6A1'],
 ];
 
-const getGradientFromName = (name: string): [string, string] => {
+const getGradientFromName = (name?: string): [string, string] => {
+  const safeName = name || '';
   let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < safeName.length; i++) {
+    hash = safeName.charCodeAt(i) + ((hash << 5) - hash);
   }
   return AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length];
 };
