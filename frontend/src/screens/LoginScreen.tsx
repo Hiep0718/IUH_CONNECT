@@ -19,6 +19,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, Animations } from '../theme/theme';
+import { API_URL } from '../config/env';
 
 const { width, height } = Dimensions.get('window');
 
@@ -99,11 +100,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const serverUrl = Platform.select({
-    android: 'http://10.0.2.2:8080',
-    default: 'http://localhost:8080',
-  });
-
   const handleLogin = async () => {
     if (!validate()) return;
 
@@ -111,22 +107,30 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
     Animated.loop(Animated.timing(shimmerAnim, { toValue: 1, duration: 1500, useNativeDriver: false })).start();
 
     try {
-      const response = await fetch(`${serverUrl}/api/v1/auth/login`, {
+      const response = await fetch(`${API_URL}/api/v1/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ username: username.trim(), password }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        throw new Error('Máy chủ phản hồi sai định dạng (không phải JSON). Vui lòng kiểm tra lại backend.');
+      }
 
       if (response.ok && data.accessToken) {
         onLogin(data.accessToken, username.trim());
       } else {
         Alert.alert('Đăng nhập thất bại', data.message || 'Tên đăng nhập hoặc mật khẩu không đúng');
       }
-    } catch (error) {
-      console.log('API unavailable, using demo mode');
-      onLogin('demo-token-' + Date.now(), username.trim());
+    } catch (error: any) {
+      console.log('Lỗi đăng nhập:', error.message);
+      Alert.alert('Lỗi kết nối', error.message || 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại mạng hoặc IP cấu hình.');
     } finally {
       shimmerAnim.stopAnimation();
       setIsLoading(false);
@@ -140,9 +144,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
     Animated.loop(Animated.timing(shimmerAnim, { toValue: 1, duration: 1500, useNativeDriver: false })).start();
     
     try {
-      const response = await fetch(`${serverUrl}/api/v1/auth/register`, {
+      const response = await fetch(`${API_URL}/api/v1/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ 
           username: username.trim(), 
           password,
@@ -151,7 +158,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        throw new Error('Máy chủ phản hồi sai định dạng (không phải JSON). Vui lòng kiểm tra lại backend.');
+      }
 
       if (response.ok) {
         Alert.alert('Đăng ký thành công', 'Hệ thống đang tự động đăng nhập...');
@@ -163,8 +175,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
       } else {
         Alert.alert('Đăng ký thất bại', data.message || 'Tên đăng nhập có thể đã tồn tại');
       }
-    } catch (error) {
-      Alert.alert('Lỗi mạng', 'Không thể kết nối đến server');
+    } catch (error: any) {
+      Alert.alert('Lỗi mạng', error.message || 'Không thể kết nối đến server');
     } finally {
       shimmerAnim.stopAnimation();
       setIsLoading(false);

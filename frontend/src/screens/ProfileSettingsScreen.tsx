@@ -22,6 +22,7 @@ import DatePicker from 'react-native-date-picker';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/theme';
 import Avatar from '../components/Avatar';
 import type { LecturerStatus, UserRole } from '../types/types';
+import { API_URL } from '../config/env';
 
 interface ProfileSettingsScreenProps {
   navigation: any;
@@ -120,15 +121,10 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const statsAnim = useRef(new Animated.Value(0)).current;
 
-  const serverUrl = Platform.select({
-    android: 'http://10.0.2.2:8080',
-    default: 'http://localhost:8080',
-  });
-
   const fetchProfile = async () => {
     if (!token) return;
     try {
-      const response = await fetch(`${serverUrl}/api/v1/users/me`, {
+      const response = await fetch(`${API_URL}/api/v1/users/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -171,7 +167,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
     const newStatus: LecturerStatus = lecturerStatus === 'available' ? 'busy' : 'available';
     setLecturerStatus(newStatus);
     try {
-      await fetch(`${serverUrl}/api/v1/users/me`, {
+      await fetch(`${API_URL}/api/v1/users/me`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ lecturerStatus: newStatus.toUpperCase() })
@@ -216,7 +212,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
     const isoDateString = editForm.dateOfBirth.toISOString().split('T')[0];
     
     try {
-      const response = await fetch(`${serverUrl}/api/v1/users/me`, {
+      const response = await fetch(`${API_URL}/api/v1/users/me`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -279,7 +275,19 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
       </View>
     );
   }
-  if (!profile) return <View style={styles.container}><Text style={{textAlign: 'center', marginTop: 50}}>Không tìm thấy hồ sơ.</Text></View>;
+  if (!profile) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{textAlign: 'center', marginBottom: 20}}>Không tìm thấy hồ sơ.</Text>
+        <TouchableOpacity style={[styles.logoutButton, { width: 200, marginHorizontal: 0, marginTop: 0 }]} onPress={handleLogout} activeOpacity={0.7}>
+          <LinearGradient colors={[Colors.dangerLight, '#FFE0E0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.logoutGradient}>
+            <Icon name="logout" size={20} color={Colors.danger} />
+            <Text style={styles.logoutText}>Đăng xuất</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

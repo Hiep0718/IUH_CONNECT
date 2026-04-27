@@ -12,6 +12,7 @@ import {
   Dimensions,
   ScrollView,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -21,6 +22,7 @@ import StatusBadge from '../components/StatusBadge';
 import SectionHeader from '../components/SectionHeader';
 import EmptyState from '../components/EmptyState';
 import type { Conversation, LecturerStatus } from '../types/types';
+import { API_URL } from '../config/env';
 
 const { width } = Dimensions.get('window');
 
@@ -87,18 +89,24 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
 
   const loadConversations = useCallback(async () => {
     try {
-      const serverUrl = Platform.select({
-        android: 'http://10.0.2.2:8080',
-        default: 'http://localhost:8080',
-      });
-      const res = await fetch(`${serverUrl}/api/v1/chat/conversations/${currentUser}`);
+      const res = await fetch(`${API_URL}/api/v1/chat/conversations/${currentUser}`);
       if (res.ok) {
         const data = await res.json();
         const mapped = data.map((msg: any) => {
-          const otherUserId = msg.senderId === currentUser ? msg.receiverId : msg.senderId;
+          // Recover from corrupted data where msg.receiverId is a conversation ID
+          let otherUserId = msg.senderId === currentUser ? msg.receiverId : msg.senderId;
+          
+          // If the extracted otherUserId looks like a conversation ID (contains a hyphen),
+          // fallback to extracting it from the conversationId securely.
+          if (otherUserId && otherUserId.includes('-')) {
+            const parts = msg.conversationId.split('-');
+            otherUserId = parts[0] === currentUser ? parts[1] : parts[0];
+          }
+
           return {
             id: msg.conversationId,
             name: otherUserId, // TODO: Fetch real name if needed
+            targetUserId: otherUserId,
             isGroup: false,
             participants: [],
             lastMessage: {
@@ -149,7 +157,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
   };
 
   const filteredConversations = conversations.filter((conv) =>
-    conv.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    (conv.name || '').toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const pinnedConversations = filteredConversations.filter((c) => c.isPinned);
@@ -159,7 +167,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
     navigation.navigate('Chat', {
       conversationId: conversation.id,
       recipientName: conversation.name,
-      recipientId: conversation.id,
+      recipientId: conversation.targetUserId || conversation.name,
       isOnline: conversation.isOnline,
       lecturerStatus: conversation.lecturerStatus,
       isGroup: conversation.isGroup,
@@ -439,7 +447,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
             title="Chưa có cuộc trò chuyện"
             subtitle="Bắt đầu nhắn tin với bạn bè và giảng viên của bạn"
             actionLabel="Bắt đầu trò chuyện"
-            onAction={() => {}}
+            onAction={() => { }}
           />
         }
       />

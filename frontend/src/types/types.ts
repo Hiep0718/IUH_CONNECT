@@ -74,6 +74,7 @@ export interface ChatMessage {
 export interface Conversation {
   id: string;
   name: string;
+  targetUserId?: string;
   avatar?: string;
   isGroup: boolean;
   participants: User[];
@@ -130,6 +131,8 @@ export type RootStackParamList = {
     callerName: string;
     callerAvatar?: string;
     isIncoming?: boolean;
+    token?: string;
+    roomName?: string;
   };
   ProfileSettings: undefined;
 };

@@ -18,6 +18,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/theme';
 import Avatar from '../components/Avatar';
 import SectionHeader from '../components/SectionHeader';
+import { API_URL } from '../config/env';
 
 interface ContactsScreenProps {
   navigation: any;
@@ -32,26 +33,21 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
   const [showAddModal, setShowAddModal] = useState(false);
   const [targetUsername, setTargetUsername] = useState('');
 
-  const serverUrl = Platform.select({
-    android: 'http://10.0.2.2:8080',
-    default: 'http://localhost:8080',
-  });
-
   const loadContacts = useCallback(async () => {
     try {
-      const pRes = await fetch(`${serverUrl}/api/v1/contacts/pending`, {
+      const pRes = await fetch(`${API_URL}/api/v1/contacts/pending`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (pRes.ok) setPendings(await pRes.json());
 
-      const fRes = await fetch(`${serverUrl}/api/v1/contacts/list`, {
+      const fRes = await fetch(`${API_URL}/api/v1/contacts/list`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (fRes.ok) setFriends(await fRes.json());
     } catch (e) {
       console.log('Load contacts error', e);
     }
-  }, [token, serverUrl]);
+  }, [token]);
 
   useEffect(() => {
     Animated.timing(headerAnim, {
@@ -66,7 +62,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
   const handleSendRequest = async () => {
     if (!targetUsername) return;
     try {
-      const res = await fetch(`${serverUrl}/api/v1/contacts/request?targetUsername=${targetUsername}`, {
+      const res = await fetch(`${API_URL}/api/v1/contacts/request?targetUsername=${targetUsername}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -85,7 +81,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
 
   const handleAcceptRequest = async (senderUsername: string) => {
     try {
-      const res = await fetch(`${serverUrl}/api/v1/contacts/accept?senderUsername=${senderUsername}`, {
+      const res = await fetch(`${API_URL}/api/v1/contacts/accept?senderUsername=${senderUsername}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });

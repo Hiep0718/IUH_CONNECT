@@ -9,13 +9,18 @@ import {
   Animated,
   Dimensions,
   Platform,
+  Alert,
+  Linking,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/theme';
 import Avatar from '../components/Avatar';
+import { WS_URL } from '../config/env';
 
 const { width, height } = Dimensions.get('window');
+
+const JITSI_SERVER = 'https://meet.jit.si';
 
 interface VideoCallScreenProps {
   navigation: any;
@@ -25,22 +30,26 @@ interface VideoCallScreenProps {
       callerName: string;
       callerAvatar?: string;
       isIncoming?: boolean;
+      token?: string;
+      roomName?: string;
     };
   };
 }
 
 const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ navigation, route }) => {
-  const { callerName, callerAvatar, isIncoming = false } = route.params;
+  const { callerId, callerName, callerAvatar, isIncoming = false, token, roomName: initialRoomName } = route.params;
 
-  const [isMicOn, setIsMicOn] = useState(true);
-  const [isCameraOn, setIsCameraOn] = useState(true);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
-  const [showControls, setShowControls] = useState(true);
+  const [callStatus, setCallStatus] = useState(
+    isIncoming ? 'Đang kết nối...' : 'Đang gọi...'
+  );
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const roomNameRef = useRef<string>(initialRoomName || '');
+  const jitsiOpenedRef = useRef(false);
 
   // Animations
-  const pipScale = useRef(new Animated.Value(0)).current;
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const connectingPulse = useRef(new Animated.Value(1)).current;
   const connectingPulse2 = useRef(new Animated.Value(1)).current;
@@ -48,25 +57,124 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ navigation, route }) 
   const endCallScale = useRef(new Animated.Value(1)).current;
   const recordingDotAnim = useRef(new Animated.Value(1)).current;
 
-  // Simulate connection
+  // Open Jitsi Meet in browser
+  const openJitsiMeeting = (room: string) => {
+    if (jitsiOpenedRef.current) return;
+    jitsiOpenedRef.current = true;
+
+    const jitsiUrl = `${JITSI_SERVER}/${room}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.disableDeepLinking=true&interfaceConfig.TOOLBAR_BUTTONS=["microphone","camera","hangup","fullscreen","tileview"]&interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS=true&interfaceConfig.SHOW_CHROME_EXTENSION_BANNER=false`;
+
+    console.log('🌐 Opening Jitsi Meet:', room);
+    setIsConnected(true);
+    setCallStatus('Đang trong cuộc gọi');
+
+    Linking.openURL(jitsiUrl).catch((err) => {
+      console.error('Failed to open Jitsi URL:', err);
+      Alert.alert('Lỗi', 'Không thể mở trình duyệt để bắt đầu cuộc gọi.', [
+        { text: 'Đóng', onPress: () => navigation.goBack() },
+      ]);
+    });
+  };
+
+  // Initialize Signaling
   useEffect(() => {
+    let isMounted = true;
+
     Animated.timing(callerInfoAnim, {
       toValue: 1,
       duration: 500,
       useNativeDriver: true,
     }).start();
 
-    const connectTimer = setTimeout(() => {
-      setIsConnected(true);
-      Animated.spring(pipScale, {
-        toValue: 1,
-        tension: 60,
-        friction: 10,
-        useNativeDriver: true,
-      }).start();
-    }, 2500);
+    if (token) {
+      const ws = new WebSocket(`${WS_URL}/ws/chat?token=${token}`);
+      wsRef.current = ws;
 
-    return () => clearTimeout(connectTimer);
+      ws.onopen = () => {
+        console.log('✅ Signaling WebSocket connected');
+
+        if (!isIncoming) {
+          // === CALLER ===
+          // Generate room name if not provided
+          if (!roomNameRef.current) {
+            roomNameRef.current = `IUHConnect_${callerId}_${Date.now()}`;
+          }
+
+          // Send CALL_INVITE with roomName
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'WEBRTC',
+              signalType: 'CALL_INVITE',
+              senderId: '',
+              receiverId: callerId,
+              roomName: roomNameRef.current,
+            }));
+            console.log('📞 CALL_INVITE sent to', callerId, 'room:', roomNameRef.current);
+          }
+          setCallStatus('Đang gọi...');
+        } else {
+          // === CALLEE ===
+          // Send CALL_ACCEPTED
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'WEBRTC',
+              signalType: 'CALL_ACCEPTED',
+              senderId: '',
+              receiverId: callerId,
+            }));
+            console.log('✅ CALL_ACCEPTED sent');
+          }
+
+          // Open Jitsi immediately for callee (they already have roomName)
+          if (roomNameRef.current) {
+            setTimeout(() => {
+              if (isMounted) openJitsiMeeting(roomNameRef.current);
+            }, 500);
+          }
+        }
+      };
+
+      ws.onerror = (e: any) => {
+        console.error('Signaling WebSocket error:', e);
+      };
+
+      ws.onmessage = (event) => {
+        if (!isMounted) return;
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'WEBRTC') {
+            console.log('📩 Signal:', data.signalType);
+
+            if (data.signalType === 'CALL_ACCEPTED') {
+              console.log('✅ Call accepted! Opening Jitsi...');
+              setCallStatus('Đối phương đã nghe máy!');
+              // Caller opens Jitsi after callee accepted
+              setTimeout(() => {
+                if (isMounted) openJitsiMeeting(roomNameRef.current);
+              }, 500);
+            } else if (data.signalType === 'CALL_END') {
+              console.log('📞 Remote ended the call');
+              if (isMounted) {
+                Alert.alert('Cuộc gọi kết thúc', 'Đối phương đã kết thúc cuộc gọi.', [
+                  { text: 'OK', onPress: () => navigation.goBack() },
+                ]);
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Signaling parse error:', e);
+        }
+      };
+
+      return () => {
+        isMounted = false;
+        try {
+          if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+            ws.close();
+          }
+        } catch (_) { }
+      };
+    }
   }, []);
 
   // Connecting ripple animation
@@ -88,7 +196,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ navigation, route }) 
       );
       const pulse2 = Animated.loop(
         Animated.sequence([
-          Animated.delay(500),
+          Animated.delay(400),
           Animated.timing(connectingPulse2, {
             toValue: 1.8,
             duration: 1500,
@@ -141,16 +249,6 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ navigation, route }) 
     return () => clearInterval(timer);
   }, [isConnected]);
 
-  const toggleControls = () => {
-    const toValue = showControls ? 0 : 1;
-    Animated.timing(controlsOpacity, {
-      toValue,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-    setShowControls(!showControls);
-  };
-
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -158,97 +256,77 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ navigation, route }) 
   };
 
   const handleEndCall = () => {
-    Animated.parallel([
-      Animated.timing(endCallScale, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify({
+          type: 'WEBRTC',
+          signalType: 'CALL_END',
+          receiverId: callerId,
+          content: '📞 Cuộc gọi đã kết thúc',
+        }));
+      } catch (_) { }
+    }
+
+    Animated.timing(endCallScale, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
       navigation.goBack();
     });
   };
 
-  const ControlButton = ({
-    icon,
-    label,
-    isActive = true,
-    onPress,
-    isDanger = false,
-  }: {
-    icon: string;
-    label: string;
-    isActive?: boolean;
-    onPress: () => void;
-    isDanger?: boolean;
-  }) => (
-    <TouchableOpacity
-      style={styles.controlItem}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View
-        style={[
-          styles.controlButton,
-          !isActive && styles.controlButtonOff,
-          isDanger && styles.endCallButton,
-        ]}
-      >
-        {isDanger ? (
-          <LinearGradient
-            colors={['#F44336', '#C62828']}
-            style={styles.endCallGradient}
-          >
-            <Icon name={icon} size={28} color={Colors.white} />
-          </LinearGradient>
-        ) : (
-          <Icon name={icon} size={24} color={Colors.white} />
-        )}
-      </View>
-      <Text style={styles.controlLabel}>{label}</Text>
-    </TouchableOpacity>
-  );
+  const handleRejoinJitsi = () => {
+    if (roomNameRef.current) {
+      jitsiOpenedRef.current = false;
+      openJitsiMeeting(roomNameRef.current);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       <Animated.View style={[styles.fullScreen, { transform: [{ scale: endCallScale }] }]}>
-        <TouchableOpacity
-          style={styles.fullScreen}
-          activeOpacity={1}
-          onPress={toggleControls}
+        <LinearGradient
+          colors={['#0F172A', '#1E293B', '#0F172A']}
+          style={styles.background}
         >
-          {/* Remote Video */}
-          <View style={styles.remoteVideo}>
-            {isConnected ? (
-              <LinearGradient
-                colors={['#0F172A', '#1E293B', '#0F172A']}
-                style={styles.videoSimulation}
-              >
-                <View style={styles.remoteAvatarContainer}>
-                  <Avatar
-                    name={callerName}
-                    uri={callerAvatar}
-                    size="xlarge"
+          {/* Top Bar */}
+          <View style={styles.topBar}>
+            <TouchableOpacity
+              style={styles.topBackButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Icon name="arrow-left" size={22} color={Colors.white} />
+            </TouchableOpacity>
+
+            <View style={styles.topInfo}>
+              <Text style={styles.topCallerName}>{callerName}</Text>
+              {isConnected && (
+                <View style={styles.durationRow}>
+                  <Animated.View
+                    style={[
+                      styles.recordingDot,
+                      { opacity: recordingDotAnim },
+                    ]}
                   />
-                  <Text style={styles.remoteVideoLabel}>
-                    Video của {callerName}
+                  <Text style={styles.durationText}>
+                    {formatDuration(callDuration)}
                   </Text>
                 </View>
+              )}
+            </View>
 
-                {/* Network quality indicator */}
-                <View style={styles.networkIndicator}>
-                  <Icon name="signal-cellular-3" size={16} color="#4CAF50" />
-                  <Text style={styles.networkText}>Tốt</Text>
-                </View>
-              </LinearGradient>
-            ) : (
-              /* Connecting State */
-              <LinearGradient
-                colors={['#0F172A', '#1E293B']}
-                style={styles.connectingContainer}
-              >
+            <View style={styles.topSpacer} />
+          </View>
+
+          {/* Center Content */}
+          <View style={styles.centerContent}>
+            {/* Ripple Effects */}
+            {!isConnected && (
+              <>
                 <Animated.View
                   style={[
                     styles.connectingRipple,
@@ -264,7 +342,6 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ navigation, route }) 
                 <Animated.View
                   style={[
                     styles.connectingRipple,
-                    styles.connectingRipple2,
                     {
                       transform: [{ scale: connectingPulse2 }],
                       opacity: connectingPulse2.interpolate({
@@ -274,18 +351,42 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ navigation, route }) 
                     },
                   ]}
                 />
+              </>
+            )}
+
+            {/* Avatar */}
+            <Animated.View
+              style={[
+                styles.avatarContainer,
+                {
+                  opacity: callerInfoAnim,
+                  transform: [{
+                    translateY: callerInfoAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30, 0],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              <View style={styles.avatarWrapper}>
                 <Avatar
                   name={callerName}
                   uri={callerAvatar}
-                  size="xlarge"
-                  showGradientRing
+                  size="xxlarge"
                 />
-                <Text style={styles.connectingName}>{callerName}</Text>
-                <Text style={styles.connectingStatus}>
-                  {isIncoming ? 'Cuộc gọi đến...' : 'Đang kết nối...'}
-                </Text>
+                {isConnected && (
+                  <View style={styles.connectedBadge}>
+                    <Icon name="video" size={16} color={Colors.white} />
+                  </View>
+                )}
+              </View>
 
-                {/* Animated dots */}
+              <Text style={styles.callerNameText}>{callerName}</Text>
+              <Text style={styles.callStatusText}>{callStatus}</Text>
+
+              {/* Animated dots when not connected */}
+              {!isConnected && (
                 <View style={styles.connectingDots}>
                   {[0, 1, 2].map((i) => (
                     <Animated.View
@@ -302,118 +403,44 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ navigation, route }) 
                     />
                   ))}
                 </View>
-              </LinearGradient>
-            )}
-          </View>
+              )}
 
-          {/* Local PiP */}
-          {isConnected && (
-            <Animated.View
-              style={[
-                styles.localVideoPiP,
-                { transform: [{ scale: pipScale }] },
-              ]}
-            >
-              {isCameraOn ? (
-                <LinearGradient
-                  colors={['#334155', '#1E293B']}
-                  style={styles.localVideoSimulation}
+              {/* Rejoin button when connected */}
+              {isConnected && (
+                <TouchableOpacity
+                  style={styles.rejoinButton}
+                  onPress={handleRejoinJitsi}
+                  activeOpacity={0.7}
                 >
-                  <Icon name="account" size={32} color="rgba(255,255,255,0.7)" />
-                  <Text style={styles.localVideoLabel}>Bạn</Text>
-                </LinearGradient>
-              ) : (
-                <View style={styles.cameraOffPiP}>
-                  <Icon name="camera-off" size={24} color="rgba(255,255,255,0.5)" />
-                </View>
+                  <LinearGradient
+                    colors={['#4CAF50', '#2E7D32']}
+                    style={styles.rejoinGradient}
+                  >
+                    <Icon name="video" size={20} color={Colors.white} />
+                    <Text style={styles.rejoinText}>Mở lại cuộc gọi</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               )}
             </Animated.View>
-          )}
-
-          {/* Top Overlay */}
-          <Animated.View
-            style={[
-              styles.topOverlay,
-              { opacity: controlsOpacity },
-            ]}
-          >
-            <LinearGradient
-              colors={['rgba(0,0,0,0.6)', 'transparent']}
-              style={styles.topOverlayGradient}
-            >
-              <TouchableOpacity
-                style={styles.topBackButton}
-                onPress={() => navigation.goBack()}
-              >
-                <Icon name="arrow-left" size={22} color={Colors.white} />
-              </TouchableOpacity>
-
-              <View style={styles.topInfo}>
-                <Text style={styles.topCallerName}>{callerName}</Text>
-                {isConnected && (
-                  <View style={styles.durationRow}>
-                    <Animated.View
-                      style={[
-                        styles.recordingDot,
-                        { opacity: recordingDotAnim },
-                      ]}
-                    />
-                    <Text style={styles.durationText}>
-                      {formatDuration(callDuration)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.topSpacer} />
-            </LinearGradient>
-          </Animated.View>
+          </View>
 
           {/* Bottom Controls */}
-          <Animated.View
-            style={[
-              styles.controlsContainer,
-              { opacity: controlsOpacity },
-            ]}
-          >
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.7)']}
-              style={styles.controlsGradient}
+          <View style={styles.bottomControls}>
+            <TouchableOpacity
+              style={styles.endCallButton}
+              onPress={handleEndCall}
+              activeOpacity={0.7}
             >
-              <View style={styles.controlsBar}>
-                <ControlButton
-                  icon={isMicOn ? 'microphone' : 'microphone-off'}
-                  label={isMicOn ? 'Tắt mic' : 'Bật mic'}
-                  isActive={isMicOn}
-                  onPress={() => setIsMicOn(!isMicOn)}
-                />
-                <ControlButton
-                  icon={isCameraOn ? 'camera' : 'camera-off'}
-                  label={isCameraOn ? 'Tắt cam' : 'Bật cam'}
-                  isActive={isCameraOn}
-                  onPress={() => setIsCameraOn(!isCameraOn)}
-                />
-                <ControlButton
-                  icon="phone-hangup"
-                  label="Kết thúc"
-                  onPress={handleEndCall}
-                  isDanger
-                />
-                <ControlButton
-                  icon={isSpeakerOn ? 'volume-high' : 'volume-off'}
-                  label={isSpeakerOn ? 'Loa' : 'Tai nghe'}
-                  isActive={isSpeakerOn}
-                  onPress={() => setIsSpeakerOn(!isSpeakerOn)}
-                />
-                <ControlButton
-                  icon="camera-flip-outline"
-                  label="Xoay cam"
-                  onPress={() => {}}
-                />
-              </View>
-            </LinearGradient>
-          </Animated.View>
-        </TouchableOpacity>
+              <LinearGradient
+                colors={['#F44336', '#C62828']}
+                style={styles.endCallGradient}
+              >
+                <Icon name="phone-hangup" size={32} color={Colors.white} />
+              </LinearGradient>
+            </TouchableOpacity>
+            <Text style={styles.endCallLabel}>Kết thúc</Text>
+          </View>
+        </LinearGradient>
       </Animated.View>
     </SafeAreaView>
   );
@@ -427,131 +454,23 @@ const styles = StyleSheet.create({
   fullScreen: {
     flex: 1,
   },
-  // Remote Video
-  remoteVideo: {
+  background: {
     flex: 1,
+    justifyContent: 'space-between',
   },
-  videoSimulation: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  remoteAvatarContainer: {
-    alignItems: 'center',
-  },
-  remoteVideoLabel: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: Typography.bodySmall,
-    marginTop: Spacing.md,
-  },
-  // Network
-  networkIndicator: {
-    position: 'absolute',
-    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 44) + 60 : 100,
-    right: Spacing.lg,
+  // Top Bar
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.round,
-    gap: 4,
-  },
-  networkText: {
-    fontSize: Typography.tiny,
-    color: '#4CAF50',
-    fontWeight: Typography.medium,
-  },
-  // Connecting
-  connectingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  connectingRipple: {
-    position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    borderWidth: 2,
-    borderColor: 'rgba(0, 168, 255, 0.3)',
-  },
-  connectingRipple2: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-  },
-  connectingName: {
-    fontSize: Typography.h2,
-    fontWeight: Typography.bold,
-    color: Colors.white,
-    marginTop: Spacing.xxl,
-    letterSpacing: 0.5,
-  },
-  connectingStatus: {
-    fontSize: Typography.body,
-    color: 'rgba(255,255,255,0.5)',
-    marginTop: Spacing.sm,
-  },
-  connectingDots: {
-    flexDirection: 'row',
-    marginTop: Spacing.xl,
-    gap: 8,
-  },
-  connectingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.accent,
-  },
-  // PiP
-  localVideoPiP: {
-    position: 'absolute',
-    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 44) + 70 : 110,
-    right: Spacing.lg,
-    width: 110,
-    height: 155,
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
-    ...Shadows.lg,
-  },
-  localVideoSimulation: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  localVideoLabel: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: Typography.tiny,
-    marginTop: Spacing.xs,
-  },
-  cameraOffPiP: {
-    flex: 1,
-    backgroundColor: '#1E293B',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Top Overlay
-  topOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-  },
-  topOverlayGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 44) + 8 : 56,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 44) + 10 : 10,
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xxl,
+    paddingBottom: Spacing.md,
   },
   topBackButton: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -560,82 +479,126 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   topCallerName: {
-    fontSize: Typography.body,
-    fontWeight: Typography.bold,
     color: Colors.white,
+    fontSize: Typography.body,
+    fontWeight: '600',
+  },
+  topSpacer: {
+    width: 40,
   },
   durationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
-    gap: 6,
   },
   recordingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.danger,
+    backgroundColor: '#4CAF50',
+    marginRight: 6,
   },
   durationText: {
-    fontSize: Typography.bodySmall,
     color: 'rgba(255,255,255,0.8)',
-    fontVariant: ['tabular-nums'],
+    fontSize: Typography.bodySmall,
+    fontFamily: Platform.OS === 'android' ? 'monospace' : 'Courier',
   },
-  topSpacer: {
-    width: 40,
+  // Center Content
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  // Controls
-  controlsContainer: {
+  connectingRipple: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 2,
+    borderColor: 'rgba(59, 130, 246, 0.5)',
+  },
+  avatarContainer: {
+    alignItems: 'center',
+  },
+  avatarWrapper: {
+    marginBottom: Spacing.lg,
+    position: 'relative',
+  },
+  connectedBadge: {
     position: 'absolute',
     bottom: 0,
-    left: 0,
     right: 0,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#1E293B',
   },
-  controlsGradient: {
-    paddingBottom: Spacing.huge,
-    paddingTop: Spacing.xxxl,
+  callerNameText: {
+    color: Colors.white,
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 8,
   },
-  controlsBar: {
+  callStatusText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: Typography.body,
+    marginBottom: Spacing.md,
+  },
+  connectingDots: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    gap: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
+    gap: 6,
+    marginTop: Spacing.sm,
   },
-  controlItem: {
+  connectingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+  },
+  rejoinButton: {
+    marginTop: Spacing.xl,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+    ...Shadows.md,
+  },
+  rejoinGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: BorderRadius.lg,
+    gap: 10,
   },
-  controlButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center',
+  rejoinText: {
+    color: Colors.white,
+    fontSize: Typography.body,
+    fontWeight: '600',
+  },
+  // Bottom Controls
+  bottomControls: {
     alignItems: 'center',
-  },
-  controlButtonOff: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    opacity: 0.6,
+    paddingBottom: 50,
   },
   endCallButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'transparent',
+    borderRadius: 35,
     overflow: 'hidden',
+    ...Shadows.md,
   },
   endCallGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  controlLabel: {
-    fontSize: Typography.tiny,
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: Typography.medium,
+  endCallLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: Typography.caption,
+    marginTop: 8,
   },
 });
 

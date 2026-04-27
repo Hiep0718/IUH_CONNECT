@@ -9,6 +9,7 @@ import {
   Modal,
   Animated,
   Platform,
+  Alert,
 } from 'react-native';
 import { GiftedChat, IMessage, Bubble, InputToolbar, Composer, Send, Time, SystemMessage, Day } from 'react-native-gifted-chat';
 import LinearGradient from 'react-native-linear-gradient';
@@ -20,6 +21,7 @@ import OfflineBanner from '../components/OfflineBanner';
 import MessageTicks from '../components/MessageTicks';
 import TypingIndicator from '../components/TypingIndicator';
 import type { MessageStatus, LecturerStatus } from '../types/types';
+import { API_URL, WS_URL } from '../config/env';
 
 interface ChatScreenProps {
   navigation: any;
@@ -84,11 +86,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const serverUrl = Platform.select({
-          android: 'http://10.0.2.2:8080',
-          default: 'http://localhost:8080',
-        });
-        const res = await fetch(`${serverUrl}/api/v1/chat/history/${conversationId}`, {
+        const res = await fetch(`${API_URL}/api/v1/chat/history/${conversationId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) {
@@ -128,13 +126,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   useEffect(() => {
     if (!token) return;
 
-    const wsUrl = Platform.select({
-      android: `ws://10.0.2.2:8080/ws/chat?token=${token}`,
-      default: `ws://localhost:8080/ws/chat?token=${token}`,
-    });
-
     try {
-      const ws = new WebSocket(wsUrl!);
+      const ws = new WebSocket(`${WS_URL}/ws/chat?token=${token}`);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -145,6 +138,39 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       ws.onmessage = (event: WebSocketMessageEvent) => {
         try {
           const data = JSON.parse(event.data);
+
+          // Handle incoming call signaling
+          if (data.type === 'WEBRTC') {
+            if (data.signalType === 'CALL_INVITE') {
+              const incomingRoomName = data.roomName || '';
+              Alert.alert(
+                '📞 Cuộc gọi đến',
+                `${data.senderId || 'Người dùng'} đang gọi video cho bạn`,
+                [
+                  {
+                    text: 'Từ chối',
+                    style: 'cancel',
+                  },
+                  {
+                    text: '✅ Nghe máy',
+                    onPress: () => {
+                      navigation.navigate('VideoCall', {
+                        callerId: data.senderId || recipientId,
+                        callerName: data.senderId || recipientName,
+                        token: token,
+                        isIncoming: true,
+                        roomName: incomingRoomName,
+                      });
+                    },
+                  },
+                ],
+              );
+            }
+            // Ignore other signal types in ChatScreen
+            return;
+          }
+
+          // Normal chat message
           const incomingMessage: ExtendedMessage = {
             _id: `${data.conversationId}-${data.timestamp}-${Date.now()}`,
             text: data.content,
@@ -424,13 +450,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={styles.headerActionButton}
-              onPress={() =>
+              onPress={() => {
+                const roomName = `IUHConnect_${recipientId}_${Date.now()}`;
                 navigation.navigate('VideoCall', {
                   callerId: recipientId,
                   callerName: recipientName,
                   callerAvatar: recipientAvatar,
-                })
-              }
+                  token: token,
+                  roomName: roomName,
+                });
+              }}
             >
               <Icon name="video-outline" size={22} color={Colors.white} />
             </TouchableOpacity>
