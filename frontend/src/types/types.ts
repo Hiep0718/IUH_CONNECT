@@ -126,13 +126,13 @@ export type RootStackParamList = {
     lecturerStatus?: LecturerStatus;
     isGroup?: boolean;
   };
-  VideoCall: {
+  Meeting: {
     callerId: string;
     callerName: string;
     callerAvatar?: string;
     isIncoming?: boolean;
-    token?: string;
     roomName?: string;
+    meetingId?: string;
   };
   ProfileSettings: undefined;
 };

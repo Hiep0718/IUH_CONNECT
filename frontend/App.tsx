@@ -14,8 +14,11 @@ import ChatListScreen from './src/screens/ChatListScreen';
 import ContactsScreen from './src/screens/ContactsScreen';
 import GroupsScreen from './src/screens/GroupsScreen';
 import ChatScreen from './src/screens/ChatScreen';
-import VideoCallScreen from './src/screens/VideoCallScreen';
+import MeetingScreen from './src/screens/MeetingScreen';
 import ProfileSettingsScreen from './src/screens/ProfileSettingsScreen';
+
+// Services
+import { WebSocketProvider } from './src/services/WebSocketProvider';
 
 // Theme
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from './src/theme/theme';
@@ -348,6 +351,7 @@ export default function App() {
   const [token, setToken] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<string>('');
   const [showSplash, setShowSplash] = useState(true);
+  const navigationRef = useRef<any>(null);
 
   const handleLogin = (accessToken: string, username: string) => {
     setToken(accessToken);
@@ -363,78 +367,90 @@ export default function App() {
     return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
 
-  return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor={Colors.primaryDark}
-          translucent={false}
-        />
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            animation: 'slide_from_right',
-            contentStyle: { backgroundColor: Colors.background },
-          }}
-        >
-          {!token ? (
-            <Stack.Screen name="Login">
-              {(props) => (
-                <LoginScreen {...props} onLogin={handleLogin} />
+  // WebSocketProvider bọc ngoài NavigationContainer khi đã authenticated
+  // Nếu chưa login thì không tạo WS connection
+  const renderNavigation = () => (
+    <NavigationContainer ref={navigationRef}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={Colors.primaryDark}
+        translucent={false}
+      />
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          contentStyle: { backgroundColor: Colors.background },
+        }}
+      >
+        {!token ? (
+          <Stack.Screen name="Login">
+            {(props) => (
+              <LoginScreen {...props} onLogin={handleLogin} />
+            )}
+          </Stack.Screen>
+        ) : (
+          <>
+            <Stack.Screen name="MainTabs" options={{ animation: 'fade' }}>
+              {() => (
+                <MainTabs
+                  currentUser={currentUser}
+                  token={token}
+                  onLogout={handleLogout}
+                />
               )}
             </Stack.Screen>
-          ) : (
-            <>
-              <Stack.Screen name="MainTabs" options={{ animation: 'fade' }}>
-                {() => (
-                  <MainTabs
-                    currentUser={currentUser}
-                    token={token}
-                    onLogout={handleLogout}
-                  />
-                )}
-              </Stack.Screen>
 
-              <Stack.Screen
-                name="Chat"
-                options={{ animation: 'slide_from_right' }}
-              >
-                {(props) => (
-                  <ChatScreen
-                    {...props}
-                    currentUser={currentUser}
-                    token={token}
-                  />
-                )}
-              </Stack.Screen>
+            <Stack.Screen
+              name="Chat"
+              options={{ animation: 'slide_from_right' }}
+            >
+              {(props) => (
+                <ChatScreen
+                  {...props}
+                  currentUser={currentUser}
+                  token={token}
+                />
+              )}
+            </Stack.Screen>
 
-              <Stack.Screen
-                name="VideoCall"
-                options={{
-                  animation: 'slide_from_bottom',
-                  gestureEnabled: false,
-                }}
-              >
-                {(props) => <VideoCallScreen {...props} />}
-              </Stack.Screen>
+            <Stack.Screen
+              name="Meeting"
+              options={{
+                animation: 'slide_from_bottom',
+                gestureEnabled: false,
+              }}
+            >
+              {(props) => <MeetingScreen {...props} />}
+            </Stack.Screen>
 
-              <Stack.Screen
-                name="ProfileSettings"
-                options={{ animation: 'slide_from_right' }}
-              >
-                {(props) => (
-                  <ProfileSettingsScreen
-                    {...props}
-                    currentUser={currentUser}
-                    onLogout={handleLogout}
-                  />
-                )}
-              </Stack.Screen>
-            </>
-          )}
-        </Stack.Navigator>
-      </NavigationContainer>
+            <Stack.Screen
+              name="ProfileSettings"
+              options={{ animation: 'slide_from_right' }}
+            >
+              {(props) => (
+                <ProfileSettingsScreen
+                  {...props}
+                  currentUser={currentUser}
+                  onLogout={handleLogout}
+                />
+              )}
+            </Stack.Screen>
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+
+  return (
+    <SafeAreaProvider>
+      {token ? (
+        <WebSocketProvider token={token} navigationRef={navigationRef}>
+          {renderNavigation()}
+        </WebSocketProvider>
+      ) : (
+        renderNavigation()
+      )}
     </SafeAreaProvider>
   );
 }

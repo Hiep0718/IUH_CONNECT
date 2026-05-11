@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IUH Connect - Tham gia cuộc họp</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 48px 40px;
+            text-align: center;
+            max-width: 440px;
+            width: 90%;
+            backdrop-filter: blur(10px);
+        }
+        .logo { font-size: 40px; margin-bottom: 8px; }
+        h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+        .subtitle { color: rgba(255, 255, 255, 0.6); font-size: 14px; margin-bottom: 32px; }
+        .room-info {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        .room-label { color: rgba(255, 255, 255, 0.5); font-size: 12px; margin-bottom: 4px; }
+        .room-name { font-size: 16px; font-weight: 600; word-break: break-all; }
+        .btn {
+            display: inline-block;
+            padding: 16px 36px;
+            background: linear-gradient(135deg, #0077CC, #004A82);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 20px rgba(0, 119, 204, 0.3);
+        }
+        .btn:hover { transform: scale(1.04); box-shadow: 0 6px 28px rgba(0, 119, 204, 0.4); }
+        .error {
+            color: #F44336;
+            margin-top: 16px;
+            padding: 12px;
+            background: rgba(244, 67, 54, 0.1);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            border-top-color: #0077CC;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #join-section { display: none; }
+        #error { display: none; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div id="loading">
+        <div class="spinner"></div>
+        <h1>IUH Connect</h1>
+        <p class="subtitle" id="status">Đang xác thực phiên họp...</p>
+    </div>
+
+    <div id="join-section">
+        <div class="logo">🎥</div>
+        <h1>IUH Connect</h1>
+        <p class="subtitle">Cuộc họp đã sẵn sàng</p>
+        <div class="room-info">
+            <div class="room-label">Phòng họp</div>
+            <div class="room-name" id="room-name"></div>
+        </div>
+        <a id="join-btn" class="btn" href="#" target="_blank"
+           onclick="onJoinClick()">
+            🎥 Tham gia cuộc họp
+        </a>
+    </div>
+
+    <div class="error" id="error"></div>
+</div>
+
+<script>
+    let meetingData = null;
+    let handoffToken = null;
+
+    (async function init() {
+        // Đọc token từ query string ?token=...
+        const params = new URLSearchParams(window.location.search);
+        handoffToken = params.get('token');
+
+        if (!handoffToken) {
+            showError('Thiếu mã tham gia. Vui lòng sử dụng link từ ứng dụng mobile.');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/v1/meetings/handoff/' + handoffToken);
+            if (!res.ok) {
+                showError('Mã tham gia không hợp lệ hoặc đã hết hạn.');
+                return;
+            }
+
+            meetingData = await res.json();
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('room-name').textContent = meetingData.roomName;
+            document.getElementById('join-btn').href = meetingData.jitsiUrl;
+            document.getElementById('join-section').style.display = 'block';
+        } catch (e) {
+            showError('Không thể kết nối tới server. Vui lòng kiểm tra mạng.');
+        }
+    })();
+
+    async function onJoinClick() {
+        // Gọi device-joined callback để thông báo mobile
+        if (meetingData && meetingData.meetingId) {
+            try {
+                let url = '/api/v1/meetings/' + meetingData.meetingId + '/device-joined';
+                if (handoffToken) {
+                    url += '?handoffToken=' + handoffToken;
+                }
+                await fetch(url, { method: 'POST' });
+            } catch (e) {
+                console.warn('device-joined callback failed:', e);
+            }
+        }
+    }
+
+    function showError(msg) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').textContent = msg;
+        document.getElementById('error').style.display = 'block';
+    }
+</script>
+</body>
+</html>

@@ -31,6 +31,18 @@ spring:
           predicates:
             - Path=/ws/chat/**
 
+        # -------- Meeting Service (HTTP) --------
+        - id: meeting-service-http
+          uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/meetings/**
+
+        # -------- Meeting Web (Static page from chat-service) --------
+        - id: meeting-web
+          uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
+          predicates:
+            - Path=/meeting/**
+
 # ---------- Actuator ----------
 management:
   endpoints:

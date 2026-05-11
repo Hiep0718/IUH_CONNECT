@@ -1,61 +1,118 @@
 # IUH Connect
 
-> Nền tảng chat cho IUH theo kiến trúc microservices, gồm frontend React Native và backend Spring Boot.
+> Ứng dụng chat cho môi trường đại học, xây theo kiến trúc microservices với frontend React Native và backend Spring Boot.
 
-## 1. Giới thiệu
+## 1. Mục đích của tài liệu này
 
-`IUH Connect` là project xây dựng ứng dụng nhắn tin thời gian thực cho môi trường đại học. Repository hiện gồm:
+`README.md` này được viết theo hướng:
 
-- `frontend`: ứng dụng di động React Native.
-- `backend/api-gateway`: cổng vào duy nhất cho REST và WebSocket.
-- `backend/auth-service`: xác thực, JWT, hồ sơ người dùng, danh bạ và kết bạn.
-- `backend/chat-service`: chat thời gian thực qua WebSocket, Kafka, MongoDB và upload media qua MinIO.
-- `backend/presence-service`: service đã được tạo khung nhưng chưa có nghiệp vụ thực tế.
-- `backend/notification-service`: service worker đã được tạo khung nhưng chưa có nghiệp vụ thực tế.
+- người mới vào project chỉ cần đọc một file là hiểu bức tranh toàn bộ
+- phân biệt rõ phần nào đang chạy thật, phần nào chỉ là prototype, phần nào mới là kế hoạch
+- giúp nhóm phát triển, giảng viên hướng dẫn hoặc người review không phải tự đọc toàn bộ source code để hiểu hệ thống
 
-Về mặt triển khai, hệ thống dùng Docker Compose để chạy toàn bộ hạ tầng và backend service.
+## 2. Tóm tắt dự án
 
-## 2. Trạng thái thực tế của project
+IUH Connect là một hệ thống giao tiếp nội bộ cho sinh viên và giảng viên, tập trung vào:
 
-Phần đã hoạt động theo code hiện tại:
+- đăng ký / đăng nhập người dùng
+- quản lý hồ sơ cá nhân
+- danh bạ và kết bạn
+- chat thời gian thực
+- upload file/media qua MinIO
+- nền tảng mở rộng cho presence, notification và meeting/video call
 
-- đăng ký và đăng nhập bằng JWT
+Project hiện gồm 2 khối lớn:
+
+- `frontend/`: app mobile React Native chạy chủ yếu cho Android
+- `backend/`: các service Spring Boot theo mô hình microservices
+
+## 3. Thành phần trong repository
+
+```text
+BaiTapLon/
+├── backend/
+│   ├── api-gateway/
+│   ├── auth-service/
+│   ├── chat-service/
+│   ├── notification-service/
+│   └── presence-service/
+├── frontend/
+├── docker-compose.yml
+├── README.md
+├── implementation_plan.md
+├── implementation_plan_part1.md
+├── implementation_plan_part2.md
+└── implementation_plan_meeting.md
+```
+
+Giải thích nhanh:
+
+- `api-gateway`: route tất cả REST và WebSocket vào các service tương ứng
+- `auth-service`: auth, JWT, user profile, contact/friendship
+- `chat-service`: chat realtime, Kafka pipeline, MongoDB, MinIO, Redis signaling/presence
+- `presence-service`: service scaffold, hiện chưa có nghiệp vụ thật
+- `notification-service`: service scaffold, hiện chưa có nghiệp vụ thật
+- `implementation_plan_meeting.md`: kế hoạch chuẩn hóa lại tính năng meeting/handoff từ mobile sang desktop
+
+## 4. Trạng thái thực tế của project
+
+### 4.1. Phần đang hoạt động
+
+- đăng ký và đăng nhập với JWT
 - lấy và cập nhật hồ sơ cá nhân
-- gửi lời mời kết bạn, chấp nhận kết bạn, xem danh sách bạn bè
-- kết nối WebSocket chat qua API Gateway
-- gửi tin nhắn theo pipeline `WebSocket -> Kafka -> Chat Consumer -> MongoDB`
-- lấy lịch sử tin nhắn và danh sách hội thoại gần đây
+- gửi lời mời kết bạn, chấp nhận kết bạn, lấy danh sách bạn bè
+- chat thời gian thực qua WebSocket
+- lưu message vào MongoDB qua Kafka consumer
+- lấy lịch sử chat và hội thoại gần đây
 - sinh presigned URL để upload file trực tiếp lên MinIO
+- presence cơ bản theo Redis trong `chat-service`
+- signaling prototype cho video call / WebRTC kiểu cũ trong `chat-service`
 
-Phần mới có cấu trúc nhưng chưa hoàn thiện:
+### 4.2. Phần có trong code nhưng chưa ổn định / chưa production-ready
 
-- `presence-service`
-- `notification-service`
-- một số màn frontend vẫn dùng dữ liệu mock hoặc UI demo
+- video call hiện tại
+- cross-device handoff sang desktop
+- signaling meeting tách biệt khỏi chat
+- đa instance chat không duplicate message
+- presence-service riêng biệt
+- notification-service riêng biệt
 
-## 3. Kiến trúc triển khai thực tế
+### 4.3. Phần mới là kế hoạch
+
+Kế hoạch meeting mới đang nằm ở:
+
+- [implementation_plan_meeting.md](D:/Study/KienTruc/BaiTapLon/implementation_plan_meeting.md:1)
+
+Mục tiêu của plan này là:
+
+- bỏ luồng video call chắp vá hiện tại
+- dùng Jitsi cho media
+- tách `CALL_SIGNAL` khỏi chat
+- cho phép chuyển cuộc họp từ mobile sang desktop web để chia sẻ màn hình
+
+## 5. Kiến trúc triển khai hiện tại
 
 ```mermaid
 graph TB
     subgraph Client
-        FE["React Native App"]
+        FE["React Native Mobile App"]
     end
 
-    subgraph API_Layer
+    subgraph API
         GW["API Gateway :8080"]
     end
 
-    subgraph Backend
+    subgraph Services
         AUTH["Auth Service :8085"]
         CHAT["Chat Service :8082"]
-        PRES["Presence Service :8083 (scaffold)"]
-        NOTI["Notification Service (worker scaffold)"]
+        PRESVC["Presence Service :8083 (scaffold)"]
+        NOTI["Notification Service (scaffold)"]
     end
 
-    subgraph Infrastructure
+    subgraph Infra
         ZK["Zookeeper :2181"]
-        KF["Kafka :9092"]
-        MDB["MariaDB :3307"]
+        KAFKA["Kafka :9092"]
+        MARIA["MariaDB :3307"]
         MONGO["MongoDB :27017"]
         REDIS["Redis :6379"]
         MINIO["MinIO :9000 / :9001"]
@@ -65,420 +122,251 @@ graph TB
     GW --> AUTH
     GW --> CHAT
 
-    AUTH --> MDB
-    AUTH -->|"user-events"| KF
+    AUTH --> MARIA
+    AUTH -->|"user-events"| KAFKA
 
-    CHAT -->|"chat-messages"| KF
+    CHAT -->|"chat-messages"| KAFKA
     CHAT --> MONGO
+    CHAT --> REDIS
     CHAT --> MINIO
 
-    PRES --> REDIS
-    PRES --> KF
-    NOTI --> KF
-    KF --> ZK
+    KAFKA --> ZK
 ```
 
-## 4. Sơ đồ component-level
+## 6. Kiến trúc logic theo service
 
-### 4.1. Auth service
+### 6.1. API Gateway
 
-```mermaid
-graph LR
-    A["AuthController"] --> B["AuthService"]
-    C["UserController"] --> D["UserService"]
-    E["ContactController"] --> F["ContactService"]
+Vai trò:
 
-    B --> G["UserRepository"]
-    B --> H["PasswordEncoder"]
-    B --> I["JwtTokenProvider"]
-    B --> J["UserEventProducer"]
+- là entry point duy nhất cho mobile app
+- route HTTP cho auth/contact/user/chat
+- route WebSocket `/ws/chat/**` vào `chat-service`
 
-    D --> G
-    F --> G
-    F --> K["FriendshipRepository"]
+File chính:
 
-    G --> L["MariaDB.users"]
-    K --> M["MariaDB.friendships"]
-    J --> N["Kafka topic: user-events"]
-```
+- [backend/api-gateway/src/main/resources/application.yml](D:/Study/KienTruc/BaiTapLon/backend/api-gateway/src/main/resources/application.yml:1)
+- [backend/api-gateway/src/main/java/com/iuhconnect/gateway/ApiGatewayApplication.java](D:/Study/KienTruc/BaiTapLon/backend/api-gateway/src/main/java/com/iuhconnect/gateway/ApiGatewayApplication.java:1)
 
-### 4.2. Chat service
+### 6.2. Auth Service
 
-```mermaid
-graph LR
-    A["WebSocket /ws/chat"] --> B["JwtHandshakeInterceptor"]
-    B --> C["ChatWebSocketHandler"]
-    C --> D["KafkaTemplate"]
-    D --> E["Kafka topic: chat-messages"]
+Vai trò:
 
-    E --> F["ChatMessageKafkaConsumer"]
-    F --> G["WebSocketSessionManager"]
-    F --> H["MessageRepository"]
-    H --> I["MongoDB.messages"]
+- đăng ký / đăng nhập
+- sinh JWT
+- đọc và cập nhật hồ sơ user
+- quản lý friend request / contacts
+- publish `user-events` lên Kafka để `chat-service` sync read-model
 
-    J["UserEventConsumer"] --> K["ChatUserRepository"]
-    L["Kafka topic: user-events"] --> J
-    K --> M["MongoDB.chat_users"]
+Thành phần chính:
 
-    N["ChatController"] --> H
-    O["FileUploadController"] --> P["MinioClient"]
-    P --> Q["MinIO bucket: chat-media"]
-```
+- `AuthController`, `AuthService`
+- `UserController`, `UserService`
+- `ContactController`, `ContactService`
+- `JwtAuthenticationFilter`, `JwtTokenProvider`
+- `UserRepository`, `FriendshipRepository`
 
-### 4.3. Frontend
+Persistence:
 
-```mermaid
-graph TB
-    APP["App.tsx"] --> LOGIN["LoginScreen"]
-    APP --> HOME["HomeScreen"]
-    APP --> CHATLIST["ChatListScreen"]
-    APP --> CONTACTS["ContactsScreen"]
-    APP --> GROUPS["GroupsScreen"]
-    APP --> CHAT["ChatScreen"]
-    APP --> PROFILE["ProfileSettingsScreen"]
-    APP --> VIDEO["VideoCallScreen"]
+- MariaDB
 
-    LOGIN --> AUTHAPI["/api/v1/auth/*"]
-    CONTACTS --> CONTACTAPI["/api/v1/contacts/*"]
-    PROFILE --> USERAPI["/api/v1/users/me"]
-    CHATLIST --> CHATAPI["/api/v1/chat/conversations/*"]
-    CHAT --> HISTORYAPI["/api/v1/chat/history/*"]
-    CHAT --> WS["/ws/chat?token=..."]
-```
+### 6.3. Chat Service
 
-## 5. Ghi chú quan trọng về implementation
+Vai trò:
 
-- `auth-service` chạy ở cổng `8085`, không phải `8081`.
-- `chat-service` hiện chưa dùng Redis Pub/Sub trong code, dù Redis có mặt trong `docker-compose.yml`.
-- Broadcast tin nhắn hiện đang dựa vào Kafka consumer với `groupId` sinh động trong `ChatMessageKafkaConsumer`.
-- Với cách làm hiện tại, nếu scale nhiều instance `chat-service`, khả năng fan-out có thể hoạt động nhưng việc lưu MongoDB có nguy cơ bị trùng bản ghi nếu không bổ sung cơ chế deduplicate.
-- `presence-service` và `notification-service` mới chỉ có lớp khởi động Spring Boot, chưa có controller, consumer, handler hoặc service nghiệp vụ.
+- mở WebSocket endpoint `/ws/chat`
+- nhận message realtime từ client
+- route chat message vào Kafka
+- consumer Kafka để lưu MongoDB và push lại WebSocket
+- đồng bộ `ChatUser` từ `user-events`
+- cấp presigned URL upload file qua MinIO
+- giữ presence và signaling Redis trong cùng service
 
-## 6. Danh sách service
+Thành phần chính:
 
-| Service | Port | Trạng thái | Vai trò chính |
-| --- | --- | --- | --- |
-| `api-gateway` | `8080` | Hoạt động | Route REST và WebSocket vào backend |
-| `auth-service` | `8085` | Hoạt động | Đăng ký, đăng nhập, JWT, profile, contacts |
-| `chat-service` | `8082` | Hoạt động | WebSocket chat, Kafka pipeline, MongoDB, MinIO |
-| `presence-service` | `8083` | Scaffold | Chưa có nghiệp vụ thực tế |
-| `notification-service` | không expose port | Scaffold | Chưa có nghiệp vụ thực tế |
-| `frontend` | app mobile | Hoạt động/demo | Giao diện client cho login, chat, contacts, profile |
+- `ChatWebSocketHandler`
+- `WebSocketSessionManager`
+- `ChatMessageKafkaConsumer`
+- `UserEventConsumer`
+- `MessageService`
+- `ChatController`
+- `FileUploadController`
+- `PresenceService`
+- `SignalingRedisSubscriber`
+- `RedisSignalingConfig`
 
-## 7. Luồng xử lý chính
+Persistence / infra:
+
+- MongoDB cho message và chat user
+- Redis cho presence và signaling cross-instance
+- Kafka cho pipeline chat
+- MinIO cho upload media
+
+### 6.4. Presence Service riêng
+
+`backend/presence-service/` hiện mới chỉ có bootstrap app.
+
+Điều quan trọng:
+
+- project có **module `presence-service` riêng**
+- nhưng **presence logic đang dùng thật lại nằm trong `chat-service`**
+
+Nói cách khác:
+
+- `presence-service` module: chưa hoàn thiện
+- `PresenceService` class trong `chat-service`: đang được dùng thật
+
+### 6.5. Notification Service riêng
+
+`backend/notification-service/` hiện cũng mới là scaffold.
+
+Hiện chưa có:
+
+- consumer nghiệp vụ ổn định
+- FCM flow đầy đủ
+- API hay worker flow hoàn chỉnh
+
+## 7. Luồng dữ liệu chính
 
 ### 7.1. Luồng đăng ký người dùng
 
-1. Client gọi `POST /api/v1/auth/register` qua gateway hoặc trực tiếp tới `auth-service`.
-2. `AuthController` chuyển request vào `AuthService`.
-3. `AuthService` kiểm tra username, mã hóa password, lưu user vào MariaDB.
-4. Sau khi lưu thành công, `AuthService` publish event lên Kafka topic `user-events`.
-5. `UserEventConsumer` của `chat-service` consume event này và upsert `ChatUser` vào MongoDB.
-6. `auth-service` trả về access token và refresh token.
-
-### 7.2. Luồng đăng nhập
-
-1. Client gọi `POST /api/v1/auth/login`.
-2. `AuthService` kiểm tra username và password.
-3. Nếu hợp lệ, hệ thống sinh JWT và trả token cho client.
-
-### 7.3. Luồng chat thời gian thực
-
-1. Client mở WebSocket tới `ws://<host>:8080/ws/chat?token=<jwt>`.
-2. API Gateway forward kết nối sang `chat-service`.
-3. `JwtHandshakeInterceptor` xác thực token và lấy username từ JWT.
-4. `ChatWebSocketHandler` nhận tin nhắn JSON từ client.
-5. Handler đẩy message vào Kafka topic `chat-messages`.
-6. `ChatMessageKafkaConsumer` consume message.
-7. Consumer cố gắng gửi message tới session WebSocket đang online trên node hiện tại.
-8. Consumer lưu message vào MongoDB.
-
-## 8. Sơ đồ sequence chi tiết theo use case
-
-### 8.1. Use case đăng ký tài khoản
-
 ```mermaid
 sequenceDiagram
-    participant Client as Client
+    participant Client as Mobile App
     participant Gateway as API Gateway
-    participant AuthController as AuthController
-    participant AuthService as AuthService
-    participant UserRepo as UserRepository
+    participant Auth as Auth Service
     participant MariaDB as MariaDB
-    participant Producer as UserEventProducer
     participant Kafka as Kafka
-    participant UserEventConsumer as Chat.UserEventConsumer
-    participant ChatUserRepo as ChatUserRepository
+    participant Chat as Chat Service
     participant MongoDB as MongoDB
 
     Client->>Gateway: POST /api/v1/auth/register
-    Gateway->>AuthController: Forward request
-    AuthController->>AuthService: register(request)
-    AuthService->>UserRepo: findByUsername(username)
-    UserRepo->>MariaDB: SELECT user
-    MariaDB-->>UserRepo: result
-    AuthService->>UserRepo: save(user)
-    UserRepo->>MariaDB: INSERT users
-    MariaDB-->>UserRepo: saved user
-    AuthService->>Producer: publishUserCreatedEvent(...)
-    Producer->>Kafka: send user-events
-    AuthService-->>AuthController: AuthResponse(accessToken, refreshToken)
-    AuthController-->>Gateway: 201 Created
-    Gateway-->>Client: JWT response
-
-    Kafka-->>UserEventConsumer: consume user-events
-    UserEventConsumer->>ChatUserRepo: findByUserId / save
-    ChatUserRepo->>MongoDB: upsert chat user
+    Gateway->>Auth: forward request
+    Auth->>MariaDB: save user
+    Auth->>Kafka: publish user-events
+    Auth-->>Client: accessToken + refreshToken
+    Kafka-->>Chat: consume user-events
+    Chat->>MongoDB: upsert ChatUser
 ```
 
-### 8.2. Use case đăng nhập
+### 7.2. Luồng chat realtime
 
 ```mermaid
 sequenceDiagram
-    participant Client as Client
+    participant Sender as Sender
     participant Gateway as API Gateway
-    participant AuthController as AuthController
-    participant AuthService as AuthService
-    participant UserRepo as UserRepository
-    participant MariaDB as MariaDB
-    participant JwtProvider as JwtTokenProvider
-
-    Client->>Gateway: POST /api/v1/auth/login
-    Gateway->>AuthController: Forward request
-    AuthController->>AuthService: login(request)
-    AuthService->>UserRepo: findByUsername(username)
-    UserRepo->>MariaDB: SELECT user
-    MariaDB-->>UserRepo: user row
-    AuthService->>AuthService: verify password with BCrypt
-    AuthService->>JwtProvider: generateAccessToken(username)
-    AuthService->>JwtProvider: generateRefreshToken(username)
-    AuthService-->>AuthController: AuthResponse
-    AuthController-->>Gateway: 200 OK
-    Gateway-->>Client: JWT response
-```
-
-### 8.3. Use case lấy hồ sơ cá nhân
-
-```mermaid
-sequenceDiagram
-    participant Client as Client
-    participant Gateway as API Gateway
-    participant Filter as JwtAuthenticationFilter
-    participant UserController as UserController
-    participant UserService as UserService
-    participant UserRepo as UserRepository
-    participant MariaDB as MariaDB
-
-    Client->>Gateway: GET /api/v1/users/me + Bearer token
-    Gateway->>Filter: Forward request
-    Filter->>Filter: validate JWT, set SecurityContext
-    Filter->>UserController: authenticated request
-    UserController->>UserService: getCurrentUserProfile(principal.name)
-    UserService->>UserRepo: findByUsername(username)
-    UserRepo->>MariaDB: SELECT user
-    MariaDB-->>UserRepo: user row
-    UserService-->>UserController: UserDto
-    UserController-->>Gateway: 200 OK
-    Gateway-->>Client: profile JSON
-```
-
-### 8.4. Use case gửi lời mời kết bạn
-
-```mermaid
-sequenceDiagram
-    participant Client as Client
-    participant Gateway as API Gateway
-    participant Filter as JwtAuthenticationFilter
-    participant ContactController as ContactController
-    participant ContactService as ContactService
-    participant UserRepo as UserRepository
-    participant FriendshipRepo as FriendshipRepository
-    participant MariaDB as MariaDB
-
-    Client->>Gateway: POST /api/v1/contacts/request?targetUsername=...
-    Gateway->>Filter: Forward request
-    Filter->>ContactController: authenticated request
-    ContactController->>ContactService: sendFriendRequest(currentUsername, targetUsername)
-    ContactService->>UserRepo: find sender
-    ContactService->>UserRepo: find receiver
-    UserRepo->>MariaDB: SELECT users
-    MariaDB-->>UserRepo: sender / receiver
-    ContactService->>FriendshipRepo: findByUsers(sender, receiver)
-    FriendshipRepo->>MariaDB: SELECT friendship
-    MariaDB-->>FriendshipRepo: result
-    ContactService->>FriendshipRepo: save(PENDING)
-    FriendshipRepo->>MariaDB: INSERT friendship
-    ContactService-->>ContactController: success
-    ContactController-->>Gateway: 200 OK
-    Gateway-->>Client: Friend request sent
-```
-
-### 8.5. Use case chấp nhận kết bạn
-
-```mermaid
-sequenceDiagram
-    participant Client as Client
-    participant Gateway as API Gateway
-    participant Filter as JwtAuthenticationFilter
-    participant ContactController as ContactController
-    participant ContactService as ContactService
-    participant UserRepo as UserRepository
-    participant FriendshipRepo as FriendshipRepository
-    participant MariaDB as MariaDB
-
-    Client->>Gateway: POST /api/v1/contacts/accept?senderUsername=...
-    Gateway->>Filter: Forward request
-    Filter->>ContactController: authenticated request
-    ContactController->>ContactService: acceptFriendRequest(currentUsername, senderUsername)
-    ContactService->>UserRepo: find receiver
-    ContactService->>UserRepo: find sender
-    ContactService->>FriendshipRepo: findByUsers(sender, receiver)
-    FriendshipRepo->>MariaDB: SELECT friendship
-    MariaDB-->>FriendshipRepo: pending friendship
-    ContactService->>FriendshipRepo: save(ACCEPTED)
-    FriendshipRepo->>MariaDB: UPDATE friendship
-    ContactController-->>Gateway: 200 OK
-    Gateway-->>Client: Friend request accepted
-```
-
-### 8.6. Use case kết nối WebSocket chat
-
-```mermaid
-sequenceDiagram
-    participant Client as Client
-    participant Gateway as API Gateway
-    participant Interceptor as JwtHandshakeInterceptor
-    participant Handler as ChatWebSocketHandler
-    participant SessionManager as WebSocketSessionManager
-
-    Client->>Gateway: WS /ws/chat?token=<jwt>
-    Gateway->>Interceptor: forward handshake
-    Interceptor->>Interceptor: parse and validate JWT
-    Interceptor-->>Handler: attach username to session attributes
-    Handler->>SessionManager: registerSession(username, session)
-    Handler-->>Client: WebSocket connected
-```
-
-### 8.7. Use case gửi tin nhắn realtime
-
-```mermaid
-sequenceDiagram
-    participant Sender as Sender Client
-    participant Gateway as API Gateway
-    participant WSHandler as ChatWebSocketHandler
+    participant WS as ChatWebSocketHandler
     participant Kafka as Kafka
     participant Consumer as ChatMessageKafkaConsumer
-    participant SessionManager as WebSocketSessionManager
-    participant Receiver as Receiver Client
-    participant MessageRepo as MessageRepository
     participant MongoDB as MongoDB
+    participant Receiver as Receiver
 
-    Sender->>Gateway: WebSocket message JSON
-    Gateway->>WSHandler: forward frame
-    WSHandler->>Kafka: send chat-messages(conversationId, payload)
-    Kafka-->>Consumer: consume payload
-    Consumer->>SessionManager: getSession(receiverId)
-    alt receiver is connected on this node
-        SessionManager-->>Consumer: WebSocketSession
-        Consumer-->>Receiver: push TextMessage
-    else receiver is not connected on this node
-        SessionManager-->>Consumer: null
-    end
-    Consumer->>MessageRepo: save(MessageEntity)
-    MessageRepo->>MongoDB: INSERT message
+    Sender->>Gateway: WS /ws/chat?token=...
+    Gateway->>WS: text frame
+    WS->>Kafka: send chat-messages
+    Kafka-->>Consumer: consume
+    Consumer->>MongoDB: save message
+    Consumer-->>Receiver: push message nếu session online ở node hiện tại
 ```
 
-### 8.8. Use case lấy lịch sử hội thoại
+### 7.3. Luồng signaling video call hiện tại
 
-```mermaid
-sequenceDiagram
-    participant Client as Client
-    participant Gateway as API Gateway
-    participant ChatController as ChatController
-    participant MessageService as MessageService
-    participant MessageRepo as MessageRepository
-    participant MongoDB as MongoDB
+Luồng này đang tồn tại trong code, nhưng **chưa phải giải pháp cuối cùng**.
 
-    Client->>Gateway: GET /api/v1/chat/history/{conversationId}
-    Gateway->>ChatController: forward request
-    ChatController->>MessageService: getHistory(conversationId)
-    MessageService->>MessageRepo: findByConversationIdOrderByTimestampDesc(...)
-    MessageRepo->>MongoDB: query messages
-    MongoDB-->>MessageRepo: message list
-    MessageService-->>ChatController: messages
-    ChatController-->>Gateway: 200 OK
-    Gateway-->>Client: history JSON
-```
+Hiện trạng:
 
-### 8.9. Use case lấy URL upload file
+- frontend `VideoCallScreen` không làm WebRTC native hoàn chỉnh
+- frontend gửi signaling kiểu `type = "WEBRTC"` qua cùng WebSocket `/ws/chat`
+- `ChatWebSocketHandler` phân nhánh `WEBRTC` để relay signal
+- nếu receiver ở node khác, `chat-service` dùng Redis Pub/Sub để route
+- sau đó frontend mở Jitsi bằng browser / deep link
 
-```mermaid
-sequenceDiagram
-    participant Client as Client
-    participant Gateway as API Gateway
-    participant FileController as FileUploadController
-    participant MinioClient as MinioClient
-    participant MinIO as MinIO
+Luồng này mang tính prototype:
 
-    Client->>Gateway: GET /api/v1/files/presigned-url?fileName=...&contentType=...
-    Gateway->>FileController: forward request
-    FileController->>MinioClient: getPresignedObjectUrl(...)
-    MinioClient-->>FileController: presigned PUT URL
-    FileController-->>Gateway: URL string
-    Gateway-->>Client: presigned URL
-    Client->>MinIO: PUT file using presigned URL
-```
+- có signaling riêng
+- có presence Redis
+- có route qua `SignalingRedisSubscriber`
+- nhưng chưa ổn định để coi là production-ready
 
-## 9. Bảng mapping giữa source code và kiến trúc
+## 8. Tính năng meeting / video call hiện tại
 
-### 9.1. Mapping tổng quan backend
+### 8.1. Thực tế đang có trong code
 
-| Thành phần kiến trúc | Vai trò | Source code chính |
-| --- | --- | --- |
-| API Gateway | Route REST và WebSocket | `backend/api-gateway/src/main/java/com/iuhconnect/gateway/ApiGatewayApplication.java`, `backend/api-gateway/src/main/resources/application.yml` |
-| Auth API layer | Nhận request auth | `backend/auth-service/src/main/java/com/iuhconnect/authservice/controller/AuthController.java` |
-| User API layer | Hồ sơ người dùng | `backend/auth-service/src/main/java/com/iuhconnect/authservice/controller/UserController.java` |
-| Contact API layer | Kết bạn và danh bạ | `backend/auth-service/src/main/java/com/iuhconnect/authservice/controller/ContactController.java` |
-| Auth business logic | Đăng ký, đăng nhập, sinh token | `backend/auth-service/src/main/java/com/iuhconnect/authservice/service/AuthService.java` |
-| User business logic | Đọc và cập nhật profile | `backend/auth-service/src/main/java/com/iuhconnect/authservice/service/UserService.java` |
-| Contact business logic | Gửi/chấp nhận lời mời kết bạn | `backend/auth-service/src/main/java/com/iuhconnect/authservice/service/ContactService.java` |
-| JWT security | Lọc request và xử lý token | `backend/auth-service/src/main/java/com/iuhconnect/authservice/security/JwtAuthenticationFilter.java`, `backend/auth-service/src/main/java/com/iuhconnect/authservice/security/JwtTokenProvider.java`, `backend/auth-service/src/main/java/com/iuhconnect/authservice/config/SecurityConfig.java` |
-| Auth persistence | Truy cập MariaDB | `backend/auth-service/src/main/java/com/iuhconnect/authservice/repository/UserRepository.java`, `backend/auth-service/src/main/java/com/iuhconnect/authservice/repository/FriendshipRepository.java` |
-| User event producer | Publish `user-events` | `backend/auth-service/src/main/java/com/iuhconnect/authservice/service/UserEventProducer.java`, `backend/auth-service/src/main/java/com/iuhconnect/authservice/config/KafkaProducerConfig.java` |
-| Chat REST API | Lịch sử chat, hội thoại gần đây | `backend/chat-service/src/main/java/com/iuhconnect/chatservice/controller/ChatController.java` |
-| File API | Sinh presigned URL upload | `backend/chat-service/src/main/java/com/iuhconnect/chatservice/controller/FileUploadController.java` |
-| WebSocket auth | Xác thực JWT khi handshake | `backend/chat-service/src/main/java/com/iuhconnect/chatservice/security/JwtHandshakeInterceptor.java` |
-| WebSocket handler | Nhận frame chat từ client | `backend/chat-service/src/main/java/com/iuhconnect/chatservice/handler/ChatWebSocketHandler.java` |
-| Session manager | Quản lý session WebSocket theo user | `backend/chat-service/src/main/java/com/iuhconnect/chatservice/handler/WebSocketSessionManager.java` |
-| Chat consumer | Consume `chat-messages`, gửi WS, lưu DB | `backend/chat-service/src/main/java/com/iuhconnect/chatservice/consumer/ChatMessageKafkaConsumer.java` |
-| User sync consumer | Consume `user-events`, sync `ChatUser` | `backend/chat-service/src/main/java/com/iuhconnect/chatservice/consumer/UserEventConsumer.java` |
-| Chat service layer | Truy vấn lịch sử message | `backend/chat-service/src/main/java/com/iuhconnect/chatservice/service/MessageService.java` |
-| Chat persistence | Truy cập MongoDB | `backend/chat-service/src/main/java/com/iuhconnect/chatservice/repository/MessageRepository.java`, `backend/chat-service/src/main/java/com/iuhconnect/chatservice/repository/ChatUserRepository.java` |
-| Kafka config | Producer/consumer config cho chat | `backend/chat-service/src/main/java/com/iuhconnect/chatservice/config/KafkaProducerConfig.java`, `backend/chat-service/src/main/java/com/iuhconnect/chatservice/config/KafkaConsumerConfig.java` |
-| MinIO config | Kết nối object storage | `backend/chat-service/src/main/java/com/iuhconnect/chatservice/config/MinioConfig.java` |
-| Presence scaffold | Service hiện mới bootstrap | `backend/presence-service/src/main/java/com/iuhconnect/presenceservice/PresenceServiceApplication.java` |
-| Notification scaffold | Service hiện mới bootstrap | `backend/notification-service/src/main/java/com/iuhconnect/notificationservice/NotificationServiceApplication.java` |
+Màn hình:
 
-### 9.2. Mapping frontend với use case
+- [frontend/src/screens/VideoCallScreen.tsx](D:/Study/KienTruc/BaiTapLon/frontend/src/screens/VideoCallScreen.tsx:1)
 
-| Use case / màn hình | Source code chính | Ghi chú |
-| --- | --- | --- |
-| Điều phối navigation và app shell | `frontend/App.tsx` | Khai báo stack, tab, splash screen |
-| Đăng ký / đăng nhập | `frontend/src/screens/LoginScreen.tsx` | Gọi `/api/v1/auth/login` và `/api/v1/auth/register` |
-| Danh sách hội thoại | `frontend/src/screens/ChatListScreen.tsx` | Gọi `/api/v1/chat/conversations/{userId}` |
-| Màn hình chat | `frontend/src/screens/ChatScreen.tsx` | Gọi history REST và WebSocket `/ws/chat` |
-| Danh bạ / kết bạn | `frontend/src/screens/ContactsScreen.tsx` | Gọi nhóm API `/api/v1/contacts/*` |
-| Hồ sơ cá nhân | `frontend/src/screens/ProfileSettingsScreen.tsx` | Gọi `/api/v1/users/me` |
-| Trang chủ | `frontend/src/screens/HomeScreen.tsx` | Chủ yếu dữ liệu mock/demo |
-| Nhóm | `frontend/src/screens/GroupsScreen.tsx` | Chủ yếu dữ liệu mock/demo |
-| Video call | `frontend/src/screens/VideoCallScreen.tsx` | Demo UI, chưa có backend call |
-| Component giao diện hỗ trợ | `frontend/src/components/*` | Avatar, trạng thái, banner offline, typing indicator |
+Điểm chính:
 
-## 10. API hiện đang có
+- màn chat có nút camera
+- khi bấm gọi, app điều hướng sang `VideoCallScreen`
+- `VideoCallScreen` mở signaling qua WebSocket
+- nếu đối phương accept, app mở Jitsi room bằng `Linking.openURL(...)`
 
-### 10.1. Auth và user
+### 8.2. Tại sao chưa ổn
 
-Các route bên dưới đang đi qua `api-gateway`:
+Các vấn đề hiện tại:
+
+- signaling đang đi chung đường với chat
+- contract `WEBRTC` chưa tách bạch với contract chat
+- UX nhận cuộc gọi vẫn phụ thuộc nhiều vào trạng thái màn hình hiện tại
+- không có cross-device handoff chuẩn cho desktop
+- media thật đang nằm ngoài app qua Jitsi nên lifecycle khó đồng bộ
+
+### 8.3. Hướng xử lý đã thống nhất
+
+Tính năng này sẽ được làm lại theo plan mới:
+
+- dùng `CALL_SIGNAL` thay cho `WEBRTC`
+- tách meeting khỏi chat
+- vẫn dùng Jitsi làm media engine
+- thêm desktop web tối giản để chuyển cuộc họp từ mobile sang máy tính
+
+Tài liệu thiết kế:
+
+- [implementation_plan_meeting.md](D:/Study/KienTruc/BaiTapLon/implementation_plan_meeting.md:1)
+
+## 9. Mapping giữa code và chức năng
+
+### 9.1. Backend
+
+| Chức năng | File chính |
+| --- | --- |
+| Route gateway | `backend/api-gateway/src/main/resources/application.yml` |
+| Đăng ký / đăng nhập | `backend/auth-service/.../controller/AuthController.java`, `.../service/AuthService.java` |
+| Hồ sơ cá nhân | `backend/auth-service/.../controller/UserController.java`, `.../service/UserService.java` |
+| Kết bạn / danh bạ | `backend/auth-service/.../controller/ContactController.java`, `.../service/ContactService.java` |
+| JWT filter | `backend/auth-service/.../security/JwtAuthenticationFilter.java` |
+| WebSocket chat | `backend/chat-service/.../handler/ChatWebSocketHandler.java` |
+| Session WebSocket | `backend/chat-service/.../handler/WebSocketSessionManager.java` |
+| Consumer lưu message | `backend/chat-service/.../consumer/ChatMessageKafkaConsumer.java` |
+| Consumer sync user | `backend/chat-service/.../consumer/UserEventConsumer.java` |
+| Presence Redis | `backend/chat-service/.../service/PresenceService.java` |
+| Redis signaling subscriber | `backend/chat-service/.../handler/SignalingRedisSubscriber.java` |
+| Redis signaling config | `backend/chat-service/.../config/RedisSignalingConfig.java` |
+| API lịch sử chat | `backend/chat-service/.../controller/ChatController.java` |
+| Presigned URL upload | `backend/chat-service/.../controller/FileUploadController.java` |
+
+### 9.2. Frontend
+
+| Màn hình / use case | File chính |
+| --- | --- |
+| App shell / navigation | `frontend/App.tsx` |
+| Login / Register | `frontend/src/screens/LoginScreen.tsx` |
+| Danh sách hội thoại | `frontend/src/screens/ChatListScreen.tsx` |
+| Màn chat | `frontend/src/screens/ChatScreen.tsx` |
+| Danh bạ / kết bạn | `frontend/src/screens/ContactsScreen.tsx` |
+| Hồ sơ cá nhân | `frontend/src/screens/ProfileSettingsScreen.tsx` |
+| Video call prototype | `frontend/src/screens/VideoCallScreen.tsx` |
+| Màn demo home | `frontend/src/screens/HomeScreen.tsx` |
+| Màn demo groups | `frontend/src/screens/GroupsScreen.tsx` |
+| Config backend URL | `frontend/src/config/env.ts` |
+
+## 10. API hiện có
+
+### 10.1. Auth / User / Contact
+
+Đi qua gateway:
 
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
@@ -489,14 +377,14 @@ Các route bên dưới đang đi qua `api-gateway`:
 - `GET /api/v1/contacts/pending`
 - `GET /api/v1/contacts/list`
 
-### 10.2. Chat
+### 10.2. Chat / File
 
 - `GET /api/v1/chat/history/{conversationId}`
 - `GET /api/v1/chat/conversations/{userId}`
 - `GET /api/v1/files/presigned-url?fileName=<name>&contentType=<type>`
 - `WS /ws/chat?token=<jwt>`
 
-### 10.3. Format tin nhắn WebSocket
+### 10.3. Payload chat WebSocket
 
 ```json
 {
@@ -508,40 +396,60 @@ Các route bên dưới đang đi qua `api-gateway`:
 }
 ```
 
-## 11. Công nghệ sử dụng
+### 10.4. Payload signaling prototype hiện tại
+
+```json
+{
+  "type": "WEBRTC",
+  "senderId": "user1",
+  "receiverId": "user2",
+  "signalType": "CALL_INVITE",
+  "payload": {}
+}
+```
+
+Lưu ý:
+
+- đây là contract tạm thời / prototype
+- contract này dự kiến sẽ bị thay bằng `CALL_SIGNAL` trong redesign meeting
+
+## 11. Frontend hiện đang làm gì
+
+### 11.1. Màn đã nối backend thật
+
+- `LoginScreen`: login/register
+- `ChatScreen`: history + WebSocket chat
+- `ChatListScreen`: conversations
+- `ContactsScreen`: contact APIs
+- `ProfileSettingsScreen`: user profile APIs
+
+### 11.2. Màn chủ yếu là demo UI
+
+- `HomeScreen`
+- `GroupsScreen`
+- một phần `VideoCallScreen`
+
+## 12. Hạ tầng và công nghệ
 
 | Tầng | Công nghệ |
 | --- | --- |
-| Frontend | React Native 0.73, React Navigation, Gifted Chat |
-| API Gateway | Spring Cloud Gateway |
+| Mobile app | React Native 0.73 |
+| Navigation | React Navigation |
+| Chat UI | `react-native-gifted-chat` |
 | Backend | Spring Boot 3.2, Java 17 |
-| Security | Spring Security, JWT (`jjwt`) |
-| Messaging | Apache Kafka, Zookeeper |
-| CSDL quan hệ | MariaDB 11 |
-| CSDL document | MongoDB 7 |
-| Cache / hạ tầng dự kiến | Redis 7.2 |
+| Auth | Spring Security + JWT (`jjwt`) |
+| Message broker | Kafka + Zookeeper |
+| DB quan hệ | MariaDB 11 |
+| DB document | MongoDB 7 |
+| Cache / presence / signaling | Redis 7.2 |
 | Object storage | MinIO |
-| Build tool | Maven, npm |
-| Container | Docker Compose |
+| Containerization | Docker Compose |
 
-## 12. Cách chạy hệ thống
+## 13. Cấu hình môi trường local
 
-### 12.1. Yêu cầu trước khi chạy
+### 13.1. Docker services
 
-- Docker
-- Docker Compose
-- Node.js `>= 18` nếu muốn chạy frontend
-- Môi trường React Native Android/iOS nếu muốn build app mobile
-
-### 12.2. Chạy toàn bộ backend và hạ tầng
-
-```bash
-docker-compose up --build -d
-```
-
-### 12.3. Các container dự kiến
-
-Sau khi khởi động thành công, Compose sẽ chạy các container:
+Khi chạy `docker-compose up --build -d`, hệ thống sẽ tạo:
 
 - `iuh-zookeeper`
 - `iuh-kafka`
@@ -555,15 +463,51 @@ Sau khi khởi động thành công, Compose sẽ chạy các container:
 - `iuh-presence-service`
 - `iuh-notification-service`
 
-Kiểm tra bằng lệnh:
+### 13.2. Port
+
+| Thành phần | Port |
+| --- | --- |
+| API Gateway | `8080` |
+| Auth Service | `8085` |
+| Chat Service | `8082` |
+| Presence Service | `8083` |
+| Zookeeper | `2181` |
+| Kafka | `9092` |
+| MariaDB | `3307` |
+| MongoDB | `27017` |
+| Redis | `6379` |
+| MinIO API | `9000` |
+| MinIO Console | `9001` |
+
+### 13.3. Credential local
+
+| Thành phần | Giá trị |
+| --- | --- |
+| MariaDB root password | `root123` |
+| MariaDB database | `auth_db` |
+| MariaDB user / password | `iuh_user` / `iuh_pass` |
+| MongoDB admin | `iuh_admin` / `iuh_mongo_pass` |
+| Redis password | `iuh_redis_pass` |
+| MinIO root | `iuh_minio_admin` / `iuh_minio_password` |
+| JWT secret | `IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!` |
+
+## 14. Cách chạy project
+
+### 14.1. Chạy backend + infra
+
+```bash
+docker-compose up --build -d
+```
+
+Kiểm tra:
 
 ```bash
 docker ps -a --filter "name=iuh" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ```
 
-### 12.4. Test nhanh
+### 14.2. Test nhanh auth
 
-Đăng ký qua gateway:
+Đăng ký:
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/register \
@@ -571,7 +515,7 @@ curl -X POST http://localhost:8080/api/v1/auth/register \
   -d "{\"username\":\"testuser\",\"password\":\"123456\",\"fullName\":\"Test User\",\"email\":\"test@example.com\"}"
 ```
 
-Đăng nhập qua gateway:
+Đăng nhập:
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/login \
@@ -579,25 +523,13 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -d "{\"username\":\"testuser\",\"password\":\"123456\"}"
 ```
 
-Health check gateway:
+Health gateway:
 
 ```bash
 curl http://localhost:8080/actuator/health
 ```
 
-### 12.5. Dừng hệ thống
-
-```bash
-docker-compose down
-```
-
-Xóa cả volume để reset dữ liệu:
-
-```bash
-docker-compose down -v
-```
-
-## 13. Cách chạy frontend
+### 14.3. Chạy frontend
 
 ```bash
 cd frontend
@@ -605,90 +537,88 @@ npm install
 npx react-native start
 ```
 
-Mở terminal khác:
+Ở terminal khác:
 
 ```bash
 npx react-native run-android
 ```
 
-Ghi chú:
+## 15. Lưu ý cấu hình frontend
 
-- Trên Android emulator, app đang gọi `http://10.0.2.2:8080`.
-- Trên nền tảng khác, app đang gọi `http://localhost:8080`.
-- Một số màn như `HomeScreen`, `GroupsScreen`, `VideoCallScreen` hiện mang tính demo UI nhiều hơn là tích hợp backend đầy đủ.
+File:
 
-## 14. Cấu trúc thư mục
+- [frontend/src/config/env.ts](D:/Study/KienTruc/BaiTapLon/frontend/src/config/env.ts:1)
 
-```text
-BaiTapLon/
-├── docker-compose.yml
-├── README.md
-├── backend/
-│   ├── api-gateway/
-│   ├── auth-service/
-│   ├── chat-service/
-│   ├── notification-service/
-│   └── presence-service/
-└── frontend/
-```
+Điểm quan trọng:
 
-## 15. Thông tin cấu hình local development
+- app hiện đang dùng `SERVER_IP` hardcode
+- trên máy thật hoặc emulator khác môi trường, cần đổi lại IP LAN đúng của máy đang chạy backend
 
-| Thành phần | Giá trị |
-| --- | --- |
-| MariaDB root password | `root123` |
-| MariaDB database | `auth_db` |
-| MariaDB user / password | `iuh_user` / `iuh_pass` |
-| MongoDB database | `iuh_connect_db` |
-| MongoDB admin user / password | `iuh_admin` / `iuh_mongo_pass` |
-| Redis password | `iuh_redis_pass` |
-| MinIO root user / password | `iuh_minio_admin` / `iuh_minio_password` |
-| JWT secret | `IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!` |
+Ví dụ:
 
-Các giá trị trên chỉ nên dùng cho môi trường phát triển nội bộ.
+- emulator Android: có thể dùng `10.0.2.2`
+- máy thật: phải đổi sang IP LAN của máy dev, ví dụ `192.168.x.x`
 
-## 16. Phân tích ưu/nhược điểm kiến trúc microservices
+Nếu quên đổi:
 
-### 16.1. Ưu điểm
+- login không vào
+- WebSocket không kết nối
+- video call / signaling prototype không hoạt động
 
-- Phân tách trách nhiệm rõ ràng: `auth-service` xử lý người dùng và bảo mật, `chat-service` xử lý realtime chat, `api-gateway` làm điểm vào thống nhất. Điều này giúp code dễ tổ chức và dễ mở rộng hơn monolith.
-- Dễ mở rộng theo tải thực tế: nếu lưu lượng chat tăng mạnh, về mặt kiến trúc có thể scale `chat-service` độc lập với `auth-service`.
-- Phù hợp với nghiệp vụ bất đồng bộ: Kafka rất hợp cho các luồng như đồng bộ user sang read model và xử lý message không chặn request đồng bộ.
-- Công nghệ lưu trữ được chọn theo mục đích: MariaDB phù hợp dữ liệu giao dịch như user/friendship; MongoDB phù hợp message document và truy vấn hội thoại.
-- Tăng tính độc lập triển khai: mỗi service có thể build, cấu hình và triển khai riêng.
-- Tạo nền tảng để mở rộng nghiệp vụ sau này: `presence-service`, `notification-service`, MinIO cho media đều cho thấy kiến trúc đã chuẩn bị sẵn cho các tính năng tiếp theo.
+## 16. Hạn chế hiện tại
 
-### 16.2. Nhược điểm
+### 16.1. Chat / realtime
 
-- Độ phức tạp hệ thống tăng lên rõ rệt: chỉ để chạy local đã cần nhiều thành phần như Gateway, Kafka, Zookeeper, MariaDB, MongoDB, Redis, MinIO và nhiều service.
-- Debug khó hơn monolith: một use case đơn giản như gửi tin nhắn phải đi qua WebSocket, Gateway, Kafka, Consumer và MongoDB.
-- Chi phí đồng bộ dữ liệu cao hơn: user được lưu ở MariaDB nhưng lại cần sync sang MongoDB qua event, dẫn tới khả năng chậm đồng bộ hoặc lệch dữ liệu tạm thời.
-- Yêu cầu thiết kế event cẩn thận: nếu message processing không có idempotency tốt thì khi scale out sẽ dễ bị duplicate hoặc inconsistency.
-- Testing tích hợp phức tạp: phải kiểm tra cả REST, WebSocket, Kafka và nhiều kho dữ liệu cùng lúc.
-- Vận hành khó hơn: cần giám sát nhiều service, nhiều port, nhiều cấu hình môi trường hơn so với kiến trúc đơn khối.
+- pipeline Kafka hiện tại có nguy cơ duplicate khi scale nhiều instance `chat-service`
+- session manager hiện thiên về 1 session / 1 user
+- logic broadcast và logic persistence còn dính nhau trong `ChatMessageKafkaConsumer`
 
-### 16.3. Đánh giá cụ thể trên project này
+### 16.2. Presence / signaling
 
-- Project đã thể hiện đúng tinh thần microservices ở mức tách domain và dùng event-driven.
-- Tuy nhiên implementation hiện tại vẫn đang ở giai đoạn phát triển học thuật, chưa đạt mức production-ready.
-- Điểm yếu lớn nhất là `chat-service` chưa hoàn chỉnh cơ chế broadcast đa node và chống duplicate khi scale nhiều instance.
-- Hai service `presence-service` và `notification-service` mới dừng ở scaffold, nên lợi ích “mở rộng độc lập” mới dừng ở mức định hướng kiến trúc.
-- Dù vậy, đối với đồ án, cấu trúc hiện tại là một nền tảng tốt để trình bày các khái niệm microservices, API Gateway, event-driven architecture, CQRS/read-model sync và polyglot persistence.
+- presence thật đang nằm trong `chat-service`, chưa tách thành service riêng hoàn chỉnh
+- signaling video call hiện là prototype kiểu `WEBRTC`
+- signaling vẫn đi chung endpoint `/ws/chat`
 
-## 17. Hạn chế hiện tại và hướng cải thiện
+### 16.3. Meeting / video call
 
-Các điểm chưa hoàn thiện trong code hiện tại:
+- chưa có meeting module độc lập
+- chưa có handoff chuẩn từ mobile sang desktop
+- Jitsi chỉ mới được dùng như giải pháp mở browser ngoài
+- lifecycle cuộc gọi chưa đồng bộ tốt giữa app và media session thực tế
 
-- `chat-service` chưa có cơ chế chống ghi trùng message khi scale nhiều instance.
-- Redis đã được deploy nhưng chưa được dùng đúng vai trò broadcast realtime trong `chat-service`.
-- `UserServiceClient` trong `chat-service` đã được khai báo nhưng chưa thể hiện luồng sử dụng rõ ràng trong nghiệp vụ hiện tại.
-- `presence-service` và `notification-service` mới là skeleton.
-- frontend còn nhiều màn mock dữ liệu, chưa nối trọn backend.
+### 16.4. Frontend
 
-Hướng cải thiện hợp lý:
+- một số màn còn là mock/demo
+- chưa có global incoming call coordinator
+- config môi trường đang phụ thuộc chỉnh tay IP
 
-1. Tách riêng consumer lưu DB và consumer broadcast.
-2. Đưa Redis Pub/Sub vào đúng vai trò broadcast đa node.
-3. Bổ sung presence thật sự và push notification thật sự.
-4. Chuẩn hóa conversation id và message id để tránh duplicate.
-5. Hoàn thiện frontend theo API thực tế thay vì dùng mock ở nhiều màn.
+## 17. Hướng phát triển đã thống nhất
+
+Hướng đi đã được chốt cho tính năng meeting:
+
+- không tiếp tục đẩy WebRTC native custom
+- dùng Jitsi cho media
+- tách `CALL_SIGNAL` khỏi chat
+- tạo `MeetingScreen` riêng
+- thêm desktop web tối giản để join cùng cuộc họp từ máy tính
+- cho phép giảng viên chuyển thiết bị sang desktop để chia sẻ màn hình thuận tiện hơn
+
+Tài liệu thiết kế chính:
+
+- [implementation_plan_meeting.md](D:/Study/KienTruc/BaiTapLon/implementation_plan_meeting.md:1)
+
+## 18. Kết luận
+
+Hiện tại project đã có nền tảng backend/frontend khá đầy đủ cho:
+
+- auth
+- profile
+- contacts
+- chat realtime
+- upload media
+
+Phần video call / meeting đang ở trạng thái prototype và là khu vực cần refactor lớn tiếp theo. Người đọc nên hiểu dự án theo 3 lớp:
+
+1. `Đang chạy tốt`: auth, profile, contacts, chat, upload
+2. `Đang tồn tại trong code nhưng chưa ổn`: signaling/video call prototype
+3. `Định hướng sắp làm`: meeting module + desktop handoff theo `implementation_plan_meeting.md`

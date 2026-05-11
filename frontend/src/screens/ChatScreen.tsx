@@ -21,7 +21,9 @@ import OfflineBanner from '../components/OfflineBanner';
 import MessageTicks from '../components/MessageTicks';
 import TypingIndicator from '../components/TypingIndicator';
 import type { MessageStatus, LecturerStatus } from '../types/types';
-import { API_URL, WS_URL } from '../config/env';
+import { API_URL } from '../config/env';
+import { useWebSocket } from '../services/WebSocketProvider';
+import { isCallSignal } from '../services/callSignaling';
 
 interface ChatScreenProps {
   navigation: any;
@@ -67,13 +69,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   } = route.params;
 
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
-  const [isOffline, setIsOffline] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
   const attachMenuAnim = useRef(new Animated.Value(0)).current;
   const headerAnim = useRef(new Animated.Value(0)).current;
+
+  // Dùng global WebSocket thay vì tạo WS riêng
+  const { sendMessage, addListener, removeListener, isConnected } = useWebSocket();
+  const isOffline = !isConnected;
 
   useEffect(() => {
     Animated.timing(headerAnim, {
@@ -122,88 +126,34 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     fetchHistory();
   }, [conversationId, token, currentUser, recipientId, recipientName, lecturerStatus]);
 
-  // WebSocket connection
+  // Subscribe tới global WebSocket — chỉ nhận chat messages
+  // Incoming call được xử lý ở WebSocketProvider (global coordinator)
   useEffect(() => {
-    if (!token) return;
+    const listenerId = 'chat-' + conversationId;
 
-    try {
-      const ws = new WebSocket(`${WS_URL}/ws/chat?token=${token}`);
-      wsRef.current = ws;
+    const handler = (data: any) => {
+      // Bỏ qua call signals — đã xử lý ở global level
+      if (isCallSignal(data)) return;
 
-      ws.onopen = () => {
-        console.log('✅ Chat WebSocket connected');
-        setIsOffline(false);
+      // Chỉ nhận message thuộc conversation hiện tại
+      if (data.conversationId !== conversationId) return;
+
+      const incomingMessage: ExtendedMessage = {
+        _id: `${data.conversationId}-${data.timestamp}-${Date.now()}`,
+        text: data.content,
+        createdAt: new Date(data.timestamp || Date.now()),
+        user: {
+          _id: data.senderId,
+          name: data.senderId,
+        },
+        status: 'delivered' as MessageStatus,
       };
+      setMessages((prev) => GiftedChat.append(prev, [incomingMessage]));
+    };
 
-      ws.onmessage = (event: WebSocketMessageEvent) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          // Handle incoming call signaling
-          if (data.type === 'WEBRTC') {
-            if (data.signalType === 'CALL_INVITE') {
-              const incomingRoomName = data.roomName || '';
-              Alert.alert(
-                '📞 Cuộc gọi đến',
-                `${data.senderId || 'Người dùng'} đang gọi video cho bạn`,
-                [
-                  {
-                    text: 'Từ chối',
-                    style: 'cancel',
-                  },
-                  {
-                    text: '✅ Nghe máy',
-                    onPress: () => {
-                      navigation.navigate('VideoCall', {
-                        callerId: data.senderId || recipientId,
-                        callerName: data.senderId || recipientName,
-                        token: token,
-                        isIncoming: true,
-                        roomName: incomingRoomName,
-                      });
-                    },
-                  },
-                ],
-              );
-            }
-            // Ignore other signal types in ChatScreen
-            return;
-          }
-
-          // Normal chat message
-          const incomingMessage: ExtendedMessage = {
-            _id: `${data.conversationId}-${data.timestamp}-${Date.now()}`,
-            text: data.content,
-            createdAt: new Date(data.timestamp || Date.now()),
-            user: {
-              _id: data.senderId,
-              name: data.senderId,
-            },
-            status: 'delivered',
-          };
-          setMessages((prev) => GiftedChat.append(prev, [incomingMessage]));
-        } catch (e) {
-          console.error('Failed to parse message:', e);
-        }
-      };
-
-      ws.onclose = () => {
-        setIsOffline(true);
-      };
-
-      ws.onerror = () => {
-        setIsOffline(true);
-      };
-
-      return () => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.close();
-        }
-      };
-    } catch {
-      setIsOffline(true);
-    }
-  }, [token]);
+    addListener(listenerId, handler);
+    return () => removeListener(listenerId);
+  }, [conversationId, addListener, removeListener]);
 
   const onSend = useCallback(
     (newMessages: IMessage[] = []) => {
@@ -215,18 +165,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
       setMessages((prev) => GiftedChat.append(prev, extendedMessages));
 
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        newMessages.forEach((msg) => {
-          const payload = {
-            senderId: currentUser,
-            receiverId: recipientId,
-            content: msg.text,
-            conversationId: conversationId,
-          };
-          ws.send(JSON.stringify(payload));
+      // Gửi qua global WebSocket
+      newMessages.forEach((msg) => {
+        sendMessage({
+          senderId: currentUser,
+          receiverId: recipientId,
+          content: msg.text,
+          conversationId: conversationId,
         });
+      });
 
+      if (!isOffline) {
         setTimeout(() => {
           setMessages((prev) =>
             prev.map((m) =>
@@ -248,10 +197,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         }, 3000);
       }
     },
-    [isOffline, currentUser, recipientId, conversationId],
+    [isOffline, currentUser, recipientId, conversationId, sendMessage],
   );
 
-  const toggleOffline = () => setIsOffline(!isOffline);
+  // isOffline giờ dựa trên isConnected từ WebSocket — không toggle thủ công nữa
 
   const toggleAttachMenu = () => {
     const toValue = showAttachMenu ? 0 : 1;
@@ -452,11 +401,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
               style={styles.headerActionButton}
               onPress={() => {
                 const roomName = `IUHConnect_${recipientId}_${Date.now()}`;
-                navigation.navigate('VideoCall', {
+                navigation.navigate('Meeting', {
                   callerId: recipientId,
                   callerName: recipientName,
                   callerAvatar: recipientAvatar,
-                  token: token,
                   roomName: roomName,
                 });
               }}
