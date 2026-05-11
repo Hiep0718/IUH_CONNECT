@@ -413,7 +413,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerActionButton}
-              onPress={toggleOffline}
+              onPress={() => {}}
             >
               <Icon
                 name={isOffline ? 'wifi-off' : 'dots-vertical'}
@@ -426,7 +426,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       </Animated.View>
 
       {/* Offline Banner */}
-      <OfflineBanner isOffline={isOffline} onRetry={() => setIsOffline(false)} />
+      <OfflineBanner isOffline={isOffline} onRetry={() => {}} />
 
       {/* Busy Notice */}
       {lecturerStatus === 'busy' && (

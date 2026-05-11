@@ -12,6 +12,7 @@ import {
   Alert,
   Linking,
   Share,
+  PermissionsAndroid,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -24,9 +25,12 @@ import {
   createCallEnd,
   isCallSignal,
 } from '../services/callSignaling';
+import { WebView } from 'react-native-webview';
+import { createHandoffToken } from '../services/meetingApi';
 
 const { width, height } = Dimensions.get('window');
-const JITSI_SERVER = 'https://meet.jit.si';
+// meet.jit.si bắt buộc đăng nhập để tạo phòng. Dùng server cộng đồng miễn phí không cần login.
+const JITSI_SERVER = 'https://meet.ffmuc.net';
 
 interface MeetingScreenProps {
   navigation: any;
@@ -40,9 +44,10 @@ interface MeetingScreenProps {
       meetingId?: string;
     };
   };
+  token: string | null;
 }
 
-const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route }) => {
+const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token }) => {
   const {
     callerId,
     callerName,
@@ -60,6 +65,8 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route }) => {
     isIncoming ? 'Đang kết nối...' : 'Đang gọi...',
   );
   const [desktopJoined, setDesktopJoined] = useState(false);
+  const [showWebView, setShowWebView] = useState(false);
+  const [jitsiUrl, setJitsiUrl] = useState('');
 
   const roomNameRef = useRef<string>(initialRoomName || '');
   const meetingIdRef = useRef<string>(initialMeetingId || '');
@@ -75,22 +82,44 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route }) => {
   // ============================================================
   // Jitsi
   // ============================================================
-  const openJitsiMeeting = (room: string) => {
+  const requestPermissions = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        ]);
+        return (
+          granted[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED &&
+          granted[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED
+        );
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const openJitsiMeeting = async (room: string) => {
     if (jitsiOpenedRef.current) return;
+    
+    const hasPermissions = await requestPermissions();
+    if (!hasPermissions) {
+      Alert.alert('Lỗi quyền', 'Cần cấp quyền Camera và Micro để gọi video.');
+      return;
+    }
+
     jitsiOpenedRef.current = true;
 
-    const jitsiUrl = `${JITSI_SERVER}/${room}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.disableDeepLinking=true&interfaceConfig.TOOLBAR_BUTTONS=["microphone","camera","hangup","fullscreen","tileview"]&interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS=true&interfaceConfig.SHOW_CHROME_EXTENSION_BANNER=false`;
-
-    console.log('🌐 Opening Jitsi Meet:', room);
+    // WebView url - hide header and disable prejoin
+    const url = `${JITSI_SERVER}/${room}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.disableDeepLinking=true&interfaceConfig.TOOLBAR_BUTTONS=["microphone","camera","hangup","fullscreen","tileview","chat"]&interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS=true&interfaceConfig.SHOW_CHROME_EXTENSION_BANNER=false`;
+    
+    console.log('🌐 Opening Jitsi inside WebView:', room);
     setIsConnected(true);
     setCallStatus('Đang trong cuộc gọi');
-
-    Linking.openURL(jitsiUrl).catch((err) => {
-      console.error('Failed to open Jitsi URL:', err);
-      Alert.alert('Lỗi', 'Không thể mở trình duyệt để bắt đầu cuộc gọi.', [
-        { text: 'Đóng', onPress: () => navigation.goBack() },
-      ]);
-    });
+    setJitsiUrl(url);
+    setShowWebView(true);
   };
 
   // ============================================================
@@ -228,27 +257,29 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route }) => {
 
   const handleRejoinJitsi = () => {
     if (roomNameRef.current) {
-      jitsiOpenedRef.current = false;
-      openJitsiMeeting(roomNameRef.current);
+      setShowWebView(true);
     }
   };
 
   const handleOpenOnDesktop = async () => {
-    // Hiện link cho user copy — handoff token sẽ được tạo từ MeetingHandoffModal
-    // Tạm thời hiển thị room name để user có thể join trên desktop
     const meetingId = meetingIdRef.current;
     if (!meetingId) {
-      Alert.alert('Chưa sẵn sàng', 'Vui lòng đợi cuộc gọi được kết nối.');
+      Alert.alert('Chưa sẵn sàng', 'Vui lòng đợi cuộc gọi được kết nối hoàn tất để lấy mã chuyển thiết bị.');
       return;
     }
 
     try {
+      if (!token) throw new Error('No auth token');
+      Alert.alert('Đang tạo link...', 'Vui lòng đợi trong giây lát');
+      const data = await createHandoffToken(meetingId, token);
+      
       await Share.share({
-        message: `Tham gia cuộc họp IUH Connect: ${JITSI_SERVER}/${roomNameRef.current}`,
-        title: 'IUH Connect - Chia sẻ cuộc họp',
+        message: `Mở link sau trên máy tính của bạn để tiếp tục cuộc gọi IUH Connect:\n${data.meetingUrl}`,
+        title: 'Chuyển cuộc gọi sang Máy tính',
       });
     } catch (e) {
-      console.error('Share failed:', e);
+      console.error('Handoff error:', e);
+      Alert.alert('Lỗi', 'Không thể tạo link chuyển thiết bị lúc này.');
     }
   };
 
@@ -436,6 +467,35 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route }) => {
           </View>
         </LinearGradient>
       </Animated.View>
+
+      {/* Jitsi WebView Overlay */}
+      {showWebView && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', zIndex: 999 }]}>
+          <SafeAreaView style={{ flex: 1 }}>
+            <View style={styles.webViewHeader}>
+              <TouchableOpacity
+                style={styles.webViewCloseBtn}
+                onPress={() => setShowWebView(false)}
+              >
+                <Icon name="chevron-down" size={28} color="#FFF" />
+              </TouchableOpacity>
+              <Text style={styles.webViewTitle}>Cuộc họp: {callerName}</Text>
+              <TouchableOpacity style={styles.webViewEndBtn} onPress={handleEndCall}>
+                <Icon name="phone-hangup" size={20} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+            <WebView
+              source={{ uri: jitsiUrl }}
+              style={{ flex: 1 }}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              allowsInlineMediaPlayback={true}
+              mediaPlaybackRequiresUserAction={false}
+              mediaCapturePermissionGrantType="grant"
+            />
+          </SafeAreaView>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -516,6 +576,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   endCallLabel: { color: 'rgba(255,255,255,0.6)', fontSize: Typography.caption, marginTop: 8 },
+  webViewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  webViewCloseBtn: {
+    padding: 4,
+  },
+  webViewTitle: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  webViewEndBtn: {
+    backgroundColor: '#F44336',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
 
 export default MeetingScreen;

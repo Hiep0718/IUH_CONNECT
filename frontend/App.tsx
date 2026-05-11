@@ -421,7 +421,7 @@ export default function App() {
                 gestureEnabled: false,
               }}
             >
-              {(props) => <MeetingScreen {...props} />}
+              {(props) => <MeetingScreen {...props} token={token} />}
             </Stack.Screen>
 
             <Stack.Screen
