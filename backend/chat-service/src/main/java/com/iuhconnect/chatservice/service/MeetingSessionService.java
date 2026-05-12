@@ -173,6 +173,40 @@ public class MeetingSessionService {
         log.info("🗑️ Handoff token consumed [token={}]", token);
     }
 
+    // ==================== Desktop QR Handoff ====================
+
+    /**
+     * Mobile quét QR code và gửi sessionId lên để link với meeting hiện tại.
+     * Trả về true nếu link thành công.
+     */
+    public boolean linkDesktopSession(String meetingId, String sessionId, String userId) {
+        MeetingSession session = getMeeting(meetingId);
+        if (session == null || session.getStatus() == MeetingStatus.ENDED) {
+            return false;
+        }
+        if (!session.getParticipantUserIds().contains(userId)) {
+            return false;
+        }
+        
+        // Lưu mapping từ sessionId -> meetingId (TTL 5 phút)
+        String key = "meeting:desktop:" + sessionId;
+        redisTemplate.opsForValue().set(key, meetingId, 5, TimeUnit.MINUTES);
+        log.info("📱 Mobile linked desktop session [meetingId={}, sessionId={}]", meetingId, sessionId);
+        return true;
+    }
+
+    /**
+     * Desktop gọi API này để kiểm tra xem đã được link chưa.
+     */
+    public MeetingSession checkDesktopSession(String sessionId) {
+        String key = "meeting:desktop:" + sessionId;
+        String meetingId = redisTemplate.opsForValue().get(key);
+        if (meetingId == null) {
+            return null; // Chưa có ai quét hoặc hết hạn
+        }
+        return getMeeting(meetingId);
+    }
+
     // ==================== Internal ====================
 
     private void saveMeeting(MeetingSession session) {

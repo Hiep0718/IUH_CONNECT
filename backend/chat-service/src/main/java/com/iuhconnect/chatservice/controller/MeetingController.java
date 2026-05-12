@@ -10,7 +10,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
@@ -24,10 +30,20 @@ import jakarta.servlet.http.HttpServletRequest;
 public class MeetingController {
 
     private static final Logger log = LoggerFactory.getLogger(MeetingController.class);
-    private static final String JITSI_SERVER = "https://meet.jit.si";
+    private static final String JITSI_SERVER = "https://meet.ffmuc.net";
 
     private final MeetingSessionService meetingSessionService;
     private final CallSignalService callSignalService;
+
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
+    private SecretKey key;
+
+    @PostConstruct
+    public void init() {
+        this.key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
 
     public MeetingController(MeetingSessionService meetingSessionService,
                              CallSignalService callSignalService) {
@@ -136,20 +152,76 @@ public class MeetingController {
     }
 
     /**
+     * POST /api/v1/meetings/{meetingId}/link-desktop/{sessionId}
+     *
+     * Mobile quét QR và gọi API này để liên kết meeting với desktop session.
+     */
+    @PostMapping("/{meetingId}/link-desktop/{sessionId}")
+    public ResponseEntity<Void> linkDesktop(
+            @PathVariable String meetingId,
+            @PathVariable String sessionId,
+            HttpServletRequest request) {
+        String userId = extractUserId(request);
+        if (userId == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        boolean linked = meetingSessionService.linkDesktopSession(meetingId, sessionId, userId);
+        if (!linked) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * GET /api/v1/meetings/desktop-session/{sessionId}
+     *
+     * Desktop gọi định kỳ (polling) để chờ mobile scan.
+     */
+    @GetMapping("/desktop-session/{sessionId}")
+    public ResponseEntity<MeetingJoinInfoResponse> checkDesktopSession(@PathVariable String sessionId) {
+        MeetingSession session = meetingSessionService.checkDesktopSession(sessionId);
+        if (session == null) {
+            return ResponseEntity.notFound().build(); // 404 nghĩa là đang chờ hoặc hết hạn
+        }
+
+        String jitsiUrl = JITSI_SERVER + "/" + session.getRoomName();
+        return ResponseEntity.ok(MeetingJoinInfoResponse.builder()
+                .meetingId(session.getMeetingId())
+                .roomName(session.getRoomName())
+                .jitsiUrl(jitsiUrl)
+                .build());
+    }
+
+    /**
      * Trích xuất userId từ request.
-     * Gateway chuyển tiếp JWT, chat-service có thể dùng header hoặc attribute.
      */
     private String extractUserId(HttpServletRequest request) {
-        // Ưu tiên 1: attribute set bởi JWT filter
+        // Ưu tiên 1: Authorization Header (JWT)
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            try {
+                return Jwts.parser()
+                        .verifyWith(key)
+                        .build()
+                        .parseSignedClaims(token)
+                        .getPayload()
+                        .getSubject();
+            } catch (Exception e) {
+                log.warn("Invalid JWT in MeetingController: {}", e.getMessage());
+            }
+        }
+
+        // Ưu tiên 2: attribute set bởi JWT filter (nếu có sau này)
         Object userAttr = request.getAttribute("username");
         if (userAttr != null) return userAttr.toString();
 
-        // Ưu tiên 2: header X-User-Id (set bởi gateway hoặc filter)
+        // Ưu tiên 3: header X-User-Id (set bởi gateway)
         String headerUser = request.getHeader("X-User-Id");
         if (headerUser != null && !headerUser.isEmpty()) return headerUser;
 
-        // Ưu tiên 3: query param (fallback cho testing)
-        String paramUser = request.getParameter("userId");
-        return paramUser;
+        // Ưu tiên 4: query param (fallback)
+        return request.getParameter("userId");
     }
 }

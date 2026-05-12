@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { Alert } from 'react-native';
 import { WS_URL } from '../config/env';
+import Sound from 'react-native-sound';
 
 // ============================================================
 // Types
@@ -64,6 +65,21 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout>>();
   const isMountedRef = useRef(true);
+  const globalRingtoneRef = useRef<Sound | null>(null);
+
+  // Initialize Global Ringtone
+  useEffect(() => {
+    globalRingtoneRef.current = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, (error) => {
+      if (error) console.log('Lỗi tải global ringtone', error);
+    });
+
+    return () => {
+      if (globalRingtoneRef.current) {
+        globalRingtoneRef.current.stop();
+        globalRingtoneRef.current.release();
+      }
+    };
+  }, []);
 
   // ---- Connect ----
   const connect = useCallback(() => {
@@ -83,11 +99,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           const data = JSON.parse(event.data);
 
           // === Global incoming call handler ===
-          if (
-            data.type === 'CALL_SIGNAL' &&
-            data.signalType === 'CALL_INVITE'
-          ) {
-            handleGlobalIncomingCall(data);
+          if (data.type === 'CALL_SIGNAL') {
+            if (data.signalType === 'CALL_INVITE') {
+              handleGlobalIncomingCall(data);
+            } else if (data.signalType === 'CALL_END' || data.signalType === 'CALL_REJECT') {
+              if (globalRingtoneRef.current) {
+                globalRingtoneRef.current.stop();
+              }
+            }
           }
 
           // Broadcast tới tất cả listeners
@@ -161,6 +180,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const handleGlobalIncomingCall = (data: any) => {
     const callerName = data.senderName || data.senderId || 'Người dùng';
 
+    // Play ringtone globally when invited
+    if (globalRingtoneRef.current) {
+      globalRingtoneRef.current.setNumberOfLoops(-1);
+      globalRingtoneRef.current.play();
+    }
+
     Alert.alert(
       '📞 Cuộc gọi đến',
       `${callerName} đang gọi video cho bạn`,
@@ -169,6 +194,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           text: 'Từ chối',
           style: 'cancel',
           onPress: () => {
+            if (globalRingtoneRef.current) globalRingtoneRef.current.stop();
             // Gửi CALL_REJECT
             sendMessage({
               type: 'CALL_SIGNAL',
@@ -181,6 +207,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         {
           text: '✅ Nghe máy',
           onPress: () => {
+            if (globalRingtoneRef.current) globalRingtoneRef.current.stop();
             if (navigationRef?.current) {
               navigationRef.current.navigate('Meeting', {
                 callerId: data.senderId,
@@ -193,6 +220,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           },
         },
       ],
+      {
+        onDismiss: () => {
+          if (globalRingtoneRef.current) globalRingtoneRef.current.stop();
+        }
+      }
     );
   };
 

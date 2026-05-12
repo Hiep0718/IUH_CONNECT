@@ -26,7 +26,13 @@ import {
   isCallSignal,
 } from '../services/callSignaling';
 import { WebView } from 'react-native-webview';
-import { createHandoffToken } from '../services/meetingApi';
+import { createHandoffToken, linkDesktopSession } from '../services/meetingApi';
+import { API_URL } from '../config/env';
+import { MeetingHandoffModal } from '../components/MeetingHandoffModal';
+import Sound from 'react-native-sound';
+
+// Kích hoạt sound
+Sound.setCategory('Playback');
 
 const { width, height } = Dimensions.get('window');
 // meet.jit.si bắt buộc đăng nhập để tạo phòng. Dùng server cộng đồng miễn phí không cần login.
@@ -67,6 +73,11 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
   const [desktopJoined, setDesktopJoined] = useState(false);
   const [showWebView, setShowWebView] = useState(false);
   const [jitsiUrl, setJitsiUrl] = useState('');
+  
+  // Handoff Modal state
+  const [handoffModalVisible, setHandoffModalVisible] = useState(false);
+  const [handoffUrl, setHandoffUrl] = useState('');
+  const [isGeneratingHandoff, setIsGeneratingHandoff] = useState(false);
 
   const roomNameRef = useRef<string>(initialRoomName || '');
   const meetingIdRef = useRef<string>(initialMeetingId || '');
@@ -78,6 +89,33 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
   const callerInfoAnim = useRef(new Animated.Value(0)).current;
   const endCallScale = useRef(new Animated.Value(1)).current;
   const recordingDotAnim = useRef(new Animated.Value(1)).current;
+
+  // Sound Refs
+  const ringtoneSound = useRef<Sound | null>(null);
+  const dialtoneSound = useRef<Sound | null>(null);
+
+  // Initialize Sounds
+  useEffect(() => {
+    // Âm báo cuộc gọi đến
+    ringtoneSound.current = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, (error) => {
+      if (error) console.log('Lỗi tải ringtone', error);
+    });
+    // Âm đổ chuông khi gọi đi
+    dialtoneSound.current = new Sound('dialtone.mp3', Sound.MAIN_BUNDLE, (error) => {
+      if (error) console.log('Lỗi tải dialtone', error);
+    });
+
+    return () => {
+      if (ringtoneSound.current) {
+        ringtoneSound.current.stop();
+        ringtoneSound.current.release();
+      }
+      if (dialtoneSound.current) {
+        dialtoneSound.current.stop();
+        dialtoneSound.current.release();
+      }
+    };
+  }, []);
 
   // ============================================================
   // Jitsi
@@ -141,12 +179,28 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
       }
       sendMessage(createCallInvite(callerId, roomNameRef.current));
       setCallStatus('Đang gọi...');
+      
+      // Phát âm đổ chuông (lặp lại)
+      setTimeout(() => {
+        if (dialtoneSound.current && !isConnected) {
+          dialtoneSound.current.setNumberOfLoops(-1);
+          dialtoneSound.current.play();
+        }
+      }, 500);
+      
     } else {
       // === CALLEE ===
+      // Phát chuông báo cuộc gọi đến
+      if (ringtoneSound.current) {
+        ringtoneSound.current.setNumberOfLoops(-1);
+        ringtoneSound.current.play();
+      }
+      
       sendMessage(
         createCallAccept(callerId, meetingIdRef.current, roomNameRef.current),
       );
       setTimeout(() => {
+        if (ringtoneSound.current) ringtoneSound.current.stop();
         if (isMounted) openJitsiMeeting(roomNameRef.current);
       }, 500);
     }
@@ -158,6 +212,8 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
       console.log('📩 Meeting Signal:', data.signalType);
 
       if (data.signalType === 'CALL_ACCEPT') {
+        if (dialtoneSound.current) dialtoneSound.current.stop();
+        
         // Lưu meetingId từ backend
         if (data.meetingId) meetingIdRef.current = data.meetingId;
         setCallStatus('Đối phương đã nghe máy!');
@@ -165,10 +221,16 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
           if (isMounted) openJitsiMeeting(roomNameRef.current);
         }, 500);
       } else if (data.signalType === 'CALL_REJECT') {
+        if (dialtoneSound.current) dialtoneSound.current.stop();
+        if (ringtoneSound.current) ringtoneSound.current.stop();
+        
         Alert.alert('Cuộc gọi bị từ chối', 'Đối phương đã từ chối cuộc gọi.', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
       } else if (data.signalType === 'CALL_END') {
+        if (dialtoneSound.current) dialtoneSound.current.stop();
+        if (ringtoneSound.current) ringtoneSound.current.stop();
+        
         Alert.alert('Cuộc gọi kết thúc', 'Đối phương đã kết thúc cuộc gọi.', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
@@ -249,6 +311,9 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
   };
 
   const handleEndCall = () => {
+    if (dialtoneSound.current) dialtoneSound.current.stop();
+    if (ringtoneSound.current) ringtoneSound.current.stop();
+    
     sendMessage(createCallEnd(callerId, meetingIdRef.current));
     Animated.timing(endCallScale, {
       toValue: 0, duration: 300, useNativeDriver: true,
@@ -261,25 +326,30 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
     }
   };
 
-  const handleOpenOnDesktop = async () => {
+  const handleOpenOnDesktop = () => {
     const meetingId = meetingIdRef.current;
     if (!meetingId) {
       Alert.alert('Chưa sẵn sàng', 'Vui lòng đợi cuộc gọi được kết nối hoàn tất để lấy mã chuyển thiết bị.');
       return;
     }
 
+    setHandoffModalVisible(true);
+  };
+
+  const handleScanSuccess = async (desktopId: string) => {
+    const meetingId = meetingIdRef.current;
+    if (!meetingId || !token) return;
+
+    setIsGeneratingHandoff(true);
     try {
-      if (!token) throw new Error('No auth token');
-      Alert.alert('Đang tạo link...', 'Vui lòng đợi trong giây lát');
-      const data = await createHandoffToken(meetingId, token);
-      
-      await Share.share({
-        message: `Mở link sau trên máy tính của bạn để tiếp tục cuộc gọi IUH Connect:\n${data.meetingUrl}`,
-        title: 'Chuyển cuộc gọi sang Máy tính',
-      });
+      await linkDesktopSession(meetingId, desktopId, token);
+      // Backend will relay DEVICE_JOINED when desktop joins
     } catch (e) {
-      console.error('Handoff error:', e);
-      Alert.alert('Lỗi', 'Không thể tạo link chuyển thiết bị lúc này.');
+      console.error('Link desktop error:', e);
+      Alert.alert('Lỗi', 'Không thể liên kết thiết bị. Vui lòng thử lại.');
+      setHandoffModalVisible(false);
+    } finally {
+      setIsGeneratingHandoff(false);
     }
   };
 
@@ -496,6 +566,14 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
           </SafeAreaView>
         </View>
       )}
+
+      {/* Handoff Modal */}
+      <MeetingHandoffModal
+        visible={handoffModalVisible}
+        onClose={() => setHandoffModalVisible(false)}
+        onScanSuccess={handleScanSuccess}
+        isJoined={desktopJoined}
+      />
     </SafeAreaView>
   );
 };

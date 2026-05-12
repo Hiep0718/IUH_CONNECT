@@ -28,3 +28,26 @@ export const createHandoffToken = async (
 
   return res.json();
 };
+
+/**
+ * Liên kết meeting với desktop session qua QR scan.
+ */
+export const linkDesktopSession = async (
+  meetingId: string,
+  desktopSessionId: string,
+  authToken: string,
+): Promise<void> => {
+  const res = await fetch(
+    `${API_URL}/api/v1/meetings/${meetingId}/link-desktop/${desktopSessionId}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    },
+  );
+
+  if (!res.ok) {
+    throw new Error(`Failed to link desktop session: ${res.status}`);
+  }
+};
