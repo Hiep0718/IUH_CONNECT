@@ -372,7 +372,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             <Icon name="arrow-left" size={24} color={Colors.white} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.headerProfile} activeOpacity={0.7}>
+          <TouchableOpacity 
+            style={styles.headerProfile} 
+            activeOpacity={0.7}
+            onPress={() => {
+              if (isGroup) {
+                navigation.navigate('GroupSettings', { conversationId, groupName: recipientName });
+              }
+            }}
+          >
             <Avatar
               name={recipientName}
               uri={recipientAvatar}

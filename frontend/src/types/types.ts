@@ -117,6 +117,7 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   Login: undefined;
   MainTabs: undefined;
+  CreateGroup: undefined;
   Chat: {
     conversationId: string;
     recipientName: string;
@@ -125,6 +126,10 @@ export type RootStackParamList = {
     isOnline?: boolean;
     lecturerStatus?: LecturerStatus;
     isGroup?: boolean;
+  };
+  GroupSettings: {
+    conversationId: string;
+    groupName: string;
   };
   Meeting: {
     callerId: string;

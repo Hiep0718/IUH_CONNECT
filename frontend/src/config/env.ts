@@ -17,7 +17,7 @@ import { Platform } from 'react-native';
 
 // Đổi dòng này thành IP LAN của bạn, ví dụ: const SERVER_IP = '192.168.1.45';
 // Nếu để 'AUTO', app sẽ tự động chọn 10.0.2.2 cho Android và localhost cho iOS (chỉ chạy được trên máy ảo)
-const SERVER_IP: string = '192.168.1.21';
+const SERVER_IP: string = '192.168.1.139';
 const SERVER_PORT = '8080';
 
 const getHost = () => {

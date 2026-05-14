@@ -11,6 +11,7 @@
 *.log
 target/
 !.mvn/wrapper/maven-wrapper.jar
+!gradle-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
 

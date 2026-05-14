@@ -13,6 +13,8 @@ import HomeScreen from './src/screens/HomeScreen';
 import ChatListScreen from './src/screens/ChatListScreen';
 import ContactsScreen from './src/screens/ContactsScreen';
 import GroupsScreen from './src/screens/GroupsScreen';
+import CreateGroupScreen from './src/screens/CreateGroupScreen';
+import GroupSettingsScreen from './src/screens/GroupSettingsScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import MeetingScreen from './src/screens/MeetingScreen';
 import ProfileSettingsScreen from './src/screens/ProfileSettingsScreen';
@@ -398,6 +400,24 @@ export default function App() {
                   token={token}
                   onLogout={handleLogout}
                 />
+              )}
+            </Stack.Screen>
+
+            <Stack.Screen
+              name="CreateGroup"
+              options={{ animation: 'slide_from_bottom' }}
+            >
+              {(props) => (
+                <CreateGroupScreen {...props} />
+              )}
+            </Stack.Screen>
+
+            <Stack.Screen
+              name="GroupSettings"
+              options={{ animation: 'slide_from_right' }}
+            >
+              {(props) => (
+                <GroupSettingsScreen {...props} currentUser={currentUser} token={token} />
               )}
             </Stack.Screen>
 

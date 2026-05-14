@@ -461,7 +461,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
           },
         ]}
       >
-        <TouchableOpacity activeOpacity={0.85} style={styles.fabTouch}>
+        <TouchableOpacity activeOpacity={0.85} style={styles.fabTouch} onPress={() => navigation.navigate('CreateGroup', { currentUser })}>
           <LinearGradient
             colors={['#0077CC', '#004A82']}
             start={{ x: 0, y: 0 }}
