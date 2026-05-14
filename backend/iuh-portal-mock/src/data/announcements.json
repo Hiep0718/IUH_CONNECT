@@ -1,0 +1,98 @@
+{
+  "school": [
+    {
+      "id": "tb01",
+      "title": "Thông báo lịch nghỉ lễ Giỗ Tổ Hùng Vương 2026",
+      "source": "Ban Giám Hiệu",
+      "content": "Theo thông báo của Ban Giám Hiệu, toàn thể cán bộ, giảng viên và sinh viên được nghỉ lễ Giỗ Tổ Hùng Vương từ ngày 10/04/2026 đến hết ngày 10/04/2026. Lịch học bù sẽ được thông báo sau.",
+      "createdAt": "2026-05-14T06:00:00Z",
+      "category": "nghỉ lễ",
+      "priority": "high"
+    },
+    {
+      "id": "tb02",
+      "title": "Kế hoạch tổ chức Lễ tốt nghiệp đợt 1 năm 2026",
+      "source": "Phòng Đào Tạo",
+      "content": "Lễ tốt nghiệp đợt 1 năm 2026 sẽ được tổ chức vào ngày 20/06/2026 tại Hội trường lớn. Sinh viên đủ điều kiện xem danh sách trên website phòng đào tạo.",
+      "createdAt": "2026-05-13T04:00:00Z",
+      "category": "đào tạo",
+      "priority": "high"
+    },
+    {
+      "id": "tb03",
+      "title": "Thông báo đóng học phí HK2 năm học 2025-2026",
+      "source": "Phòng Tài Chính",
+      "content": "Sinh viên hoàn thành đóng học phí HK2 trước ngày 30/05/2026. Sau thời hạn, sinh viên chưa đóng sẽ bị hủy đăng ký môn học.",
+      "createdAt": "2026-05-12T07:00:00Z",
+      "category": "học phí",
+      "priority": "normal"
+    },
+    {
+      "id": "tb04",
+      "title": "Cập nhật quy chế thi kết thúc học phần",
+      "source": "Phòng Đào Tạo",
+      "content": "Quy chế thi mới áp dụng từ HK2 2025-2026. Sinh viên cần đọc kỹ quy định về điều kiện dự thi, quy tắc phòng thi và xử lý vi phạm.",
+      "createdAt": "2026-05-11T08:00:00Z",
+      "category": "quy chế",
+      "priority": "normal"
+    },
+    {
+      "id": "tb05",
+      "title": "Thông báo tuyển dụng thực tập sinh hè 2026",
+      "source": "Phòng CTSV",
+      "content": "Các doanh nghiệp đối tác đang tuyển thực tập sinh cho đợt hè 2026. Sinh viên xem chi tiết trên website phòng CTSV hoặc liên hệ cố vấn học tập.",
+      "createdAt": "2026-05-10T03:00:00Z",
+      "category": "việc làm",
+      "priority": "normal"
+    },
+    {
+      "id": "tb06",
+      "title": "Lịch đăng ký môn học HK1 năm học 2026-2027",
+      "source": "Phòng Đào Tạo",
+      "content": "Thời gian đăng ký môn học HK1 2026-2027 bắt đầu từ ngày 01/06/2026 đến 15/06/2026. Sinh viên đăng nhập hệ thống đào tạo để đăng ký.",
+      "createdAt": "2026-05-09T02:00:00Z",
+      "category": "đào tạo",
+      "priority": "high"
+    }
+  ],
+  "faculty": {
+    "CNTT": [
+      {
+        "id": "khoa01",
+        "title": "Lịch thi HK2 khoa CNTT đã được cập nhật",
+        "source": "Khoa CNTT",
+        "content": "Lịch thi kết thúc học phần HK2 2025-2026 đã được cập nhật. Sinh viên kiểm tra lịch thi trên hệ thống.",
+        "createdAt": "2026-05-13T05:00:00Z",
+        "category": "lịch thi",
+        "priority": "high"
+      },
+      {
+        "id": "khoa02",
+        "title": "Thông báo seminar: AI trong phát triển phần mềm",
+        "source": "Khoa CNTT",
+        "content": "Khoa CNTT tổ chức seminar chuyên đề 'Ứng dụng AI trong phát triển phần mềm hiện đại' vào ngày 15/05/2026 tại phòng V7.01. Mời toàn thể SV và GV tham dự.",
+        "createdAt": "2026-05-13T02:00:00Z",
+        "category": "seminar",
+        "priority": "normal"
+      },
+      {
+        "id": "khoa03",
+        "title": "Danh sách sinh viên đủ điều kiện thực tập tốt nghiệp",
+        "source": "Khoa CNTT",
+        "content": "Danh sách sinh viên đủ điều kiện đăng ký thực tập tốt nghiệp HK2 2025-2026 đã được công bố. Xem chi tiết trên website khoa.",
+        "createdAt": "2026-05-12T06:00:00Z",
+        "category": "thực tập",
+        "priority": "normal"
+      },
+      {
+        "id": "khoa04",
+        "title": "Hướng dẫn đồ án tốt nghiệp HK2 2025-2026",
+        "source": "Khoa CNTT",
+        "content": "Sinh viên thực hiện đồ án tốt nghiệp nộp đề cương trước ngày 25/05/2026. Liên hệ giảng viên hướng dẫn để được phê duyệt đề tài.",
+        "createdAt": "2026-05-11T03:00:00Z",
+        "category": "đồ án",
+        "priority": "normal"
+      }
+    ]
+  }
+}

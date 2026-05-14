@@ -1,0 +1,102 @@
+{
+  "studentSchedules": {
+    "22641211": {
+      "semester": "HK2 2025-2026",
+      "monday": [
+        { "subject": "Kiến trúc phần mềm", "lecturer": "TS. Nguyễn Văn An", "room": "V7.01", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "credits": 3 },
+        { "subject": "Lập trình di động", "lecturer": "ThS. Trần Thị Bình", "room": "V9.02", "startTime": "09:45", "endTime": "11:15", "periods": "Tiết 4-5", "credits": 3 },
+        { "subject": "Toán rời rạc", "lecturer": "TS. Hoàng Minh Đức", "room": "X12.05", "startTime": "13:00", "endTime": "15:30", "periods": "Tiết 7-9", "credits": 3 }
+      ],
+      "tuesday": [
+        { "subject": "Cơ sở dữ liệu", "lecturer": "TS. Lê Minh Tuấn", "room": "V8.03", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "credits": 3 },
+        { "subject": "Lập trình hướng đối tượng", "lecturer": "ThS. Võ Thị Mai", "room": "V10.01", "startTime": "13:00", "endTime": "15:30", "periods": "Tiết 7-9", "credits": 3 }
+      ],
+      "wednesday": [
+        { "subject": "Kiến trúc phần mềm", "lecturer": "TS. Nguyễn Văn An", "room": "V7.01", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "credits": 3 },
+        { "subject": "Anh văn chuyên ngành", "lecturer": "ThS. Nguyễn Thị Lan", "room": "V5.04", "startTime": "09:45", "endTime": "11:15", "periods": "Tiết 4-5", "credits": 2 },
+        { "subject": "Toán rời rạc", "lecturer": "TS. Hoàng Minh Đức", "room": "X12.05", "startTime": "13:00", "endTime": "15:30", "periods": "Tiết 7-9", "credits": 3 }
+      ],
+      "thursday": [
+        { "subject": "Cơ sở dữ liệu", "lecturer": "TS. Lê Minh Tuấn", "room": "V8.03", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "credits": 3 },
+        { "subject": "Lập trình di động", "lecturer": "ThS. Trần Thị Bình", "room": "V9.02", "startTime": "09:45", "endTime": "11:15", "periods": "Tiết 4-5", "credits": 3 }
+      ],
+      "friday": [
+        { "subject": "Lập trình hướng đối tượng", "lecturer": "ThS. Võ Thị Mai", "room": "V10.01", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "credits": 3 }
+      ],
+      "saturday": [],
+      "sunday": []
+    },
+    "20001234": {
+      "semester": "HK2 2025-2026",
+      "monday": [
+        { "subject": "Công nghệ phần mềm", "lecturer": "TS. Nguyễn Văn An", "room": "V7.02", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "credits": 3 },
+        { "subject": "Mạng máy tính", "lecturer": "TS. Phạm Quốc Hưng", "room": "V11.03", "startTime": "13:00", "endTime": "15:30", "periods": "Tiết 7-9", "credits": 3 }
+      ],
+      "tuesday": [
+        { "subject": "Trí tuệ nhân tạo", "lecturer": "TS. Trần Minh Quang", "room": "X9.01", "startTime": "09:45", "endTime": "11:15", "periods": "Tiết 4-5", "credits": 3 }
+      ],
+      "wednesday": [],
+      "thursday": [
+        { "subject": "Công nghệ phần mềm", "lecturer": "TS. Nguyễn Văn An", "room": "V7.02", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "credits": 3 }
+      ],
+      "friday": [
+        { "subject": "Mạng máy tính", "lecturer": "TS. Phạm Quốc Hưng", "room": "V11.03", "startTime": "13:00", "endTime": "15:30", "periods": "Tiết 7-9", "credits": 3 }
+      ],
+      "saturday": [],
+      "sunday": []
+    }
+  },
+  "lecturerSchedules": {
+    "GV001": {
+      "semester": "HK2 2025-2026",
+      "monday": [
+        { "subject": "Kiến trúc phần mềm", "classCode": "DHTH17A", "room": "V7.01", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "studentCount": 45 },
+        { "subject": "Công nghệ phần mềm", "classCode": "DHTH15A", "room": "V7.02", "startTime": "13:00", "endTime": "15:30", "periods": "Tiết 7-9", "studentCount": 52 }
+      ],
+      "tuesday": [],
+      "wednesday": [
+        { "subject": "Kiến trúc phần mềm", "classCode": "DHTH17A", "room": "V7.01", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "studentCount": 45 }
+      ],
+      "thursday": [
+        { "subject": "Công nghệ phần mềm", "classCode": "DHTH15A", "room": "V7.02", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "studentCount": 52 }
+      ],
+      "friday": [],
+      "saturday": [],
+      "sunday": []
+    },
+    "GV002": {
+      "semester": "HK2 2025-2026",
+      "monday": [
+        { "subject": "Lập trình di động", "classCode": "DHTH17A", "room": "V9.02", "startTime": "09:45", "endTime": "11:15", "periods": "Tiết 4-5", "studentCount": 45 }
+      ],
+      "tuesday": [
+        { "subject": "Lập trình Web", "classCode": "DHTH16A", "room": "V8.01", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "studentCount": 48 }
+      ],
+      "wednesday": [],
+      "thursday": [
+        { "subject": "Lập trình di động", "classCode": "DHTH17A", "room": "V9.02", "startTime": "09:45", "endTime": "11:15", "periods": "Tiết 4-5", "studentCount": 45 }
+      ],
+      "friday": [
+        { "subject": "Lập trình Web", "classCode": "DHTH16A", "room": "V8.01", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "studentCount": 48 }
+      ],
+      "saturday": [],
+      "sunday": []
+    },
+    "GV003": {
+      "semester": "HK2 2025-2026",
+      "monday": [
+        { "subject": "Toán rời rạc", "classCode": "DHTH17A", "room": "X12.05", "startTime": "13:00", "endTime": "15:30", "periods": "Tiết 7-9", "studentCount": 45 }
+      ],
+      "tuesday": [],
+      "wednesday": [
+        { "subject": "Toán rời rạc", "classCode": "DHTH17A", "room": "X12.05", "startTime": "13:00", "endTime": "15:30", "periods": "Tiết 7-9", "studentCount": 45 }
+      ],
+      "thursday": [
+        { "subject": "Cấu trúc dữ liệu và giải thuật", "classCode": "DHTH16B", "room": "X10.02", "startTime": "07:00", "endTime": "09:30", "periods": "Tiết 1-3", "studentCount": 40 }
+      ],
+      "friday": [],
+      "saturday": [],
+      "sunday": []
+    }
+  }
+}

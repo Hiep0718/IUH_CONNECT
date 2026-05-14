@@ -1,0 +1,32 @@
+{
+  "studentExams": {
+    "22641211": [
+      { "subject": "Cơ sở dữ liệu", "date": "2026-05-22", "startTime": "07:30", "endTime": "09:30", "room": "V7.01", "type": "Giữa kỳ", "note": "Được sử dụng tài liệu" },
+      { "subject": "Lập trình hướng đối tượng", "date": "2026-05-30", "startTime": "13:00", "endTime": "15:00", "room": "X9.03", "type": "Cuối kỳ", "note": "Không sử dụng tài liệu" },
+      { "subject": "Kiến trúc phần mềm", "date": "2026-06-02", "startTime": "09:00", "endTime": "11:00", "room": "V12.02", "type": "Giữa kỳ", "note": "Được sử dụng tài liệu" },
+      { "subject": "Toán rời rạc", "date": "2026-06-10", "startTime": "07:30", "endTime": "09:30", "room": "X12.05", "type": "Cuối kỳ", "note": "Không sử dụng tài liệu" },
+      { "subject": "Lập trình di động", "date": "2026-06-15", "startTime": "13:00", "endTime": "15:00", "room": "V9.02", "type": "Cuối kỳ", "note": "Thực hành trên máy" }
+    ],
+    "20001234": [
+      { "subject": "Công nghệ phần mềm", "date": "2026-05-25", "startTime": "07:30", "endTime": "09:30", "room": "V7.02", "type": "Cuối kỳ", "note": "Không sử dụng tài liệu" },
+      { "subject": "Mạng máy tính", "date": "2026-06-05", "startTime": "13:00", "endTime": "15:00", "room": "V11.03", "type": "Cuối kỳ", "note": "Được sử dụng tài liệu" },
+      { "subject": "Trí tuệ nhân tạo", "date": "2026-06-12", "startTime": "09:00", "endTime": "11:00", "room": "X9.01", "type": "Cuối kỳ", "note": "Không sử dụng tài liệu" }
+    ]
+  },
+  "lecturerProctoring": {
+    "GV001": [
+      { "subject": "Kiến trúc phần mềm", "classCode": "DHTH17A", "date": "2026-06-02", "startTime": "09:00", "endTime": "11:00", "room": "V12.02", "type": "Giữa kỳ", "studentCount": 45, "role": "Coi thi chính" },
+      { "subject": "Công nghệ phần mềm", "classCode": "DHTH15A", "date": "2026-06-08", "startTime": "07:30", "endTime": "09:30", "room": "V7.02", "type": "Cuối kỳ", "studentCount": 52, "role": "Coi thi chính" },
+      { "subject": "Cơ sở dữ liệu", "classCode": "DHTH17A", "date": "2026-05-22", "startTime": "07:30", "endTime": "09:30", "room": "V7.01", "type": "Giữa kỳ", "studentCount": 45, "role": "Coi thi phụ" }
+    ],
+    "GV002": [
+      { "subject": "Lập trình di động", "classCode": "DHTH17A", "date": "2026-06-15", "startTime": "13:00", "endTime": "15:00", "room": "V9.02", "type": "Cuối kỳ", "studentCount": 45, "role": "Coi thi chính" },
+      { "subject": "Lập trình Web", "classCode": "DHTH16A", "date": "2026-06-18", "startTime": "07:30", "endTime": "09:30", "room": "V8.01", "type": "Cuối kỳ", "studentCount": 48, "role": "Coi thi chính" },
+      { "subject": "Lập trình hướng đối tượng", "classCode": "DHTH17A", "date": "2026-05-30", "startTime": "13:00", "endTime": "15:00", "room": "X9.03", "type": "Cuối kỳ", "studentCount": 45, "role": "Coi thi phụ" }
+    ],
+    "GV003": [
+      { "subject": "Toán rời rạc", "classCode": "DHTH17A", "date": "2026-06-10", "startTime": "07:30", "endTime": "09:30", "room": "X12.05", "type": "Cuối kỳ", "studentCount": 45, "role": "Coi thi chính" },
+      { "subject": "Cấu trúc dữ liệu và giải thuật", "classCode": "DHTH16B", "date": "2026-06-20", "startTime": "09:00", "endTime": "11:00", "room": "X10.02", "type": "Cuối kỳ", "studentCount": 40, "role": "Coi thi chính" }
+    ]
+  }
+}
