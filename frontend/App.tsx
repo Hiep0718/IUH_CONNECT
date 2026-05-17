@@ -409,7 +409,7 @@ export default function App() {
               options={{ animation: 'slide_from_bottom' }}
             >
               {(props) => (
-                <CreateGroupScreen {...props} />
+                <CreateGroupScreen {...props} currentUser={currentUser} token={token} />
               )}
             </Stack.Screen>
 

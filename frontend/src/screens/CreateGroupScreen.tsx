@@ -19,28 +19,37 @@ import { API_URL } from '../config/env';
 interface CreateGroupScreenProps {
   navigation: any;
   route: any;
+  currentUser: string;
+  token: string;
 }
 
-// Giả lập danh sách user (trong thực tế sẽ lấy từ API danh bạ)
-const MOCK_USERS = [
-  { id: 'u1', name: 'Văn An' },
-  { id: 'u2', name: 'Thị Bình' },
-  { id: 'u3', name: 'Hoàng Minh' },
-  { id: 'u4', name: 'Thị Lan' },
-  { id: 'u5', name: 'Minh Đức' },
-  { id: 'u6', name: 'Giáo viên ABC' },
-];
-
-const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route }) => {
-  // Lấy currentUser từ context hoặc route params (tạm thời lấy từ global context nếu có, hoặc route)
-  const currentUser = route.params?.currentUser || 'current_user'; 
-  
+const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route, currentUser, token }) => {
   const [groupName, setGroupName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
 
-  const filteredUsers = MOCK_USERS.filter(u => 
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/v1/contacts/list`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setUsers(data.map((c: any) => ({ id: c.username, name: c.fullName || c.username })));
+        }
+      } catch (error) {
+        console.error('Lỗi tải danh sách bạn bè:', error);
+      }
+    };
+    fetchUsers();
+  }, [token]);
+
+  const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -68,7 +77,8 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           name: groupName.trim(),
