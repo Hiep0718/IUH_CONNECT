@@ -34,6 +34,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'STUDENT' | 'LECTURER'>('STUDENT');
+  const [studentId, setStudentId] = useState('');
+  const [lecturerId, setLecturerId] = useState('');
   
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -94,6 +97,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
     if (isRegisterMode) {
       if (!fullName.trim()) newErrors.fullName = 'Vui lòng nhập họ tên';
       if (!email.trim() || !email.includes('@')) newErrors.email = 'Vui lòng nhập email hợp lệ';
+      if (selectedRole === 'STUDENT' && !studentId.trim()) newErrors.username = 'Vui lòng nhập MSSV';
+      if (selectedRole === 'LECTURER' && !lecturerId.trim()) newErrors.username = 'Vui lòng nhập mã giảng viên';
     }
 
     setErrors(newErrors);
@@ -154,7 +159,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
           username: username.trim(), 
           password,
           fullName: fullName.trim(),
-          email: email.trim()
+          email: email.trim(),
+          role: selectedRole,
+          studentId: selectedRole === 'STUDENT' ? studentId.trim() : undefined,
+          lecturerId: selectedRole === 'LECTURER' ? lecturerId.trim() : undefined,
         }),
       });
 
@@ -236,6 +244,24 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
 
               {isRegisterMode && (
                 <>
+                  {/* Role Selector */}
+                  <View style={{flexDirection: 'row', backgroundColor: Colors.background, borderRadius: BorderRadius.lg, padding: 3, marginBottom: 4}}>
+                    <TouchableOpacity style={[{flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: BorderRadius.md - 2}, selectedRole === 'STUDENT' && {backgroundColor: Colors.white, ...Shadows.sm}]} onPress={() => setSelectedRole('STUDENT')}>
+                      <Text style={[{fontSize: Typography.bodySmall, fontWeight: Typography.medium, color: Colors.textSecondary}, selectedRole === 'STUDENT' && {color: Colors.primary, fontWeight: Typography.bold}]}>🎓 Sinh viên</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[{flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: BorderRadius.md - 2}, selectedRole === 'LECTURER' && {backgroundColor: Colors.white, ...Shadows.sm}]} onPress={() => setSelectedRole('LECTURER')}>
+                      <Text style={[{fontSize: Typography.bodySmall, fontWeight: Typography.medium, color: Colors.textSecondary}, selectedRole === 'LECTURER' && {color: Colors.primary, fontWeight: Typography.bold}]}>👨‍🏫 Giảng viên</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Student ID / Lecturer ID */}
+                  <View style={[styles.inputContainer]}>
+                    <View style={styles.inputIconWrapper}>
+                      <Icon name={selectedRole === 'STUDENT' ? 'badge-account-horizontal-outline' : 'school'} size={20} color={Colors.textMuted} />
+                    </View>
+                    <TextInput style={styles.input} placeholder={selectedRole === 'STUDENT' ? 'Mã số sinh viên (MSSV)' : 'Mã giảng viên'} placeholderTextColor={Colors.textMuted} value={selectedRole === 'STUDENT' ? studentId : lecturerId} onChangeText={selectedRole === 'STUDENT' ? setStudentId : setLecturerId} autoCapitalize="none" editable={!isLoading} />
+                  </View>
+
                   <View style={[styles.inputContainer, fullNameFocused && styles.inputFocused, errors.fullName ? styles.inputError : null]}>
                     <View style={[styles.inputIconWrapper, fullNameFocused && styles.inputIconActive]}>
                       <Icon name="card-account-details-outline" size={20} color={errors.fullName ? Colors.danger : fullNameFocused ? Colors.primary : Colors.textMuted} />

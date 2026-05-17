@@ -30,7 +30,12 @@ public class UserService {
         if (request.getPhone() != null) user.setPhone(request.getPhone());
         if (request.getDepartment() != null) user.setDepartment(request.getDepartment());
         if (request.getBio() != null) user.setBio(request.getBio());
-        if (request.getLecturerStatus() != null) user.setLecturerStatus(request.getLecturerStatus());
+        if (request.getLecturerStatus() != null) {
+            if (user.getRole() != com.iuhconnect.authservice.model.Role.LECTURER) {
+                throw new IllegalArgumentException("Chỉ giảng viên mới có thể thay đổi trạng thái tư vấn");
+            }
+            user.setLecturerStatus(request.getLecturerStatus());
+        }
         if (request.getGender() != null) user.setGender(request.getGender());
         if (request.getAddress() != null) user.setAddress(request.getAddress());
         if (request.getDateOfBirth() != null) user.setDateOfBirth(request.getDateOfBirth());

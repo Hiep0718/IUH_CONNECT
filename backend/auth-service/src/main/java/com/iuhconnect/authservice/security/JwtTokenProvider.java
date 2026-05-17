@@ -31,24 +31,28 @@ public class JwtTokenProvider {
 
     // -------------------- Generate --------------------
 
-    public String generateAccessToken(String username) {
-        return buildToken(username, accessExpirationMs);
+    public String generateAccessToken(String username, String role) {
+        return buildToken(username, role, accessExpirationMs);
     }
 
     public String generateRefreshToken(String username) {
-        return buildToken(username, refreshExpirationMs);
+        return buildToken(username, null, refreshExpirationMs);
     }
 
-    private String buildToken(String subject, long expirationMs) {
+    private String buildToken(String subject, String role, long expirationMs) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationMs);
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(subject)
                 .issuedAt(now)
-                .expiration(expiryDate)
-                .signWith(key)
-                .compact();
+                .expiration(expiryDate);
+
+        if (role != null) {
+            builder.claim("role", role);
+        }
+
+        return builder.signWith(key).compact();
     }
 
     // -------------------- Parse --------------------
@@ -60,6 +64,15 @@ public class JwtTokenProvider {
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
+    }
+
+    public String getRoleFromToken(String token) {
+        return Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get("role", String.class);
     }
 
     // -------------------- Validate --------------------

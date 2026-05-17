@@ -47,17 +47,22 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
                 return false;
             }
 
-            // Validate JWT signature and parse username
-            String username = Jwts.parser()
+            // Validate JWT signature and parse username + role
+            var claims = Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(token)
-                    .getPayload()
-                    .getSubject();
+                    .getPayload();
 
-            // Store username in WebSocket session attributes
+            String username = claims.getSubject();
+            String role = claims.get("role", String.class);
+
+            // Store in WebSocket session attributes
             attributes.put("username", username);
-            log.info("✅ WebSocket handshake accepted [username={}]", username);
+            if (role != null) {
+                attributes.put("role", role);
+            }
+            log.info("✅ WebSocket handshake accepted [username={}, role={}]", username, role);
             return true;
 
         } catch (Exception e) {
