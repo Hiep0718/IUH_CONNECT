@@ -70,11 +70,11 @@ public class ConversationService {
             throw new RuntimeException("Not a group conversation");
         }
 
-        boolean isAdmin = group.getMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(requesterId) && m.getRole() == GroupRole.ADMIN);
+        boolean hasPrivilege = group.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requesterId) && (m.getRole() == GroupRole.ADMIN || m.getRole() == GroupRole.DEPUTY));
         
-        if (!isAdmin) {
-            throw new RuntimeException("Only ADMIN can update group name");
+        if (!hasPrivilege) {
+            throw new RuntimeException("Only ADMIN or DEPUTY can update group name");
         }
 
         group.setName(newName);
@@ -90,11 +90,11 @@ public class ConversationService {
             throw new RuntimeException("Not a group conversation");
         }
 
-        boolean isAdmin = group.getMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(requesterId) && m.getRole() == GroupRole.ADMIN);
+        boolean hasPrivilege = group.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requesterId) && (m.getRole() == GroupRole.ADMIN || m.getRole() == GroupRole.DEPUTY));
         
-        if (!isAdmin) {
-            throw new RuntimeException("Only ADMIN can add members");
+        if (!hasPrivilege) {
+            throw new RuntimeException("Only ADMIN or DEPUTY can add members");
         }
 
         long now = System.currentTimeMillis();
@@ -123,12 +123,26 @@ public class ConversationService {
 
         boolean isSelfLeave = requesterId.equals(targetUserId);
 
-        // If not self leaving, check if requester is ADMIN
+        // If not self leaving, check permissions
         if (!isSelfLeave) {
-            boolean isAdmin = group.getMembers().stream()
-                    .anyMatch(m -> m.getUserId().equals(requesterId) && m.getRole() == GroupRole.ADMIN);
-            if (!isAdmin) {
-                throw new RuntimeException("Only ADMIN can remove members");
+            GroupMember requesterMember = group.getMembers().stream()
+                    .filter(m -> m.getUserId().equals(requesterId))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Requester is not in the group"));
+                    
+            GroupMember targetMemberObj = group.getMembers().stream()
+                    .filter(m -> m.getUserId().equals(targetUserId))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Target user is not in the group"));
+
+            if (requesterMember.getRole() == GroupRole.MEMBER) {
+                throw new RuntimeException("Only ADMIN or DEPUTY can remove members");
+            }
+            
+            if (requesterMember.getRole() == GroupRole.DEPUTY) {
+                if (targetMemberObj.getRole() == GroupRole.ADMIN || targetMemberObj.getRole() == GroupRole.DEPUTY) {
+                    throw new RuntimeException("DEPUTY can only remove MEMBERs");
+                }
             }
         }
 
@@ -141,10 +155,41 @@ public class ConversationService {
         if (isSelfLeave) {
             long adminCount = group.getMembers().stream().filter(m -> m.getRole() == GroupRole.ADMIN).count();
             if (adminCount == 0 && !group.getMembers().isEmpty()) {
-                // Promote the oldest member to ADMIN
-                group.getMembers().get(0).setRole(GroupRole.ADMIN);
+                // Promote the oldest member (or deputy) to ADMIN
+                // Try to find a deputy first
+                GroupMember nextAdmin = group.getMembers().stream()
+                        .filter(m -> m.getRole() == GroupRole.DEPUTY)
+                        .findFirst()
+                        .orElse(group.getMembers().get(0));
+                nextAdmin.setRole(GroupRole.ADMIN);
             }
         }
+
+        group.setUpdatedAt(System.currentTimeMillis());
+        return conversationRepository.save(group);
+    }
+
+    public ConversationEntity assignRole(String conversationId, String requesterId, String targetUserId, GroupRole newRole) {
+        ConversationEntity group = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (group.getType() != ConversationType.GROUP) {
+            throw new RuntimeException("Not a group conversation");
+        }
+
+        boolean isAdmin = group.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requesterId) && m.getRole() == GroupRole.ADMIN);
+        
+        if (!isAdmin) {
+            throw new RuntimeException("Only ADMIN can assign roles");
+        }
+
+        GroupMember targetMember = group.getMembers().stream()
+                .filter(m -> m.getUserId().equals(targetUserId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Target user is not in the group"));
+
+        targetMember.setRole(newRole);
 
         group.setUpdatedAt(System.currentTimeMillis());
         return conversationRepository.save(group);

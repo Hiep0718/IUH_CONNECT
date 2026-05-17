@@ -84,7 +84,9 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
     }
   };
 
-  const isAdmin = members.find(m => m.id === currentUser)?.role === 'ADMIN';
+  const isLeader = members.find(m => m.id === currentUser)?.role === 'ADMIN';
+  const isDeputy = members.find(m => m.id === currentUser)?.role === 'DEPUTY';
+  const hasPrivilege = isLeader || isDeputy;
 
   const handleLeaveGroup = () => {
     Alert.alert('Rời nhóm', 'Bạn có chắc chắn muốn rời khỏi nhóm này?', [
@@ -170,39 +172,77 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
     u => !members.find(m => m.id === u.id) && u.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleChangeRole = (item: any) => {
+    if (!isLeader || item.id === currentUser || item.role === 'ADMIN') return;
+
+    const isCurrentlyDeputy = item.role === 'DEPUTY';
+    const actionText = isCurrentlyDeputy ? 'Giáng chức xuống Thành viên' : 'Phong làm Phó nhóm';
+    const newRole = isCurrentlyDeputy ? 'MEMBER' : 'DEPUTY';
+
+    Alert.alert('Phân quyền', `Bạn muốn phân quyền cho ${item.name}?`, [
+      { text: 'Hủy', style: 'cancel' },
+      { text: actionText, onPress: async () => {
+          try {
+            const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${item.id}/role?requesterId=${currentUser}&newRole=${newRole}`, {
+              method: 'PUT',
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+              fetchGroupDetails();
+            } else {
+              Alert.alert('Lỗi', 'Không thể thay đổi quyền');
+            }
+          } catch (error) {
+            console.error('Role change error:', error);
+          }
+      }}
+    ]);
+  };
+
   const renderMember = ({ item }: { item: any }) => (
-    <View style={styles.memberItem}>
+    <TouchableOpacity 
+      style={styles.memberItem}
+      activeOpacity={isLeader && item.id !== currentUser && item.role !== 'ADMIN' ? 0.7 : 1}
+      onPress={() => handleChangeRole(item)}
+    >
       <Avatar name={item.name} size="medium" />
       <View style={styles.memberInfo}>
         <Text style={styles.memberName}>{item.name}</Text>
-        <Text style={styles.memberRole}>{item.role === 'ADMIN' ? 'Quản trị viên' : 'Thành viên'}</Text>
+        <Text style={styles.memberRole}>{item.role === 'ADMIN' ? 'Trưởng nhóm' : item.role === 'DEPUTY' ? 'Phó nhóm' : 'Thành viên'}</Text>
       </View>
-      {isAdmin && item.id !== currentUser && (
-        <TouchableOpacity style={styles.kickButton} onPress={() => {
-          Alert.alert('Xóa thành viên', `Bạn muốn xóa ${item.name} khỏi nhóm?`, [
-            { text: 'Hủy', style: 'cancel' },
-            { text: 'Xóa', style: 'destructive', onPress: async () => {
-                try {
-                  const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${item.id}?requesterId=${currentUser}`, {
-                    method: 'DELETE',
-                    headers: { Authorization: `Bearer ${token}` }
-                  });
-                  if (res.ok) {
-                    setMembers(members.filter(m => m.id !== item.id));
-                  } else {
-                    Alert.alert('Lỗi', 'Không thể xóa thành viên');
+      
+      {/* Nút Xóa Thành Viên */}
+      {item.id !== currentUser && (isLeader || (isDeputy && item.role === 'MEMBER')) && (
+        <TouchableOpacity 
+          style={styles.kickButton} 
+          onPress={() => {
+            Alert.alert('Xóa thành viên', `Bạn muốn xóa ${item.name} khỏi nhóm?`, [
+              { text: 'Hủy', style: 'cancel' },
+              { text: 'Xóa', style: 'destructive', onPress: async () => {
+                  try {
+                    const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${item.id}?requesterId=${currentUser}`, {
+                      method: 'DELETE',
+                      headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                      setMembers(members.filter(m => m.id !== item.id));
+                    } else {
+                      Alert.alert('Lỗi', 'Không thể xóa thành viên');
+                    }
+                  } catch (error) {
+                    console.error('Kick member error:', error);
                   }
-                } catch (error) {
-                  console.error('Kick member error:', error);
                 }
               }
-            }
-          ]);
-        }}>
-          <Icon name="account-remove-outline" size={20} color={Colors.error} />
+            ]);
+          }}
+        >
+          <View style={{ backgroundColor: '#FFEBEE', padding: 8, borderRadius: 20 }}>
+            <Icon name="account-remove-outline" size={20} color={Colors.error} />
+          </View>
         </TouchableOpacity>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   const renderUserToAdd = ({ item }: { item: any }) => {
@@ -243,7 +283,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
           </View>
           <View style={styles.groupNameRow}>
             <Text style={styles.groupName}>{currentGroupName}</Text>
-            {isAdmin && (
+            {hasPrivilege && (
               <TouchableOpacity onPress={() => setIsEditingName(true)} style={styles.editNameButton}>
                 <Icon name="pencil" size={16} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -282,7 +322,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
               {renderMember({ item })}
             </View>
           ))}
-          {isAdmin && (
+          {hasPrivilege && (
             <TouchableOpacity style={styles.addMemberRow} onPress={() => setIsAddingMember(true)}>
               <View style={styles.addMemberIcon}>
                 <Icon name="plus" size={24} color={Colors.primary} />
@@ -299,7 +339,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
             <Text style={styles.dangerText}>Rời khỏi nhóm</Text>
           </TouchableOpacity>
           
-          {isAdmin && (
+          {isLeader && (
             <TouchableOpacity style={styles.dangerRow}>
               <Icon name="delete-outline" size={24} color={Colors.error} />
               <Text style={styles.dangerText}>Giải tán nhóm</Text>

@@ -54,4 +54,13 @@ public class ConversationController {
             @RequestParam String requesterId) {
         return ResponseEntity.ok(conversationService.removeMember(conversationId, requesterId, targetUserId));
     }
+
+    @PutMapping("/group/{conversationId}/members/{targetUserId}/role")
+    public ResponseEntity<ConversationEntity> assignRole(
+            @PathVariable String conversationId,
+            @PathVariable String targetUserId,
+            @RequestParam String requesterId,
+            @RequestParam com.iuhconnect.chatservice.model.GroupRole newRole) {
+        return ResponseEntity.ok(conversationService.assignRole(conversationId, requesterId, targetUserId, newRole));
+    }
 }
