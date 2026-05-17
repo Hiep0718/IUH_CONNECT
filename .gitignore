@@ -53,6 +53,7 @@ frontend/android/app/build/
 frontend/android/.gradle/
 frontend/android/build/
 frontend/android/local.properties
+frontend/android/gradle.properties
 frontend/ios/Pods/
 frontend/ios/build/
 *.xcworkspace
@@ -72,6 +73,7 @@ docker-compose.override.yml
 .env
 .env.*
 !.env.example
+frontend/src/config/env.ts
 
 # ---------- OS Files ----------
 .DS_Store
