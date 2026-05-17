@@ -109,6 +109,8 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
     address: '',
     gender: 'OTHER',
     dateOfBirth: new Date(),
+    studentId: '',
+    lecturerId: '',
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -202,6 +204,8 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
       address: profile.address || '',
       gender: profile.gender || 'OTHER',
       dateOfBirth: parsedDate,
+      studentId: profile.studentId || '',
+      lecturerId: profile.lecturerId || '',
     });
     setShowEditModal(true);
   };
@@ -226,7 +230,9 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
           bio: editForm.bio,
           address: editForm.address,
           gender: editForm.gender,
-          dateOfBirth: isoDateString
+          dateOfBirth: isoDateString,
+          studentId: editForm.studentId,
+          lecturerId: editForm.lecturerId
         })
       });
 
@@ -241,7 +247,9 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
           bio: data.bio,
           address: data.address,
           gender: data.gender,
-          dateOfBirth: data.dateOfBirth
+          dateOfBirth: data.dateOfBirth,
+          studentId: data.studentId,
+          lecturerId: data.lecturerId
         }));
         setShowEditModal(false);
       } else {
@@ -446,6 +454,20 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
                     <Text style={styles.formLabel}>Họ và tên</Text>
                     <TextInput style={styles.formInput} value={editForm.fullName} onChangeText={(text) => setEditForm(prev => ({...prev, fullName: text}))} placeholder="Nhập họ tên" />
                   </View>
+                  <View style={styles.formDivider} />
+                  <View style={styles.formRow}>
+                    <Text style={styles.formLabel}>{isLecturer ? 'Mã GV' : 'MSSV'}</Text>
+                    <TextInput style={styles.formInput} value={isLecturer ? editForm.lecturerId : editForm.studentId} onChangeText={(text) => setEditForm(prev => ({...prev, [isLecturer ? 'lecturerId' : 'studentId']: text}))} placeholder={isLecturer ? 'Nhập mã giảng viên' : 'Nhập mã số sinh viên'} />
+                  </View>
+                  {isLecturer && (
+                    <>
+                      <View style={styles.formDivider} />
+                      <View style={styles.formRow}>
+                        <Text style={styles.formLabel}>Khoa</Text>
+                        <TextInput style={styles.formInput} value={editForm.department} onChangeText={(text) => setEditForm(prev => ({...prev, department: text}))} placeholder="VD: Khoa Công nghệ thông tin..." />
+                      </View>
+                    </>
+                  )}
                   <View style={styles.formDivider} />
                   <View style={styles.formRow}>
                     <Text style={styles.formLabel}>Tiểu sử (Bio)</Text>

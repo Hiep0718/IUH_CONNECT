@@ -97,12 +97,20 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
   // Initialize Sounds
   useEffect(() => {
     // Âm báo cuộc gọi đến
-    ringtoneSound.current = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, (error) => {
-      if (error) console.log('Lỗi tải ringtone', error);
+    const ringtone = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Lỗi tải ringtone', error);
+      } else {
+        ringtoneSound.current = ringtone;
+      }
     });
     // Âm đổ chuông khi gọi đi
-    dialtoneSound.current = new Sound('dialtone.mp3', Sound.MAIN_BUNDLE, (error) => {
-      if (error) console.log('Lỗi tải dialtone', error);
+    const dialtone = new Sound('dialtone.mp3', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Lỗi tải dialtone', error);
+      } else {
+        dialtoneSound.current = dialtone;
+      }
     });
 
     return () => {

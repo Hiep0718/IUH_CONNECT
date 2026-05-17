@@ -268,6 +268,7 @@ const MainTabs = ({
         <HomeScreen
           {...props}
           currentUser={currentUser}
+          token={token}
         />
       )}
     </Tab.Screen>

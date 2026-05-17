@@ -41,6 +41,18 @@ export const useWebSocket = () => useContext(WebSocketContext);
 // Provider
 // ============================================================
 
+let globalRingtone: Sound | null = null;
+try {
+  globalRingtone = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, (error) => {
+    if (error) {
+      console.log('Lỗi tải global ringtone', error);
+      globalRingtone = null;
+    }
+  });
+} catch (e) {
+  console.log('Lỗi khởi tạo Sound', e);
+}
+
 interface WebSocketProviderProps {
   token: string;
   children: React.ReactNode;
@@ -65,21 +77,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout>>();
   const isMountedRef = useRef(true);
-  const globalRingtoneRef = useRef<Sound | null>(null);
-
-  // Initialize Global Ringtone
-  useEffect(() => {
-    globalRingtoneRef.current = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, (error) => {
-      if (error) console.log('Lỗi tải global ringtone', error);
-    });
-
-    return () => {
-      if (globalRingtoneRef.current) {
-        globalRingtoneRef.current.stop();
-        globalRingtoneRef.current.release();
-      }
-    };
-  }, []);
 
   // ---- Connect ----
   const connect = useCallback(() => {
@@ -103,8 +100,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
             if (data.signalType === 'CALL_INVITE') {
               handleGlobalIncomingCall(data);
             } else if (data.signalType === 'CALL_END' || data.signalType === 'CALL_REJECT') {
-              if (globalRingtoneRef.current) {
-                globalRingtoneRef.current.stop();
+              if (globalRingtone && globalRingtone.isLoaded()) {
+                try {
+                  globalRingtone.stop();
+                } catch (e) {}
               }
             }
           }
@@ -181,9 +180,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     const callerName = data.senderName || data.senderId || 'Người dùng';
 
     // Play ringtone globally when invited
-    if (globalRingtoneRef.current) {
-      globalRingtoneRef.current.setNumberOfLoops(-1);
-      globalRingtoneRef.current.play();
+    if (globalRingtone && globalRingtone.isLoaded()) {
+      globalRingtone.setNumberOfLoops(-1);
+      globalRingtone.play();
     }
 
     Alert.alert(
@@ -194,7 +193,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           text: 'Từ chối',
           style: 'cancel',
           onPress: () => {
-            if (globalRingtoneRef.current) globalRingtoneRef.current.stop();
+            if (globalRingtone && globalRingtone.isLoaded()) {
+              try {
+                globalRingtone.stop();
+              } catch (e) {}
+            }
             // Gửi CALL_REJECT
             sendMessage({
               type: 'CALL_SIGNAL',
@@ -207,7 +210,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         {
           text: '✅ Nghe máy',
           onPress: () => {
-            if (globalRingtoneRef.current) globalRingtoneRef.current.stop();
+            if (globalRingtone && globalRingtone.isLoaded()) {
+              try {
+                globalRingtone.stop();
+              } catch (e) {}
+            }
             if (navigationRef?.current) {
               navigationRef.current.navigate('Meeting', {
                 callerId: data.senderId,
@@ -222,7 +229,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       ],
       {
         onDismiss: () => {
-          if (globalRingtoneRef.current) globalRingtoneRef.current.stop();
+          if (globalRingtone && globalRingtone.isLoaded()) {
+            try {
+              globalRingtone.stop();
+            } catch (e) {}
+          }
         }
       }
     );

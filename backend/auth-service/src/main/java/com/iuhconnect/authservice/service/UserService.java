@@ -39,6 +39,12 @@ public class UserService {
         if (request.getGender() != null) user.setGender(request.getGender());
         if (request.getAddress() != null) user.setAddress(request.getAddress());
         if (request.getDateOfBirth() != null) user.setDateOfBirth(request.getDateOfBirth());
+        if (request.getStudentId() != null && user.getRole() == com.iuhconnect.authservice.model.Role.STUDENT) {
+            user.setStudentId(request.getStudentId());
+        }
+        if (request.getLecturerId() != null && user.getRole() == com.iuhconnect.authservice.model.Role.LECTURER) {
+            user.setLecturerId(request.getLecturerId());
+        }
 
         User updatedUser = userRepository.save(user);
         return mapToDto(updatedUser);
