@@ -146,17 +146,32 @@ public class ConversationService {
             }
         }
 
+        // If ADMIN is leaving, check if there's a successor
+        if (isSelfLeave) {
+            GroupMember leavingMember = group.getMembers().stream()
+                    .filter(m -> m.getUserId().equals(requesterId))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Requester is not in the group"));
+
+            if (leavingMember.getRole() == GroupRole.ADMIN && group.getMembers().size() > 1) {
+                // Check if there is a deputy to auto-promote
+                boolean hasDeputy = group.getMembers().stream()
+                        .anyMatch(m -> m.getRole() == GroupRole.DEPUTY);
+                if (!hasDeputy) {
+                    throw new RuntimeException("ADMIN_MUST_TRANSFER");
+                }
+            }
+        }
+
         boolean removed = group.getMembers().removeIf(m -> m.getUserId().equals(targetUserId));
         if (!removed) {
             throw new RuntimeException("User is not a member of this group");
         }
 
-        // Handle case where the last ADMIN leaves
+        // Handle case where the last ADMIN leaves (auto-promote deputy)
         if (isSelfLeave) {
             long adminCount = group.getMembers().stream().filter(m -> m.getRole() == GroupRole.ADMIN).count();
             if (adminCount == 0 && !group.getMembers().isEmpty()) {
-                // Promote the oldest member (or deputy) to ADMIN
-                // Try to find a deputy first
                 GroupMember nextAdmin = group.getMembers().stream()
                         .filter(m -> m.getRole() == GroupRole.DEPUTY)
                         .findFirst()
@@ -164,6 +179,35 @@ public class ConversationService {
                 nextAdmin.setRole(GroupRole.ADMIN);
             }
         }
+
+        group.setUpdatedAt(System.currentTimeMillis());
+        return conversationRepository.save(group);
+    }
+
+    public ConversationEntity leaveAndTransfer(String conversationId, String requesterId, String successorId) {
+        ConversationEntity group = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (group.getType() != ConversationType.GROUP) {
+            throw new RuntimeException("Not a group conversation");
+        }
+
+        boolean isAdmin = group.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requesterId) && m.getRole() == GroupRole.ADMIN);
+        if (!isAdmin) {
+            throw new RuntimeException("Only ADMIN can transfer leadership");
+        }
+
+        GroupMember successor = group.getMembers().stream()
+                .filter(m -> m.getUserId().equals(successorId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Successor is not in the group"));
+
+        // Promote successor to ADMIN
+        successor.setRole(GroupRole.ADMIN);
+
+        // Remove the leaving admin
+        group.getMembers().removeIf(m -> m.getUserId().equals(requesterId));
 
         group.setUpdatedAt(System.currentTimeMillis());
         return conversationRepository.save(group);

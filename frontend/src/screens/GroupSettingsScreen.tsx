@@ -88,25 +88,72 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
   const isDeputy = members.find(m => m.id === currentUser)?.role === 'DEPUTY';
   const hasPrivilege = isLeader || isDeputy;
 
+  const [isTransferModalVisible, setIsTransferModalVisible] = useState(false);
+  const [selectedSuccessor, setSelectedSuccessor] = useState<string | null>(null);
+
   const handleLeaveGroup = () => {
-    Alert.alert('Rời nhóm', 'Bạn có chắc chắn muốn rời khỏi nhóm này?', [
-      { text: 'Hủy', style: 'cancel' },
-      { text: 'Rời đi', style: 'destructive', onPress: async () => {
-          try {
-            const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${currentUser}?requesterId=${currentUser}`, {
-              method: 'DELETE',
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            if (res.ok) {
-              navigation.navigate('MainTabs');
-            } else {
-              Alert.alert('Lỗi', 'Không thể rời nhóm');
-            }
-          } catch (error) {
-            console.error('Leave group error:', error);
-          }
-      }}
-    ]);
+    // Nếu là Trưởng nhóm
+    if (isLeader && members.length > 1) {
+      const hasDeputy = members.some(m => m.role === 'DEPUTY');
+      if (hasDeputy) {
+        // Có Phó nhóm → tự động chuyển quyền, chỉ cần xác nhận
+        Alert.alert(
+          'Rời nhóm',
+          'Quyền Trưởng nhóm sẽ được tự động chuyển cho Phó nhóm. Bạn có chắc chắn?',
+          [
+            { text: 'Hủy', style: 'cancel' },
+            { text: 'Rời đi', style: 'destructive', onPress: () => performLeave() }
+          ]
+        );
+      } else {
+        // Không có Phó nhóm → mở modal chọn người kế nhiệm
+        setSelectedSuccessor(null);
+        setIsTransferModalVisible(true);
+      }
+    } else {
+      // Thành viên/Phó nhóm hoặc nhóm chỉ có 1 người
+      Alert.alert('Rời nhóm', 'Bạn có chắc chắn muốn rời khỏi nhóm này?', [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Rời đi', style: 'destructive', onPress: () => performLeave() }
+      ]);
+    }
+  };
+
+  const performLeave = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${currentUser}?requesterId=${currentUser}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        navigation.navigate('MainTabs');
+      } else {
+        Alert.alert('Lỗi', 'Không thể rời nhóm');
+      }
+    } catch (error) {
+      console.error('Leave group error:', error);
+    }
+  };
+
+  const handleLeaveAndTransfer = async () => {
+    if (!selectedSuccessor) {
+      Alert.alert('Thông báo', 'Vui lòng chọn một người để bổ nhiệm làm Trưởng nhóm mới.');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/leave-transfer?requesterId=${currentUser}&successorId=${selectedSuccessor}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setIsTransferModalVisible(false);
+        navigation.navigate('MainTabs');
+      } else {
+        Alert.alert('Lỗi', 'Không thể chuyển quyền và rời nhóm');
+      }
+    } catch (error) {
+      console.error('Leave and transfer error:', error);
+    }
   };
 
   const handleSaveGroupName = async () => {
@@ -238,7 +285,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
           }}
         >
           <View style={{ backgroundColor: '#FFEBEE', padding: 8, borderRadius: 20 }}>
-            <Icon name="account-remove-outline" size={20} color={Colors.error} />
+            <Icon name="account-remove-outline" size={20} color={Colors.danger} />
           </View>
         </TouchableOpacity>
       )}
@@ -275,7 +322,8 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
         <View style={styles.headerRight} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{flex: 1}} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
         {/* Group Info Profile */}
         <View style={styles.profileSection}>
           <View style={styles.groupAvatar}>
@@ -332,16 +380,29 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
           )}
         </View>
 
-        {/* Danger Zone */}
-        <View style={styles.section}>
+        {/* Danger Zone (Đưa lại vào trong ScrollView) */}
+        <View style={[styles.section, { marginBottom: 100 }]}>
           <TouchableOpacity style={styles.dangerRow} onPress={handleLeaveGroup}>
-            <Icon name="logout" size={24} color={Colors.error} />
+            <Icon name="logout" size={24} color={Colors.danger} />
             <Text style={styles.dangerText}>Rời khỏi nhóm</Text>
           </TouchableOpacity>
           
           {isLeader && (
-            <TouchableOpacity style={styles.dangerRow}>
-              <Icon name="delete-outline" size={24} color={Colors.error} />
+            <TouchableOpacity style={styles.dangerRow} onPress={() => {
+              Alert.alert('Giải tán nhóm', 'Bạn có chắc chắn muốn giải tán nhóm này? Tất cả tin nhắn và thành viên sẽ bị xóa.', [
+                { text: 'Hủy', style: 'cancel' },
+                { text: 'Giải tán', style: 'destructive', onPress: async () => {
+                    try {
+                      // Gọi API giải tán nhóm hoặc xử lý
+                      Alert.alert('Thông báo', 'Tính năng đang được cập nhật');
+                    } catch (error) {
+                      console.error('Disband group error:', error);
+                    }
+                  }
+                }
+              ]);
+            }}>
+              <Icon name="delete-outline" size={24} color={Colors.danger} />
               <Text style={styles.dangerText}>Giải tán nhóm</Text>
             </TouchableOpacity>
           )}
@@ -414,6 +475,63 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
                 Không tìm thấy người dùng phù hợp
               </Text>
             }
+          />
+        </SafeAreaView>
+      </Modal>
+
+      {/* Transfer Leadership Modal */}
+      <Modal visible={isTransferModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.addMemberModalContainer}>
+          <View style={styles.addMemberModalHeader}>
+            <TouchableOpacity onPress={() => setIsTransferModalVisible(false)} style={styles.backButton}>
+              <Icon name="close" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Chọn Trưởng nhóm mới</Text>
+            <TouchableOpacity 
+              onPress={handleLeaveAndTransfer} 
+              style={styles.headerRightButton}
+              disabled={!selectedSuccessor}
+            >
+              <Text style={[
+                styles.headerRightButtonText, 
+                !selectedSuccessor && styles.headerRightButtonTextDisabled
+              ]}>
+                Xác nhận
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md }}>
+            <Text style={{ fontSize: Typography.bodySmall, color: Colors.textSecondary }}>
+              Bạn cần bổ nhiệm một thành viên làm Trưởng nhóm mới trước khi rời khỏi nhóm.
+            </Text>
+          </View>
+          
+          <FlatList
+            data={members.filter(m => m.id !== currentUser)}
+            renderItem={({ item }) => {
+              const isSelected = selectedSuccessor === item.id;
+              return (
+                <TouchableOpacity 
+                  style={[styles.userAddRow, isSelected && styles.userAddRowSelected]}
+                  onPress={() => setSelectedSuccessor(item.id)}
+                  activeOpacity={0.7}
+                >
+                  <Avatar name={item.name} size="medium" />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <Text style={styles.userAddName}>{item.name}</Text>
+                    <Text style={{ fontSize: Typography.caption, color: Colors.textSecondary, marginTop: 2 }}>
+                      {item.role === 'DEPUTY' ? 'Phó nhóm' : 'Thành viên'}
+                    </Text>
+                  </View>
+                  <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
+                    {isSelected && <Icon name="check" size={16} color={Colors.white} />}
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingBottom: Spacing.xxl }}
           />
         </SafeAreaView>
       </Modal>
@@ -563,6 +681,13 @@ const styles = StyleSheet.create({
     fontWeight: Typography.medium,
     marginLeft: Spacing.md,
   },
+  footerSection: {
+    backgroundColor: Colors.white,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    paddingVertical: Spacing.sm,
+    paddingBottom: Spacing.lg,
+  },
   dangerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -571,7 +696,7 @@ const styles = StyleSheet.create({
   },
   dangerText: {
     fontSize: Typography.body,
-    color: Colors.error,
+    color: Colors.danger,
     fontWeight: Typography.medium,
     marginLeft: Spacing.md,
   },

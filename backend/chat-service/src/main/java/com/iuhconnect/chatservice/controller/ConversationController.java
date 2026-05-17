@@ -63,4 +63,12 @@ public class ConversationController {
             @RequestParam com.iuhconnect.chatservice.model.GroupRole newRole) {
         return ResponseEntity.ok(conversationService.assignRole(conversationId, requesterId, targetUserId, newRole));
     }
+
+    @PostMapping("/group/{conversationId}/leave-transfer")
+    public ResponseEntity<ConversationEntity> leaveAndTransfer(
+            @PathVariable String conversationId,
+            @RequestParam String requesterId,
+            @RequestParam String successorId) {
+        return ResponseEntity.ok(conversationService.leaveAndTransfer(conversationId, requesterId, successorId));
+    }
 }
