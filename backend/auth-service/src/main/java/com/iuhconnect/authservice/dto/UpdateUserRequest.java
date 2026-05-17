@@ -20,4 +20,6 @@ public class UpdateUserRequest {
     private Gender gender;
     private String address;
     private LocalDate dateOfBirth;
+    private String studentId;
+    private String lecturerId;
 }

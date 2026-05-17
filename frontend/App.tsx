@@ -268,6 +268,7 @@ const MainTabs = ({
         <HomeScreen
           {...props}
           currentUser={currentUser}
+          token={token}
         />
       )}
     </Tab.Screen>
@@ -408,7 +409,7 @@ export default function App() {
               options={{ animation: 'slide_from_bottom' }}
             >
               {(props) => (
-                <CreateGroupScreen {...props} />
+                <CreateGroupScreen {...props} currentUser={currentUser} token={token} />
               )}
             </Stack.Screen>
 

@@ -17,6 +17,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/theme';
+import { API_URL } from '../config/env';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -27,6 +28,7 @@ const { width } = Dimensions.get('window');
 interface HomeScreenProps {
   navigation: any;
   currentUser: string;
+  token?: string | null;
 }
 
 const CURRENT_DATE = new Date();
@@ -36,7 +38,7 @@ const MONTHS_VN = [
   'tháng 7','tháng 8','tháng 9','tháng 10','tháng 11','tháng 12',
 ];
 
-const USER_ROLE = 'student' as 'lecturer' | 'student';
+
 
 // ── Schedules ──
 const LECTURER_SCHEDULE = [
@@ -102,11 +104,13 @@ const LECTURER_STATS = [
 // ============================================================
 // Component
 // ============================================================
-const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, currentUser }) => {
+const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, currentUser, token }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [scheduleExpanded, setScheduleExpanded] = useState(false);
   const [examExpanded, setExamExpanded] = useState(false);
   const [scheduleViewMode, setScheduleViewMode] = useState<'day' | 'week' | 'month'>('day');
+  const [userRole, setUserRole] = useState<'student' | 'lecturer'>('student');
+  const [userData, setUserData] = useState<any>(null);
 
   const headerAnim = useRef(new Animated.Value(0)).current;
   const contentAnim = useRef(new Animated.Value(0)).current;
@@ -114,7 +118,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, currentUser }) => {
   const chevronRotateSchedule = useRef(new Animated.Value(0)).current;
   const chevronRotateExam = useRef(new Animated.Value(0)).current;
 
-  const isLecturer = USER_ROLE === 'lecturer';
+  // Fetch user role from API
+  useEffect(() => {
+    const fetchRole = async () => {
+      if (!token) return;
+      try {
+        const response = await fetch(`${API_URL}/api/v1/users/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setUserRole(data.role?.toLowerCase() === 'lecturer' ? 'lecturer' : 'student');
+          setUserData(data);
+        }
+      } catch (e) {
+        console.log('Error fetching user role', e);
+      }
+    };
+    fetchRole();
+  }, [token]);
+
+  const isLecturer = userRole === 'lecturer';
   const schedule = isLecturer ? LECTURER_SCHEDULE : STUDENT_SCHEDULE;
   const stats = isLecturer ? LECTURER_STATS : STUDENT_STATS;
 
@@ -242,7 +266,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, currentUser }) => {
             </View>
           )}
         </View>
-        <Text style={styles.upcomingClassLecturer}>GV: {item.lecturer}</Text>
+        <Text style={styles.upcomingClassLecturer}>{isLecturer ? `Lớp: ${item.classCode}` : `GV: ${item.lecturer}`}</Text>
         <View style={styles.upcomingClassMeta}>
           <Icon name="clock-outline" size={13} color={Colors.textMuted} />
           <Text style={styles.upcomingClassMetaText}>{item.time}</Text>
@@ -252,6 +276,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, currentUser }) => {
       </View>
     </TouchableOpacity>
   );
+
+  const upcomingClasses = schedule.filter(s => s.status === 'upcoming').map((item, index) => ({
+    ...item,
+    isNext: index === 0,
+    time: `${item.startTime} - ${item.endTime}`
+  }));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -267,7 +297,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, currentUser }) => {
               <Text style={styles.greetingText}>
                 {new Date().getHours() < 12 ? 'Chào buổi sáng,' : new Date().getHours() < 18 ? 'Chào buổi chiều,' : 'Chào buổi tối,'}
               </Text>
-              <Text style={styles.greetingName}>{currentUser} 👋</Text>
+              <Text style={styles.greetingName}>{userData?.fullName || currentUser} 👋</Text>
             </View>
             <TouchableOpacity style={styles.notifButton}>
               <Icon name="bell-outline" size={22} color={Colors.white} />
@@ -277,9 +307,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, currentUser }) => {
           <Text style={styles.dateText}>{formatDateHeader()}</Text>
           <View style={styles.roleBadgeRow}>
             <View style={styles.roleBadge}>
-              <Icon name={isLecturer ? 'school' : 'badge-account-horizontal-outline'} size={14} color={Colors.white} />
+              <Icon name={isLecturer ? 'school' : 'card-account-details-outline'} size={14} color={Colors.white} />
               <Text style={styles.roleBadgeText}>
-                {isLecturer ? 'Giảng viên' : 'Sinh viên'} • {isLecturer ? 'Khoa CNTT' : 'MSSV: 20001234'}
+                {isLecturer ? 'Giảng viên' : 'Sinh viên'} • {isLecturer ? ('Mã GV: ' + (userData?.lecturerId || 'N/A')) : ('MSSV: ' + (userData?.studentId || 'N/A'))}
               </Text>
             </View>
           </View>
@@ -427,16 +457,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, currentUser }) => {
           )}
 
           {/* ═══ UPCOMING CLASSES ═══ */}
-          {UPCOMING_CLASSES.length > 0 && (
+          {upcomingClasses.length > 0 && (
             <>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionTitleRow}>
                   <Icon name="timer-outline" size={20} color="#0891B2" />
-                  <Text style={styles.sectionTitle}>Buổi học sắp diễn ra</Text>
+                  <Text style={styles.sectionTitle}>{isLecturer ? 'Lịch dạy tiếp theo' : 'Buổi học sắp diễn ra'}</Text>
                 </View>
               </View>
               <View style={styles.upcomingClassList}>
-                {UPCOMING_CLASSES.map(renderUpcomingClass)}
+                {upcomingClasses.map(renderUpcomingClass)}
               </View>
             </>
           )}

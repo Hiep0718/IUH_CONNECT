@@ -24,4 +24,15 @@ public class RegisterRequest {
     private String email;
 
     private String avatarUrl;
+
+    /** "STUDENT" hoặc "LECTURER". Mặc định STUDENT nếu null */
+    private String role;
+
+    /** Bắt buộc nếu role = STUDENT */
+    private String studentId;
+
+    /** Bắt buộc nếu role = LECTURER */
+    private String lecturerId;
+
+    private String department;
 }
