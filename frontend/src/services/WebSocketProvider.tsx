@@ -150,12 +150,61 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       isMountedRef.current = false;
       clearTimeout(reconnectTimeout.current);
       if (wsRef.current) {
-        wsRef.current.onclose = null; // tránh reconnect khi unmount
+        wsRef.current.onclose = null;
         wsRef.current.close();
         wsRef.current = null;
       }
     };
   }, [connect]);
+
+  // ---- Presence Heartbeat WS ----
+  const presenceWsRef = useRef<WebSocket | null>(null);
+  const presenceHeartbeatRef = useRef<ReturnType<typeof setInterval>>();
+  const presenceReconnectRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    const connectPresence = () => {
+      try {
+        const presenceUrl = `${WS_URL}/ws/presence?token=${token}`;
+        const ws = new WebSocket(presenceUrl);
+        presenceWsRef.current = ws;
+
+        ws.onopen = () => {
+          console.log('✅ [Presence] WebSocket connected');
+          // Send heartbeat PING every 30s
+          presenceHeartbeatRef.current = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send('PING');
+            }
+          }, 30000);
+        };
+
+        ws.onclose = () => {
+          console.log('🔌 [Presence] WebSocket disconnected');
+          clearInterval(presenceHeartbeatRef.current);
+          if (isMountedRef.current) {
+            presenceReconnectRef.current = setTimeout(connectPresence, 5000);
+          }
+        };
+
+        ws.onerror = () => { /* handled by onclose */ };
+      } catch (e) {
+        console.error('[Presence] Failed to connect:', e);
+      }
+    };
+
+    connectPresence();
+
+    return () => {
+      clearInterval(presenceHeartbeatRef.current);
+      clearTimeout(presenceReconnectRef.current);
+      if (presenceWsRef.current) {
+        presenceWsRef.current.onclose = null;
+        presenceWsRef.current.close();
+        presenceWsRef.current = null;
+      }
+    };
+  }, [token]);
 
   // ---- Send ----
   const sendMessage = useCallback((data: object) => {

@@ -10,7 +10,13 @@ import {
   Animated,
   Platform,
   Alert,
+  Image,
+  Linking,
+  ActivityIndicator,
+  PermissionsAndroid,
 } from 'react-native';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import DocumentPicker from 'react-native-document-picker';
 import { GiftedChat, IMessage, Bubble, InputToolbar, Composer, Send, Time, SystemMessage, Day } from 'react-native-gifted-chat';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -20,10 +26,12 @@ import StatusBadge from '../components/StatusBadge';
 import OfflineBanner from '../components/OfflineBanner';
 import MessageTicks from '../components/MessageTicks';
 import TypingIndicator from '../components/TypingIndicator';
+import StickerPicker from '../components/StickerPicker';
 import type { MessageStatus, LecturerStatus } from '../types/types';
 import { API_URL } from '../config/env';
 import { useWebSocket } from '../services/WebSocketProvider';
 import { isCallSignal } from '../services/callSignaling';
+import { uploadMedia, getMessageTypeFromMime } from '../services/mediaUploadService';
 
 interface ChatScreenProps {
   navigation: any;
@@ -46,6 +54,11 @@ interface ExtendedMessage extends IMessage {
   status?: MessageStatus;
   isOffline?: boolean;
   isAutoReply?: boolean;
+  messageType?: string;
+  mediaUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
 }
 
 const QUICK_REACTIONS = ['❤️', '😂', '👍', '😮', '😢', '🙏'];
@@ -72,6 +85,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [recipientPresence, setRecipientPresence] = useState<{status: string; lastSeen: number}>({status: 'OFFLINE', lastSeen: 0});
   const attachMenuAnim = useRef(new Animated.Value(0)).current;
   const headerAnim = useRef(new Animated.Value(0)).current;
 
@@ -87,6 +103,22 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     }).start();
   }, []);
 
+  // Fetch recipient presence
+  useEffect(() => {
+    const fetchPresence = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/v1/presence/${recipientId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setRecipientPresence({ status: data.status, lastSeen: data.lastSeen });
+        }
+      } catch (e) { /* ignore */ }
+    };
+    fetchPresence();
+    const interval = setInterval(fetchPresence, 30000);
+    return () => clearInterval(interval);
+  }, [recipientId]);
+
   useEffect(() => {
     const fetchHistory = async () => {
       try {
@@ -95,16 +127,29 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         });
         if (res.ok) {
           const data = await res.json();
-          const historyMsgs: ExtendedMessage[] = data.map((msg: any) => ({
-            _id: msg.id,
-            text: msg.content,
-            createdAt: new Date(msg.timestamp),
-            user: {
-              _id: msg.senderId === currentUser ? 'me' : msg.senderId,
-              name: msg.senderId === currentUser ? 'Me' : msg.senderId,
-            },
-            status: 'read',
-          }));
+          const historyMsgs: ExtendedMessage[] = data.map((msg: any) => {
+            const isStickerImage = msg.messageType === 'STICKER' && msg.content && msg.content.startsWith('http');
+            return {
+              _id: msg.id,
+              text: msg.messageType === 'IMAGE' ? '📷 Hình ảnh'
+                  : msg.messageType === 'VIDEO' ? '🎬 Video'
+                  : msg.messageType === 'FILE' ? '📎 ' + (msg.fileName || 'Tệp')
+                  : isStickerImage ? ''
+                  : msg.content,
+              createdAt: new Date(msg.timestamp),
+              user: {
+                _id: msg.senderId === currentUser ? 'me' : msg.senderId,
+                name: msg.senderId === currentUser ? 'Me' : msg.senderId,
+              },
+              status: 'read',
+              image: msg.messageType === 'IMAGE' ? msg.mediaUrl : (isStickerImage ? msg.content : undefined),
+              messageType: msg.messageType || 'TEXT',
+              mediaUrl: msg.mediaUrl,
+              fileName: msg.fileName,
+              fileSize: msg.fileSize,
+              mimeType: msg.mimeType,
+            };
+          });
           
           if (lecturerStatus === 'busy') {
              historyMsgs.unshift({
@@ -138,15 +183,26 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       // Chỉ nhận message thuộc conversation hiện tại
       if (data.conversationId !== conversationId) return;
 
+      const isStickerImage = data.messageType === 'STICKER' && data.content && data.content.startsWith('http');
       const incomingMessage: ExtendedMessage = {
         _id: `${data.conversationId}-${data.timestamp}-${Date.now()}`,
-        text: data.content,
+        text: data.messageType === 'IMAGE' ? '📷 Hình ảnh'
+            : data.messageType === 'VIDEO' ? '🎬 Video'
+            : data.messageType === 'FILE' ? '📎 ' + (data.fileName || 'Tệp')
+            : isStickerImage ? ''
+            : data.content,
         createdAt: new Date(data.timestamp || Date.now()),
         user: {
           _id: data.senderId,
           name: data.senderId,
         },
         status: 'delivered' as MessageStatus,
+        image: data.messageType === 'IMAGE' ? data.mediaUrl : (isStickerImage ? data.content : undefined),
+        messageType: data.messageType || 'TEXT',
+        mediaUrl: data.mediaUrl,
+        fileName: data.fileName,
+        fileSize: data.fileSize,
+        mimeType: data.mimeType,
       };
       setMessages((prev) => GiftedChat.append(prev, [incomingMessage]));
     };
@@ -199,6 +255,88 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     },
     [isOffline, currentUser, recipientId, conversationId, sendMessage],
   );
+
+  // ---- Media upload & send ----
+  const handleMediaSend = useCallback(async (file: { uri: string; fileName: string; type: string; fileSize?: number }) => {
+    if (!token) return;
+    setIsUploading(true);
+    try {
+      const result = await uploadMedia(token, file);
+      const msgType = getMessageTypeFromMime(result.mimeType);
+      const msgId = `media-${Date.now()}`;
+
+      const mediaMessage: ExtendedMessage = {
+        _id: msgId,
+        text: msgType === 'IMAGE' ? '📷 Hình ảnh' : msgType === 'VIDEO' ? '🎬 Video' : '📎 ' + result.fileName,
+        createdAt: new Date(),
+        user: { _id: 'me', name: currentUser },
+        image: msgType === 'IMAGE' ? result.mediaUrl : undefined,
+        messageType: msgType,
+        mediaUrl: result.mediaUrl,
+        fileName: result.fileName,
+        fileSize: result.fileSize,
+        mimeType: result.mimeType,
+        status: 'sent' as MessageStatus,
+      };
+
+      setMessages((prev) => GiftedChat.append(prev, [mediaMessage]));
+
+      sendMessage({
+        senderId: currentUser,
+        receiverId: recipientId,
+        content: msgType === 'IMAGE' ? '📷 Hình ảnh' : '📎 ' + result.fileName,
+        conversationId,
+        messageType: msgType,
+        mediaUrl: result.mediaUrl,
+        fileName: result.fileName,
+        fileSize: result.fileSize,
+        mimeType: result.mimeType,
+      });
+    } catch (error: any) {
+      Alert.alert('Lỗi upload', error.message || 'Không thể upload file');
+    } finally {
+      setIsUploading(false);
+      setShowAttachMenu(false);
+    }
+  }, [token, currentUser, recipientId, conversationId, sendMessage]);
+
+  // ---- Sticker send ----
+  const handleStickerSend = useCallback((sticker: string, type: 'emoji' | 'sticker') => {
+    const msgId = `sticker-${Date.now()}`;
+    const isImageSticker = type === 'sticker';
+    
+    const stickerMessage: ExtendedMessage = {
+      _id: msgId,
+      text: isImageSticker ? '' : sticker,
+      image: isImageSticker ? sticker : undefined,
+      createdAt: new Date(),
+      user: { _id: 'me', name: currentUser },
+      messageType: 'STICKER',
+      status: 'sent' as MessageStatus,
+    };
+    setMessages((prev) => GiftedChat.append(prev, [stickerMessage]));
+    sendMessage({
+      senderId: currentUser,
+      receiverId: recipientId,
+      content: sticker,
+      conversationId,
+      messageType: 'STICKER',
+    });
+  }, [currentUser, recipientId, conversationId, sendMessage]);
+
+  // ---- Presence text helper ----
+  const getPresenceText = () => {
+    if (recipientPresence.status === 'ONLINE') return '● Đang hoạt động';
+    if (recipientPresence.lastSeen > 0) {
+      const mins = Math.floor((Date.now() - recipientPresence.lastSeen) / 60000);
+      if (mins < 1) return 'Vừa hoạt động';
+      if (mins < 60) return `Hoạt động ${mins} phút trước`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return `Hoạt động ${hours} giờ trước`;
+      return 'Ngoại tuyến';
+    }
+    return 'Ngoại tuyến';
+  };
 
   // isOffline giờ dựa trên isConnected từ WebSocket — không toggle thủ công nữa
 
@@ -308,7 +446,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         placeholder="Nhập tin nhắn..."
         placeholderTextColor={Colors.textMuted}
       />
-      <TouchableOpacity style={styles.emojiButton}>
+      <TouchableOpacity style={styles.emojiButton} onPress={() => setShowStickerPicker(true)}>
         <Icon name="emoticon-happy-outline" size={24} color={Colors.textMuted} />
       </TouchableOpacity>
     </View>
@@ -385,7 +523,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
               name={recipientName}
               uri={recipientAvatar}
               size="medium"
-              isOnline={isOnline}
+              isOnline={recipientPresence.status === 'ONLINE'}
               showOnlineStatus
             />
             <View style={styles.headerInfo}>
@@ -396,8 +534,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                 {lecturerStatus ? (
                   <StatusBadge status={lecturerStatus} compact />
                 ) : (
-                  <Text style={styles.headerStatus}>
-                    {isOnline ? '● Đang hoạt động' : 'Ngoại tuyến'}
+                  <Text style={[styles.headerStatus, recipientPresence.status === 'ONLINE' && {color: '#4ADE80'}]}>
+                    {getPresenceText()}
                   </Text>
                 )}
               </View>
@@ -508,14 +646,53 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             <Text style={styles.attachMenuTitle}>Đính kèm tệp</Text>
             <View style={styles.attachMenuGrid}>
               {[
-                { icon: 'image', label: 'Ảnh', color: '#4CAF50', hint: 'Từ thư viện' },
-                { icon: 'file-document-outline', label: 'Tài liệu', color: '#2196F3', hint: 'PDF, DOCX' },
-                { icon: 'camera-outline', label: 'Camera', color: '#FF9800', hint: 'Chụp ảnh' },
-                { icon: 'map-marker-outline', label: 'Vị trí', color: '#E91E63', hint: 'Chia sẻ' },
-                { icon: 'account-box-outline', label: 'Liên hệ', color: '#9C27B0', hint: 'Danh bạ' },
-                { icon: 'poll', label: 'Bình chọn', color: '#00BCD4', hint: 'Tạo poll' },
+                { icon: 'image', label: 'Ảnh', color: '#4CAF50', hint: 'Từ thư viện', onPress: async () => {
+                  try {
+                    const result = await launchImageLibrary({ mediaType: 'mixed', quality: 0.8 });
+                    if (result.assets && result.assets[0]) {
+                      const asset = result.assets[0];
+                      handleMediaSend({ uri: asset.uri!, fileName: asset.fileName || 'image.jpg', type: asset.type || 'image/jpeg', fileSize: asset.fileSize });
+                    }
+                  } catch (e) { Alert.alert('Lỗi', 'Không thể mở thư viện ảnh'); }
+                }},
+                { icon: 'file-document-outline', label: 'Tài liệu', color: '#2196F3', hint: 'PDF, DOCX', onPress: async () => {
+                  try {
+                    const result = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
+                    const file = result[0];
+                    handleMediaSend({ uri: file.uri, fileName: file.name || 'document', type: file.type || 'application/octet-stream', fileSize: file.size || undefined });
+                  } catch (e: any) {
+                    if (!DocumentPicker.isCancel(e)) Alert.alert('Lỗi', 'Không thể chọn tài liệu');
+                  }
+                }},
+                { icon: 'camera-outline', label: 'Camera', color: '#FF9800', hint: 'Chụp ảnh', onPress: async () => {
+                  try {
+                    if (Platform.OS === 'android') {
+                      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+                      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+                        Alert.alert('Quyền bị từ chối', 'Ứng dụng cần quyền Camera để chụp ảnh');
+                        return;
+                      }
+                    }
+                    const result = await launchCamera({ mediaType: 'photo', quality: 0.8 });
+                    if (result.assets && result.assets[0]) {
+                      const asset = result.assets[0];
+                      handleMediaSend({ uri: asset.uri!, fileName: asset.fileName || 'photo.jpg', type: asset.type || 'image/jpeg', fileSize: asset.fileSize });
+                    }
+                  } catch (e) { Alert.alert('Lỗi', 'Không thể mở camera'); }
+                }},
+                { icon: 'video-outline', label: 'Video', color: '#E91E63', hint: 'Quay/Chọn', onPress: async () => {
+                  try {
+                    const result = await launchImageLibrary({ mediaType: 'video', quality: 0.8 });
+                    if (result.assets && result.assets[0]) {
+                      const asset = result.assets[0];
+                      handleMediaSend({ uri: asset.uri!, fileName: asset.fileName || 'video.mp4', type: asset.type || 'video/mp4', fileSize: asset.fileSize });
+                    }
+                  } catch (e) { Alert.alert('Lỗi', 'Không thể chọn video'); }
+                }},
+                { icon: 'sticker-emoji', label: 'Sticker', color: '#9C27B0', hint: 'Emoji', onPress: () => { toggleAttachMenu(); setShowStickerPicker(true); }},
+                { icon: 'emoticon-happy-outline', label: 'Emoji', color: '#00BCD4', hint: 'Biểu tượng', onPress: () => { toggleAttachMenu(); setShowStickerPicker(true); }},
               ].map((item, index) => (
-                <TouchableOpacity key={index} style={styles.attachMenuItem}>
+                <TouchableOpacity key={index} style={styles.attachMenuItem} onPress={item.onPress}>
                   <LinearGradient
                     colors={[item.color, `${item.color}DD`]}
                     style={styles.attachMenuIcon}
@@ -530,6 +707,23 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
           </Animated.View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Sticker Picker */}
+      <StickerPicker
+        visible={showStickerPicker}
+        onClose={() => setShowStickerPicker(false)}
+        onSelectSticker={(sticker, type) => handleStickerSend(sticker, type)}
+      />
+
+      {/* Upload Indicator */}
+      {isUploading && (
+        <View style={styles.uploadOverlay}>
+          <View style={styles.uploadBox}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.uploadText}>Đang tải lên...</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -762,6 +956,28 @@ const styles = StyleSheet.create({
     fontSize: Typography.tiny,
     color: Colors.textMuted,
     marginTop: 2,
+  },
+  // Upload overlay
+  uploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  uploadBox: {
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    paddingHorizontal: 32,
+    paddingVertical: 24,
+    alignItems: 'center',
+    ...Shadows.lg,
+  },
+  uploadText: {
+    marginTop: 12,
+    fontSize: Typography.bodySmall,
+    color: Colors.textSecondary,
+    fontWeight: Typography.medium as any,
   },
 });
 

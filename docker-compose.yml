@@ -181,6 +181,13 @@ services:
     depends_on:
       - auth-service
       - chat-service
+      - presence-service
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8085
+      CHAT_SERVICE_HTTP_URL: http://chat-service:8082
+      CHAT_SERVICE_WS_URL: ws://chat-service:8082
+      PRESENCE_SERVICE_URL: http://presence-service:8083
+      PRESENCE_SERVICE_WS_URL: ws://presence-service:8083
     networks:
       - iuh-connect-network
     restart: unless-stopped
@@ -202,6 +209,7 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: iuh_redis_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JWT_SECRET: IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!
     networks:
       - iuh-connect-network
     restart: unless-stopped

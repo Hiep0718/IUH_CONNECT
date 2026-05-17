@@ -45,6 +45,12 @@ public class ChatMessageKafkaConsumer {
                     .content(message.getContent())
                     .conversationId(message.getConversationId())
                     .timestamp(message.getTimestamp())
+                    .messageType(message.getMessageType() != null ? message.getMessageType() : "TEXT")
+                    .mediaUrl(message.getMediaUrl())
+                    .thumbnailUrl(message.getThumbnailUrl())
+                    .fileName(message.getFileName())
+                    .fileSize(message.getFileSize())
+                    .mimeType(message.getMimeType())
                     .build();
 
             // 1. Lưu DB: Vì sử dụng chung Group ID ngẫu nhiên để Broadcast, tất cả các instance sẽ nhận được message.

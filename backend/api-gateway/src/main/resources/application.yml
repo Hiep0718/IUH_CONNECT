@@ -43,6 +43,24 @@ spring:
           predicates:
             - Path=/meeting/**
 
+        # -------- File Upload (chat-service) --------
+        - id: file-service
+          uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/files/**
+
+        # -------- Presence Service (HTTP) --------
+        - id: presence-service-http
+          uri: ${PRESENCE_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/presence/**
+
+        # -------- Presence Service (WebSocket) --------
+        - id: presence-service-ws
+          uri: ${PRESENCE_SERVICE_WS_URL:ws://localhost:8083}
+          predicates:
+            - Path=/ws/presence/**
+
 # ---------- Actuator ----------
 management:
   endpoints:

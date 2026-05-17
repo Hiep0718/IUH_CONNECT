@@ -93,11 +93,8 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
       if (res.ok) {
         const data = await res.json();
         const mapped = data.map((msg: any) => {
-          // Recover from corrupted data where msg.receiverId is a conversation ID
           let otherUserId = msg.senderId === currentUser ? msg.receiverId : msg.senderId;
           
-          // If the extracted otherUserId looks like a conversation ID (contains a hyphen),
-          // fallback to extracting it from the conversationId securely.
           if (otherUserId && otherUserId.includes('-')) {
             const parts = msg.conversationId.split('-');
             otherUserId = parts[0] === currentUser ? parts[1] : parts[0];
@@ -105,12 +102,15 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
 
           return {
             id: msg.conversationId,
-            name: otherUserId, // TODO: Fetch real name if needed
+            name: otherUserId,
             targetUserId: otherUserId,
             isGroup: false,
             participants: [],
             lastMessage: {
-              text: msg.content,
+              text: msg.messageType === 'IMAGE' ? '📷 Hình ảnh'
+                  : msg.messageType === 'VIDEO' ? '🎬 Video'
+                  : msg.messageType === 'FILE' ? '📎 ' + (msg.fileName || 'Tệp')
+                  : msg.content,
               timestamp: new Date(msg.timestamp),
               senderId: msg.senderId,
             },
@@ -118,6 +118,28 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
             isOnline: false,
           } as Conversation;
         });
+
+        // Fetch bulk presence
+        const userIds = [...new Set(mapped.map((c: Conversation) => c.targetUserId).filter(Boolean))];
+        if (userIds.length > 0) {
+          try {
+            const presRes = await fetch(`${API_URL}/api/v1/presence/bulk`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(userIds),
+            });
+            if (presRes.ok) {
+              const presData = await presRes.json();
+              mapped.forEach((conv: Conversation) => {
+                const pres = presData[conv.targetUserId || ''];
+                if (pres) {
+                  conv.isOnline = pres.status === 'ONLINE';
+                }
+              });
+            }
+          } catch (e) { /* presence fetch optional */ }
+        }
+
         setConversations(mapped);
       }
     } catch (e) {
@@ -199,7 +221,18 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         </TouchableOpacity>
 
         {MOCK_ACTIVE_USERS.map((user) => (
-          <TouchableOpacity key={user.id} style={styles.activeUserItem}>
+          <TouchableOpacity 
+            key={user.id} 
+            style={styles.activeUserItem}
+            onPress={() => {
+              navigation.navigate('Chat', {
+                conversationId: `chat-${currentUser}-${user.id}`,
+                recipientName: user.name,
+                recipientId: user.id,
+                isOnline: user.isOnline,
+              });
+            }}
+          >
             <Avatar
               name={user.name}
               size="large"
@@ -447,7 +480,15 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
             title="Chưa có cuộc trò chuyện"
             subtitle="Bắt đầu nhắn tin với bạn bè và giảng viên của bạn"
             actionLabel="Bắt đầu trò chuyện"
-            onAction={() => { }}
+            onAction={() => {
+              // Navigate to a mock chat room to test features
+              navigation.navigate('Chat', {
+                conversationId: `demo-chat-${Date.now()}`,
+                recipientName: 'Bạn bè Demo',
+                recipientId: 'demo-user',
+                isOnline: true,
+              });
+            }}
           />
         }
       />

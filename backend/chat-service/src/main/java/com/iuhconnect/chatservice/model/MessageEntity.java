@@ -33,4 +33,24 @@ public class MessageEntity {
     private String conversationId;
 
     private long timestamp;
+
+    // ---- Media fields ----
+    @Field("message_type")
+    @Builder.Default
+    private String messageType = "TEXT";
+
+    @Field("media_url")
+    private String mediaUrl;
+
+    @Field("thumbnail_url")
+    private String thumbnailUrl;
+
+    @Field("file_name")
+    private String fileName;
+
+    @Field("file_size")
+    private long fileSize;
+
+    @Field("mime_type")
+    private String mimeType;
 }

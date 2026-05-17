@@ -16,3 +16,19 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: presence-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+# JWT Configuration (shared secret with auth-service)
+jwt:
+  secret: ${JWT_SECRET:IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!}
+
+# Presence Configuration
+presence:
+  heartbeat-timeout-seconds: 90
+  cleanup-interval-seconds: 60
