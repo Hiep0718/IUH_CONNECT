@@ -43,7 +43,7 @@ public class FcmPushService {
                             .setNotification(AndroidNotification.builder()
                                     .setColor("#0056D2") // IUH Blue
                                     .setSound("default")
-                                    //.setIcon("ic_notification") // Nếu có icon riêng
+                                    .setIcon("ic_notification") // Sử dụng icon trắng trong drawable
                                     .build())
                             .build())
                     .setApnsConfig(ApnsConfig.builder()
