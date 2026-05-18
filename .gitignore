@@ -74,6 +74,7 @@ docker-compose.override.yml
 .env.*
 !.env.example
 frontend/src/config/env.ts
+firebase-service-account.json
 
 # ---------- OS Files ----------
 .DS_Store

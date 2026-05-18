@@ -63,4 +63,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private Role role = Role.STUDENT;
+
+    @Column(name = "fcm_token", length = 500)
+    private String fcmToken;
 }

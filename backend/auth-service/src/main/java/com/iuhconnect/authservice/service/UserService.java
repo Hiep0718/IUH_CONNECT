@@ -10,9 +10,11 @@ import org.springframework.stereotype.Service;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserEventProducer userEventProducer;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, UserEventProducer userEventProducer) {
         this.userRepository = userRepository;
+        this.userEventProducer = userEventProducer;
     }
 
     public UserDto getCurrentUserProfile(String username) {
@@ -48,6 +50,22 @@ public class UserService {
 
         User updatedUser = userRepository.save(user);
         return mapToDto(updatedUser);
+    }
+
+    public void updateFcmToken(String username, String fcmToken) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        user.setFcmToken(fcmToken);
+        userRepository.save(user);
+
+        // Publish event for Notification Service
+        com.iuhconnect.authservice.dto.UserEventDto event = com.iuhconnect.authservice.dto.UserEventDto.builder()
+                .userId(user.getId())
+                .username(user.getUsername())
+                .eventType("FCM_TOKEN_UPDATED")
+                .fcmToken(fcmToken)
+                .build();
+        userEventProducer.publishUserCreatedEvent(event);
     }
 
     private UserDto mapToDto(User user) {

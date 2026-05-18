@@ -21,6 +21,12 @@ import ProfileSettingsScreen from './src/screens/ProfileSettingsScreen';
 
 // Services
 import { WebSocketProvider } from './src/services/WebSocketProvider';
+import {
+  requestUserPermission,
+  getFCMToken,
+  sendFCMTokenToBackend,
+  setupNotificationListeners,
+} from './src/services/notificationService';
 
 // Theme
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from './src/theme/theme';
@@ -360,6 +366,32 @@ export default function App() {
     setToken(accessToken);
     setCurrentUser(username);
   };
+
+  // Thiết lập Firebase Cloud Messaging sau khi người dùng đăng nhập thành công
+  useEffect(() => {
+    let unsubscribe: any = undefined;
+
+    const setupFCM = async () => {
+      if (token) {
+        const hasPermission = await requestUserPermission();
+        if (hasPermission) {
+          const fcmToken = await getFCMToken();
+          if (fcmToken) {
+            await sendFCMTokenToBackend(fcmToken, token);
+          }
+          unsubscribe = setupNotificationListeners();
+        }
+      }
+    };
+
+    setupFCM();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [token]);
 
   const handleLogout = () => {
     setToken(null);

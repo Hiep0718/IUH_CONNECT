@@ -32,4 +32,9 @@ public class KafkaConfig {
     public KafkaTemplate<String, Object> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
+
+    @Bean
+    public org.springframework.kafka.support.converter.RecordMessageConverter converter() {
+        return new org.springframework.kafka.support.converter.JsonMessageConverter();
+    }
 }

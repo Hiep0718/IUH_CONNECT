@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "194436372770",
+    "project_id": "iuh-connect",
+    "storage_bucket": "iuh-connect.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:194436372770:android:d2de3b4cfe7dae9c25ad7b",
+        "android_client_info": {
+          "package_name": "com.iuhconnect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFceaUfknsNh-yHZKylT4V50uE5YMbYZw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

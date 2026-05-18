@@ -1,29 +1,21 @@
 import React, {
   createContext,
-  useContext,
-  useRef,
-  useEffect,
   useCallback,
+  useContext,
+  useEffect,
+  useRef,
   useState,
 } from 'react';
 import { Alert } from 'react-native';
-import { WS_URL } from '../config/env';
 import Sound from 'react-native-sound';
-
-// ============================================================
-// Types
-// ============================================================
+import { WS_URL } from '../config/env';
 
 type MessageHandler = (data: any) => void;
 
 interface WebSocketContextType {
-  /** Gửi message qua WebSocket (auto-serialize JSON) */
   sendMessage: (data: object) => void;
-  /** Đăng ký listener nhận message từ WS */
   addListener: (id: string, handler: MessageHandler) => void;
-  /** Hủy đăng ký listener */
   removeListener: (id: string) => void;
-  /** Trạng thái kết nối */
   isConnected: boolean;
 }
 
@@ -34,39 +26,26 @@ const WebSocketContext = createContext<WebSocketContextType>({
   isConnected: false,
 });
 
-/** Hook để dùng WebSocket từ bất kỳ component nào */
 export const useWebSocket = () => useContext(WebSocketContext);
-
-// ============================================================
-// Provider
-// ============================================================
 
 let globalRingtone: Sound | null = null;
 try {
-  globalRingtone = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, (error) => {
+  globalRingtone = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, error => {
     if (error) {
-      console.log('Lỗi tải global ringtone', error);
+      console.log('Failed to load global ringtone', error);
       globalRingtone = null;
     }
   });
-} catch (e) {
-  console.log('Lỗi khởi tạo Sound', e);
+} catch (error) {
+  console.log('Failed to initialize ringtone', error);
 }
 
 interface WebSocketProviderProps {
   token: string;
   children: React.ReactNode;
-  /** Navigation ref để điều hướng từ global scope */
   navigationRef?: any;
 }
 
-/**
- * WebSocketProvider — mount DUY NHẤT 1 WebSocket cho toàn app authenticated.
- *
- * - Quản lý kết nối + auto reconnect
- * - Cho phép nhiều component subscribe qua addListener/removeListener
- * - Xử lý incoming call toàn cục (không phụ thuộc vào ChatScreen)
- */
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   token,
   children,
@@ -74,28 +53,108 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 }) => {
   const wsRef = useRef<WebSocket | null>(null);
   const listenersRef = useRef<Map<string, MessageHandler>>(new Map());
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const isMountedRef = useRef(false);
+  const shouldReconnectRef = useRef(false);
   const [isConnected, setIsConnected] = useState(false);
-  const reconnectTimeout = useRef<ReturnType<typeof setTimeout>>();
-  const isMountedRef = useRef(true);
 
-  // ---- Connect ----
+  const handleGlobalIncomingCall = useCallback(
+    (data: any) => {
+      const callerName = data.senderName || data.senderId || 'Nguoi dung';
+
+      if (globalRingtone && globalRingtone.isLoaded()) {
+        globalRingtone.setNumberOfLoops(-1);
+        globalRingtone.play();
+      }
+
+      Alert.alert(
+        'Cuoc goi den',
+        `${callerName} dang goi video cho ban`,
+        [
+          {
+            text: 'Tu choi',
+            style: 'cancel',
+            onPress: () => {
+              if (globalRingtone && globalRingtone.isLoaded()) {
+                try {
+                  globalRingtone.stop();
+                } catch {}
+              }
+
+              const ws = wsRef.current;
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(
+                  JSON.stringify({
+                    type: 'CALL_SIGNAL',
+                    signalType: 'CALL_REJECT',
+                    receiverId: data.senderId,
+                    meetingId: data.meetingId,
+                  }),
+                );
+              }
+            },
+          },
+          {
+            text: 'Nghe may',
+            onPress: () => {
+              if (globalRingtone && globalRingtone.isLoaded()) {
+                try {
+                  globalRingtone.stop();
+                } catch {}
+              }
+
+              navigationRef?.current?.navigate('Meeting', {
+                callerId: data.senderId,
+                callerName,
+                isIncoming: true,
+                roomName: data.roomName,
+                meetingId: data.meetingId,
+              });
+            },
+          },
+        ],
+        {
+          onDismiss: () => {
+            if (globalRingtone && globalRingtone.isLoaded()) {
+              try {
+                globalRingtone.stop();
+              } catch {}
+            }
+          },
+        },
+      );
+    },
+    [navigationRef],
+  );
+
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    const currentSocket = wsRef.current;
+    if (
+      currentSocket?.readyState === WebSocket.OPEN ||
+      currentSocket?.readyState === WebSocket.CONNECTING
+    ) {
+      return;
+    }
+
+    clearTimeout(reconnectTimeoutRef.current);
 
     try {
       const ws = new WebSocket(`${WS_URL}/ws/chat?token=${token}`);
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (wsRef.current !== ws || !isMountedRef.current) {
+          return;
+        }
+
         console.log('✅ [WSProvider] WebSocket connected');
-        if (isMountedRef.current) setIsConnected(true);
+        setIsConnected(true);
       };
 
-      ws.onmessage = (event: WebSocketMessageEvent) => {
+      ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
 
-          // === Global incoming call handler ===
           if (data.type === 'CALL_SIGNAL') {
             if (data.signalType === 'CALL_INVITE') {
               handleGlobalIncomingCall(data);
@@ -103,51 +162,70 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
               if (globalRingtone && globalRingtone.isLoaded()) {
                 try {
                   globalRingtone.stop();
-                } catch (e) {}
+                } catch {}
               }
             }
           }
 
-          // Broadcast tới tất cả listeners
           listenersRef.current.forEach(handler => {
             try {
               handler(data);
-            } catch (e) {
-              console.error('[WSProvider] Listener error:', e);
+            } catch (error) {
+              console.error('[WSProvider] Listener error:', error);
             }
           });
-        } catch (e) {
-          console.error('[WSProvider] Parse error:', e);
+        } catch (error) {
+          console.error('[WSProvider] Parse error:', error);
         }
+      };
+
+      ws.onerror = error => {
+        if (!isMountedRef.current) {
+          return;
+        }
+
+        console.error('[WSProvider] WebSocket error:', error);
+        setIsConnected(false);
       };
 
       ws.onclose = () => {
-        console.log('🔌 [WSProvider] WebSocket disconnected');
-        if (isMountedRef.current) {
-          setIsConnected(false);
-          // Auto reconnect sau 3 giây
-          reconnectTimeout.current = setTimeout(() => {
-            if (isMountedRef.current) connect();
-          }, 3000);
+        if (wsRef.current === ws) {
+          wsRef.current = null;
         }
-      };
 
-      ws.onerror = () => {
-        if (isMountedRef.current) setIsConnected(false);
+        if (!isMountedRef.current) {
+          return;
+        }
+
+        console.log('🔌 [WSProvider] WebSocket disconnected');
+        setIsConnected(false);
+
+        if (!shouldReconnectRef.current) {
+          return;
+        }
+
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (isMountedRef.current && shouldReconnectRef.current) {
+            connect();
+          }
+        }, 3000);
       };
-    } catch (e) {
-      console.error('[WSProvider] Failed to create WebSocket:', e);
-      if (isMountedRef.current) setIsConnected(false);
+    } catch (error) {
+      console.error('[WSProvider] Failed to create WebSocket:', error);
+      setIsConnected(false);
     }
-  }, [token]);
+  }, [handleGlobalIncomingCall, token]);
 
   useEffect(() => {
     isMountedRef.current = true;
+    shouldReconnectRef.current = true;
     connect();
 
     return () => {
       isMountedRef.current = false;
-      clearTimeout(reconnectTimeout.current);
+      shouldReconnectRef.current = false;
+      clearTimeout(reconnectTimeoutRef.current);
+
       if (wsRef.current) {
         wsRef.current.onclose = null;
         wsRef.current.close();
@@ -156,66 +234,16 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     };
   }, [connect]);
 
-  // ---- Presence Heartbeat WS ----
-  const presenceWsRef = useRef<WebSocket | null>(null);
-  const presenceHeartbeatRef = useRef<ReturnType<typeof setInterval>>();
-  const presenceReconnectRef = useRef<ReturnType<typeof setTimeout>>();
-
-  useEffect(() => {
-    const connectPresence = () => {
-      try {
-        const presenceUrl = `${WS_URL}/ws/presence?token=${token}`;
-        const ws = new WebSocket(presenceUrl);
-        presenceWsRef.current = ws;
-
-        ws.onopen = () => {
-          console.log('✅ [Presence] WebSocket connected');
-          // Send heartbeat PING every 30s
-          presenceHeartbeatRef.current = setInterval(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send('PING');
-            }
-          }, 30000);
-        };
-
-        ws.onclose = () => {
-          console.log('🔌 [Presence] WebSocket disconnected');
-          clearInterval(presenceHeartbeatRef.current);
-          if (isMountedRef.current) {
-            presenceReconnectRef.current = setTimeout(connectPresence, 5000);
-          }
-        };
-
-        ws.onerror = () => { /* handled by onclose */ };
-      } catch (e) {
-        console.error('[Presence] Failed to connect:', e);
-      }
-    };
-
-    connectPresence();
-
-    return () => {
-      clearInterval(presenceHeartbeatRef.current);
-      clearTimeout(presenceReconnectRef.current);
-      if (presenceWsRef.current) {
-        presenceWsRef.current.onclose = null;
-        presenceWsRef.current.close();
-        presenceWsRef.current = null;
-      }
-    };
-  }, [token]);
-
-  // ---- Send ----
   const sendMessage = useCallback((data: object) => {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(data));
-    } else {
-      console.warn('⚠️ [WSProvider] WS not connected, message queued/dropped');
+      return;
     }
+
+    console.warn('[WSProvider] WebSocket is not connected');
   }, []);
 
-  // ---- Listeners ----
   const addListener = useCallback((id: string, handler: MessageHandler) => {
     listenersRef.current.set(id, handler);
   }, []);
@@ -224,73 +252,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     listenersRef.current.delete(id);
   }, []);
 
-  // ---- Global incoming call ----
-  const handleGlobalIncomingCall = (data: any) => {
-    const callerName = data.senderName || data.senderId || 'Người dùng';
-
-    // Play ringtone globally when invited
-    if (globalRingtone && globalRingtone.isLoaded()) {
-      globalRingtone.setNumberOfLoops(-1);
-      globalRingtone.play();
-    }
-
-    Alert.alert(
-      '📞 Cuộc gọi đến',
-      `${callerName} đang gọi video cho bạn`,
-      [
-        {
-          text: 'Từ chối',
-          style: 'cancel',
-          onPress: () => {
-            if (globalRingtone && globalRingtone.isLoaded()) {
-              try {
-                globalRingtone.stop();
-              } catch (e) {}
-            }
-            // Gửi CALL_REJECT
-            sendMessage({
-              type: 'CALL_SIGNAL',
-              signalType: 'CALL_REJECT',
-              receiverId: data.senderId,
-              meetingId: data.meetingId,
-            });
-          },
-        },
-        {
-          text: '✅ Nghe máy',
-          onPress: () => {
-            if (globalRingtone && globalRingtone.isLoaded()) {
-              try {
-                globalRingtone.stop();
-              } catch (e) {}
-            }
-            if (navigationRef?.current) {
-              navigationRef.current.navigate('Meeting', {
-                callerId: data.senderId,
-                callerName: callerName,
-                isIncoming: true,
-                roomName: data.roomName,
-                meetingId: data.meetingId,
-              });
-            }
-          },
-        },
-      ],
-      {
-        onDismiss: () => {
-          if (globalRingtone && globalRingtone.isLoaded()) {
-            try {
-              globalRingtone.stop();
-            } catch (e) {}
-          }
-        }
-      }
-    );
-  };
-
   return (
     <WebSocketContext.Provider
-      value={{ sendMessage, addListener, removeListener, isConnected }}>
+      value={{ sendMessage, addListener, removeListener, isConnected }}
+    >
       {children}
     </WebSocketContext.Provider>
   );

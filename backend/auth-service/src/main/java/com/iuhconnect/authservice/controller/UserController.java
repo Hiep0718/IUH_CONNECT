@@ -35,4 +35,13 @@ public class UserController {
         UserDto updatedUser = userService.updateUserProfile(principal.getName(), request);
         return ResponseEntity.ok(updatedUser);
     }
+
+    @PostMapping("/fcm-token")
+    public ResponseEntity<Void> updateFcmToken(Principal principal, @RequestBody com.iuhconnect.authservice.dto.FcmTokenRequest request) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        userService.updateFcmToken(principal.getName(), request.getFcmToken());
+        return ResponseEntity.ok().build();
+    }
 }

@@ -1,4 +1,4 @@
-package com.iuhconnect.authservice.dto;
+package com.iuhconnect.notificationservice.dto;
 
 import lombok.*;
 
@@ -8,11 +8,9 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class UserEventDto {
-
     private Long userId;
     private String username;
     private String avatarUrl;
-    
-    private String eventType; // e.g., "USER_CREATED", "FCM_TOKEN_UPDATED"
+    private String eventType; // "USER_CREATED", "FCM_TOKEN_UPDATED"
     private String fcmToken;
 }
