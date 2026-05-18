@@ -167,6 +167,7 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: iuh_redis_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_MINIO_URL: http://minio:9000
     networks:
       - iuh-connect-network
     restart: unless-stopped

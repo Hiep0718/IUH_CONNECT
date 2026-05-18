@@ -27,6 +27,12 @@ public class FileUploadController {
     @Value("${spring.minio.url:http://localhost:9000}")
     private String minioUrl;
 
+    @Value("${spring.minio.access-key:iuh_minio_admin}")
+    private String accessKey;
+
+    @Value("${spring.minio.secret-key:iuh_minio_password}")
+    private String secretKey;
+
     public FileUploadController(MinioClient minioClient) {
         this.minioClient = minioClient;
     }
@@ -76,12 +82,22 @@ public class FileUploadController {
     @GetMapping("/presigned-url")
     public ResponseEntity<Map<String, String>> getPresignedUrl(
             @RequestParam String fileName,
-            @RequestParam String contentType) {
+            @RequestParam String contentType,
+            @RequestParam(required = false) String clientHost) {
         try {
             String objectKey = System.currentTimeMillis() + "_" + fileName;
 
+            MinioClient signClient = minioClient;
+            if (clientHost != null && !clientHost.trim().isEmpty()) {
+                signClient = MinioClient.builder()
+                        .endpoint("http://" + clientHost + ":9000")
+                        .credentials(accessKey, secretKey)
+                        .region("us-east-1")
+                        .build();
+            }
+
             // Presigned PUT URL (client uploads here)
-            String presignedUrl = minioClient.getPresignedObjectUrl(
+            String presignedUrl = signClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .method(Method.PUT)
                             .bucket(bucketName)
@@ -90,7 +106,7 @@ public class FileUploadController {
                             .build());
 
             // Public download URL (used in chat message)
-            String downloadUrl = minioUrl + "/" + bucketName + "/" + objectKey;
+            String downloadUrl = "http://" + (clientHost != null && !clientHost.trim().isEmpty() ? clientHost : "localhost") + ":9000/" + bucketName + "/" + objectKey;
 
             Map<String, String> response = new HashMap<>();
             response.put("presignedUrl", presignedUrl);
