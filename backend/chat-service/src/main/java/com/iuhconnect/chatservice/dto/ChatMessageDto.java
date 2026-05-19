@@ -9,6 +9,7 @@ import lombok.*;
 @Builder
 public class ChatMessageDto {
 
+    private String id;
     private String senderId;
     private String receiverId;
     private String content;

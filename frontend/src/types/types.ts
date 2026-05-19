@@ -138,6 +138,7 @@ export type RootStackParamList = {
     isIncoming?: boolean;
     roomName?: string;
     meetingId?: string;
+    conversationId?: string;
   };
   ProfileSettings: undefined;
 };

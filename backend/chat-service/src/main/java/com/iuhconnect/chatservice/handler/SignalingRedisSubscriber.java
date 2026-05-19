@@ -3,6 +3,7 @@ package com.iuhconnect.chatservice.handler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iuhconnect.chatservice.dto.CallSignalDto;
+import com.iuhconnect.chatservice.dto.ChatReactionEventDto;
 import com.iuhconnect.chatservice.dto.WebRTCSignalingMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +46,11 @@ public class SignalingRedisSubscriber implements MessageListener {
                 receiverId = signal.getReceiverId();
                 log.info("📥 Call Signal from Redis [to={}, signalType={}]",
                         receiverId, signal.getSignalType());
+            } else if ("CHAT_REACTION".equals(type)) {
+                ChatReactionEventDto reactionEvent = objectMapper.treeToValue(jsonNode, ChatReactionEventDto.class);
+                receiverId = reactionEvent.getReceiverId();
+                log.info("📥 Chat Reaction Event from Redis [to={}, messageId={}]",
+                        receiverId, reactionEvent.getMessageId());
             } else {
                 // Legacy WEBRTC
                 WebRTCSignalingMessage signalingMessage = objectMapper.treeToValue(jsonNode, WebRTCSignalingMessage.class);

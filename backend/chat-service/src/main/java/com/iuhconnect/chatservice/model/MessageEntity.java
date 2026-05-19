@@ -53,4 +53,24 @@ public class MessageEntity {
 
     @Field("mime_type")
     private String mimeType;
+
+    @Field("is_read")
+    @Builder.Default
+    private boolean isRead = false;
+
+    @Field("unread_count")
+    private Integer unreadCount;
+
+    // ---- Reactions: { "❤️": ["user1","user2"], "😂": ["user3"] } ----
+    private java.util.Map<String, java.util.List<String>> reactions;
+
+    // ---- Reply ----
+    @Field("reply_to_id")
+    private String replyToId;
+
+    @Field("reply_to_text")
+    private String replyToText;
+
+    @Field("reply_to_sender")
+    private String replyToSender;
 }

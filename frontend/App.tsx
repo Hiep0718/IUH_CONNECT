@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StatusBar, LogBox, View, Text, Animated, StyleSheet, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -21,8 +21,9 @@ import MeetingScreen from './src/screens/MeetingScreen';
 import ProfileSettingsScreen from './src/screens/ProfileSettingsScreen';
 
 // Services
-import { WebSocketProvider } from './src/services/WebSocketProvider';
+import { WebSocketProvider, useWebSocket } from './src/services/WebSocketProvider';
 import { isTokenExpired, onAuthExpired } from './src/services/authService';
+import { API_URL } from './src/config/env';
 import {
   requestUserPermission,
   getFCMToken,
@@ -241,8 +242,50 @@ const MainTabs = ({
   currentUser: string;
   token: string | null;
   onLogout: () => void;
-}) => (
-  <Tab.Navigator
+}) => {
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [unreadGroupCount, setUnreadGroupCount] = useState(0);
+  const { addListener, removeListener } = useWebSocket();
+
+  const fetchUnreadCounts = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch(`${API_URL}/api/v1/chat/conversations/${currentUser}`);
+      if (res.ok) {
+        const data = await res.json();
+        let chatUnread = 0;
+        let groupUnread = 0;
+        data.forEach((msg: any) => {
+          const count = msg.unreadCount || 0;
+          if (msg.type === 'GROUP' || (msg.conversationId && msg.conversationId.startsWith('GROUP_'))) {
+            groupUnread += count;
+          } else {
+            chatUnread += count;
+          }
+        });
+        setUnreadChatCount(chatUnread);
+        setUnreadGroupCount(groupUnread);
+      }
+    } catch (e) {}
+  }, [currentUser]);
+
+  useEffect(() => {
+    fetchUnreadCounts();
+  }, [fetchUnreadCounts]);
+
+  useEffect(() => {
+    const listenerId = 'main-tabs-ws';
+    const handler = (data: any) => {
+      if (!data.type || data.type === 'CHAT_MESSAGE' || data.type === 'READ_RECEIPT') {
+        fetchUnreadCounts();
+      }
+    };
+    addListener(listenerId, handler);
+    return () => removeListener(listenerId);
+  }, [addListener, removeListener, fetchUnreadCounts]);
+
+  return (
+    <Tab.Navigator
     screenOptions={{
       headerShown: false,
       tabBarShowLabel: true,
@@ -286,7 +329,7 @@ const MainTabs = ({
       options={{
         tabBarLabel: 'Tin nhắn',
         tabBarIcon: ({ focused }) => (
-          <TabIcon name={focused ? 'chat' : 'chat-outline'} focused={focused} badge={8} />
+          <TabIcon name={focused ? 'chat' : 'chat-outline'} focused={focused} badge={unreadChatCount > 0 ? unreadChatCount : undefined} />
         ),
       }}
     >
@@ -322,7 +365,7 @@ const MainTabs = ({
       options={{
         tabBarLabel: 'Nhóm',
         tabBarIcon: ({ focused }) => (
-          <TabIcon name={focused ? 'account-group' : 'account-group-outline'} focused={focused} badge={1} />
+          <TabIcon name={focused ? 'account-group' : 'account-group-outline'} focused={focused} badge={unreadGroupCount > 0 ? unreadGroupCount : undefined} />
         ),
       }}
     >
@@ -353,7 +396,8 @@ const MainTabs = ({
       )}
     </Tab.Screen>
   </Tab.Navigator>
-);
+  );
+};
 
 // ============================================================
 // Root App

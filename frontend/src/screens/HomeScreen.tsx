@@ -32,6 +32,24 @@ interface HomeScreenProps {
   token?: string | null;
 }
 
+type ScheduleStatus = 'ongoing' | 'upcoming';
+
+interface ScheduleItem {
+  id: string;
+  subject: string;
+  room: string;
+  building: string;
+  startTime: string;
+  endTime: string;
+  periods: string;
+  color: string;
+  status: ScheduleStatus;
+  classCode?: string;
+  lecturer?: string;
+  time?: string;
+  isNext?: boolean;
+}
+
 const CURRENT_DATE = new Date();
 const DAYS_VN = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 const MONTHS_VN = [
@@ -42,13 +60,13 @@ const MONTHS_VN = [
 
 
 // ── Schedules ──
-const LECTURER_SCHEDULE = [
+const LECTURER_SCHEDULE: ScheduleItem[] = [
   { id: '1', subject: 'Kiến trúc phần mềm', classCode: 'DHTH15A', room: 'V7.01', building: 'Cơ sở Quận 1', startTime: '07:00', endTime: '09:30', periods: 'Tiết 1-3', color: '#4F46E5', status: 'ongoing' as const },
   { id: '2', subject: 'Lập trình di động', classCode: 'DHTH15B', room: 'V9.02', building: 'Cơ sở Quận 1', startTime: '09:45', endTime: '11:15', periods: 'Tiết 4-5', color: '#0891B2', status: 'upcoming' as const },
   { id: '3', subject: 'Nhập môn CNTT', classCode: 'DHTH16A', room: 'X12.05', building: 'Cơ sở Gò Vấp', startTime: '13:00', endTime: '15:30', periods: 'Tiết 7-9', color: '#059669', status: 'upcoming' as const },
 ];
 
-const STUDENT_SCHEDULE = [
+const STUDENT_SCHEDULE: ScheduleItem[] = [
   { id: '1', subject: 'Kiến trúc phần mềm', lecturer: 'TS. Nguyễn Văn An', room: 'V7.01', building: 'Cơ sở Quận 1', startTime: '07:00', endTime: '09:30', periods: 'Tiết 1-3', color: '#4F46E5', status: 'ongoing' as const },
   { id: '2', subject: 'Lập trình di động', lecturer: 'ThS. Trần Thị Bình', room: 'V9.02', building: 'Cơ sở Quận 1', startTime: '09:45', endTime: '11:15', periods: 'Tiết 4-5', color: '#0891B2', status: 'upcoming' as const },
   { id: '3', subject: 'Toán rời rạc', lecturer: 'TS. Hoàng Minh Đức', room: 'X12.05', building: 'Cơ sở Gò Vấp', startTime: '13:00', endTime: '15:30', periods: 'Tiết 7-9', color: '#059669', status: 'upcoming' as const },
@@ -180,7 +198,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, currentUser, token 
   const upcomingCount = schedule.filter(s => s.status === 'upcoming').length;
 
   // ── Render helpers ──
-  const renderScheduleCard = (item: any) => (
+  const renderScheduleCard = (item: ScheduleItem) => (
     <View key={item.id} style={styles.scheduleCard}>
       <View style={styles.timeColumn}>
         <Text style={[styles.timeStart, item.status === 'ongoing' && { color: item.color }]}>{item.startTime}</Text>
@@ -255,7 +273,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, currentUser, token 
     </TouchableOpacity>
   );
 
-  const renderUpcomingClass = (item: any) => (
+  const renderUpcomingClass = (item: ScheduleItem) => (
     <TouchableOpacity key={item.id} style={styles.upcomingClassCard} activeOpacity={0.7}>
       <View style={[styles.upcomingClassBar, { backgroundColor: item.color }]} />
       <View style={styles.upcomingClassBody}>

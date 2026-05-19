@@ -96,6 +96,20 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                     }
                 }
 
+            } else if ("READ_RECEIPT".equals(type)) {
+                // Forward READ_RECEIPT directly to the receiver without saving to DB
+                String receiverId = jsonNode.has("receiverId") ? jsonNode.get("receiverId").asText() : null;
+                if (receiverId != null) {
+                    WebSocketSession receiverSession = sessionManager.getSession(receiverId);
+                    if (receiverSession != null && receiverSession.isOpen()) {
+                        receiverSession.sendMessage(new TextMessage(message.getPayload()));
+                    } else {
+                        String targetInstance = presenceService.getUserInstanceId(receiverId);
+                        if (targetInstance != null) {
+                            redisTemplate.convertAndSend("signaling:" + targetInstance, message.getPayload());
+                        }
+                    }
+                }
             } else {
                 // ===== Standard Chat Message to Kafka =====
                 ChatMessageDto chatMessage = objectMapper.treeToValue(jsonNode, ChatMessageDto.class);

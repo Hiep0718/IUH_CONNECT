@@ -10,6 +10,7 @@ import { Alert, View, StyleSheet } from 'react-native';
 import Sound from 'react-native-sound';
 import { WS_URL } from '../config/env';
 import InAppNotification, { InAppNotificationData } from '../components/InAppNotification';
+import { triggerAutoLogout } from './authService';
 
 type MessageHandler = (data: any) => void;
 
@@ -139,6 +140,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
                 isIncoming: true,
                 roomName: data.roomName,
                 meetingId: data.meetingId,
+                conversationId: data.conversationId || `${data.senderId}-${currentUser}`,
               });
             },
           },
@@ -222,6 +224,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
+          
+          if (data.type === 'SESSION_REVOKED') {
+            console.log('🚫 [WSProvider] Session revoked due to new login');
+            triggerAutoLogout('SESSION_REVOKED');
+            return;
+          }
 
           // ── Handle CALL_SIGNAL globally ──
           if (data.type === 'CALL_SIGNAL') {
@@ -373,4 +381,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

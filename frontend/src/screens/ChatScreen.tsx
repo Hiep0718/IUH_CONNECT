@@ -1,38 +1,48 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Modal,
+  PermissionsAndroid,
+  Platform,
   SafeAreaView,
   StatusBar,
-  Modal,
-  Animated,
-  Platform,
-  Alert,
-  Image,
-  Linking,
-  ActivityIndicator,
-  PermissionsAndroid,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import DocumentPicker from 'react-native-document-picker';
-import { GiftedChat, IMessage, Bubble, InputToolbar, Composer, Send, Time, SystemMessage, Day, Message } from 'react-native-gifted-chat';
+import {
+  Bubble,
+  Composer,
+  Day,
+  GiftedChat,
+  IMessage,
+  InputToolbar,
+  Send,
+  SystemMessage,
+  Time,
+} from 'react-native-gifted-chat';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/theme';
 import Avatar from '../components/Avatar';
-import StatusBadge from '../components/StatusBadge';
-import OfflineBanner from '../components/OfflineBanner';
 import MessageTicks from '../components/MessageTicks';
-import TypingIndicator from '../components/TypingIndicator';
+import OfflineBanner from '../components/OfflineBanner';
+import StatusBadge from '../components/StatusBadge';
 import StickerPicker from '../components/StickerPicker';
-import type { MessageStatus, LecturerStatus } from '../types/types';
+import TypingIndicator from '../components/TypingIndicator';
 import { API_URL } from '../config/env';
-import { useWebSocket } from '../services/WebSocketProvider';
+import { authFetch } from '../services/authService';
 import { isCallSignal } from '../services/callSignaling';
 import { uploadMedia, getMessageTypeFromMime } from '../services/mediaUploadService';
-import { authFetch } from '../services/authService';
+import { useWebSocket } from '../services/WebSocketProvider';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../theme/theme';
+import type { LecturerStatus, MessageStatus } from '../types/types';
+
+type ReactionMap = Record<string, string[]>;
 
 interface ChatScreenProps {
   navigation: any;
@@ -51,6 +61,15 @@ interface ChatScreenProps {
   token: string | null;
 }
 
+interface ReplyPreview {
+  _id: string | number;
+  text: string;
+  user: {
+    _id: string | number;
+    name?: string;
+  };
+}
+
 interface ExtendedMessage extends IMessage {
   status?: MessageStatus;
   isOffline?: boolean;
@@ -60,11 +79,141 @@ interface ExtendedMessage extends IMessage {
   fileName?: string;
   fileSize?: number;
   mimeType?: string;
+  replyTo?: ReplyPreview;
+  reactions?: ReactionMap;
+  serverId?: string;
+  rawContent?: string;
 }
 
-const QUICK_REACTIONS = ['❤️', '😂', '👍', '😮', '😢', '🙏'];
+interface ServerMessage {
+  id?: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  conversationId: string;
+  timestamp: number;
+  messageType?: string;
+  mediaUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+  reactions?: ReactionMap;
+  replyToId?: string;
+  replyToText?: string;
+  replyToSender?: string;
+}
 
-// Removed createMockMessages
+interface ChatReactionEvent {
+  type: 'CHAT_REACTION';
+  receiverId: string;
+  actorUserId: string;
+  conversationId: string;
+  messageId: string;
+  timestamp: number;
+  reactions: ReactionMap;
+}
+
+const LIMIT = 20;
+const REACTION_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
+const LOCAL_MESSAGE_PREFIX = 'local-';
+
+const createLocalMessageId = () => `${LOCAL_MESSAGE_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const isPersistedMessageId = (message?: ExtendedMessage | null) => {
+  if (!message) {
+    return false;
+  }
+
+  const serverId = message.serverId || String(message._id || '');
+  return serverId.length > 0 && !serverId.startsWith(LOCAL_MESSAGE_PREFIX) && !serverId.includes('-pending-');
+};
+
+const normalizeMessageText = (messageType?: string, content?: string, fileName?: string) => {
+  switch (messageType) {
+    case 'IMAGE':
+      return 'Photo';
+    case 'VIDEO':
+      return 'Video';
+    case 'FILE':
+      return `File: ${fileName || 'attachment'}`;
+    default:
+      return content || '';
+  }
+};
+
+const mapServerMessage = (
+  msg: ServerMessage,
+  currentUser: string,
+): ExtendedMessage => {
+  const isStickerImage =
+    msg.messageType === 'STICKER' &&
+    !!msg.content &&
+    msg.content.startsWith('http');
+
+  return {
+    _id: msg.id || createLocalMessageId(),
+    serverId: msg.id,
+    rawContent: msg.content,
+    text:
+      msg.messageType === 'CALL'
+        ? msg.content
+        : normalizeMessageText(msg.messageType, isStickerImage ? '' : msg.content, msg.fileName),
+    createdAt: new Date(msg.timestamp),
+    user: {
+      _id: msg.senderId === currentUser ? 'me' : msg.senderId,
+      name: msg.senderId === currentUser ? 'You' : msg.senderId,
+    },
+    status: msg.senderId === currentUser ? 'read' : 'delivered',
+    image:
+      msg.messageType === 'IMAGE'
+        ? msg.mediaUrl
+        : isStickerImage
+          ? msg.content
+          : undefined,
+    messageType: msg.messageType || 'TEXT',
+    mediaUrl: msg.mediaUrl,
+    fileName: msg.fileName,
+    fileSize: msg.fileSize,
+    mimeType: msg.mimeType,
+    reactions: msg.reactions || undefined,
+    replyTo: msg.replyToId
+      ? {
+          _id: msg.replyToId,
+          text: msg.replyToText || '',
+          user: {
+            _id: msg.replyToSender || '',
+            name: msg.replyToSender || '',
+          },
+        }
+      : undefined,
+  };
+};
+
+const formatPresenceText = (presence: { status: string; lastSeen: number }) => {
+  if (presence.status === 'ONLINE') {
+    return 'Online';
+  }
+
+  if (!presence.lastSeen) {
+    return 'Offline';
+  }
+
+  const diffMinutes = Math.max(0, Math.floor((Date.now() - presence.lastSeen) / 60000));
+  if (diffMinutes < 1) {
+    return 'Just now';
+  }
+  if (diffMinutes < 60) {
+    return `${diffMinutes} min ago`;
+  }
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} h ago`;
+  }
+  return 'Offline';
+};
+
+const isReactionEvent = (data: any): data is ChatReactionEvent =>
+  data?.type === 'CHAT_REACTION' && !!data?.messageId;
 
 const ChatScreen: React.FC<ChatScreenProps> = ({
   navigation,
@@ -77,535 +226,1063 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     recipientName,
     recipientAvatar,
     recipientId,
-    isOnline = false,
     lecturerStatus,
     isGroup = false,
   } = route.params;
+  const displayRecipientName = recipientName || recipientId || 'Người dùng';
 
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
+  const [inputText, setInputText] = useState('');
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [showMessageActions, setShowMessageActions] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<ExtendedMessage | null>(null);
+  const [replyTo, setReplyTo] = useState<ExtendedMessage | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [recipientPresence, setRecipientPresence] = useState<{status: string; lastSeen: number}>({status: 'OFFLINE', lastSeen: 0});
-  const attachMenuAnim = useRef(new Animated.Value(0)).current;
+  const [isTyping] = useState(false);
+  const [isLoadingEarlier, setIsLoadingEarlier] = useState(false);
+  const [hasEarlierMessages, setHasEarlierMessages] = useState(false);
+  const [recipientPresence, setRecipientPresence] = useState({ status: 'OFFLINE', lastSeen: 0 });
   const headerAnim = useRef(new Animated.Value(0)).current;
+  const attachMenuAnim = useRef(new Animated.Value(0)).current;
 
-  // Dùng global WebSocket thay vì tạo WS riêng
   const { sendMessage, addListener, removeListener, isConnected } = useWebSocket();
   const isOffline = !isConnected;
+
+  const presenceText = useMemo(
+    () => (lecturerStatus ? null : formatPresenceText(recipientPresence)),
+    [lecturerStatus, recipientPresence],
+  );
 
   useEffect(() => {
     Animated.timing(headerAnim, {
       toValue: 1,
-      duration: 300,
+      duration: 280,
       useNativeDriver: true,
     }).start();
+  }, [headerAnim]);
+
+  const mergeMessageIntoState = useCallback((nextMessage: ExtendedMessage) => {
+    setMessages(prev => {
+      const existingIndex = prev.findIndex(item => {
+        if (nextMessage.serverId && item.serverId === nextMessage.serverId) {
+          return true;
+        }
+
+        const sameSender = item.user._id === nextMessage.user._id;
+        const sameType = item.messageType === nextMessage.messageType;
+        const sameMedia = item.mediaUrl === nextMessage.mediaUrl;
+        const sameContent = (item.rawContent || item.text || '') === (nextMessage.rawContent || nextMessage.text || '');
+        const timeDelta = Math.abs(
+          new Date(item.createdAt).getTime() - new Date(nextMessage.createdAt).getTime(),
+        );
+
+        return sameSender && sameType && sameMedia && sameContent && timeDelta < 15000;
+      });
+
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          ...nextMessage,
+          _id: nextMessage.serverId || updated[existingIndex]._id,
+          serverId: nextMessage.serverId || updated[existingIndex].serverId,
+          status:
+            nextMessage.user._id === 'me'
+              ? 'read'
+              : updated[existingIndex].status || nextMessage.status,
+        };
+        return updated.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+      }
+
+      return [...prev, nextMessage].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    });
   }, []);
 
-  // Fetch recipient presence
-  useEffect(() => {
-    const fetchPresence = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/v1/presence/${recipientId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setRecipientPresence({ status: data.status, lastSeen: data.lastSeen });
-        }
-      } catch (e) { /* ignore */ }
-    };
-    fetchPresence();
-    const interval = setInterval(fetchPresence, 30000);
-    return () => clearInterval(interval);
+  const applyReactionEvent = useCallback((event: ChatReactionEvent) => {
+    setMessages(prev =>
+      prev.map(item =>
+        item.serverId === event.messageId || String(item._id) === event.messageId
+          ? {
+              ...item,
+              serverId: event.messageId,
+              _id: event.messageId,
+              reactions: event.reactions || {},
+            }
+          : item,
+      ),
+    );
+  }, []);
+
+  const fetchPresence = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/presence/${recipientId}`);
+      if (!res.ok) {
+        return;
+      }
+
+      const data = await res.json();
+      setRecipientPresence({
+        status: data.status || 'OFFLINE',
+        lastSeen: data.lastSeen || 0,
+      });
+    } catch {
+      // optional service
+    }
   }, [recipientId]);
 
-  useEffect(() => {
-    const fetchHistory = async () => {
+  const fetchHistory = useCallback(
+    async (beforeTimestamp?: number) => {
       try {
-        const res = await authFetch(`${API_URL}/api/v1/chat/history/${conversationId}`, {
-          headers: { Authorization: `Bearer ${token}` }
+        const url = beforeTimestamp
+          ? `${API_URL}/api/v1/chat/history/${conversationId}?before=${beforeTimestamp}&limit=${LIMIT}`
+          : `${API_URL}/api/v1/chat/history/${conversationId}?limit=${LIMIT}`;
+
+        const res = await authFetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
-        if (res.ok) {
-          const data = await res.json();
-          const historyMsgs: ExtendedMessage[] = data.map((msg: any) => {
-            const isStickerImage = msg.messageType === 'STICKER' && msg.content && msg.content.startsWith('http');
-            const isCallMsg = msg.messageType === 'CALL';
-            return {
-              _id: msg.id,
-              text: isCallMsg ? msg.content
-                  : msg.messageType === 'IMAGE' ? '📷 Hình ảnh'
-                  : msg.messageType === 'VIDEO' ? '🎬 Video'
-                  : msg.messageType === 'FILE' ? '📎 ' + (msg.fileName || 'Tệp')
-                  : isStickerImage ? ''
-                  : msg.content,
-              createdAt: new Date(msg.timestamp),
-              user: {
-                _id: msg.senderId === currentUser ? 'me' : msg.senderId,
-                name: msg.senderId === currentUser ? 'Me' : msg.senderId,
-              },
-              status: 'read',
-              image: msg.messageType === 'IMAGE' ? msg.mediaUrl : (isStickerImage ? msg.content : undefined),
-              messageType: msg.messageType || 'TEXT',
-              mediaUrl: msg.mediaUrl,
-              fileName: msg.fileName,
-              fileSize: msg.fileSize,
-              mimeType: msg.mimeType,
-            };
-          });
-          
+
+        if (!res.ok) {
+          throw new Error(`History request failed: ${res.status}`);
+        }
+
+        const data: ServerMessage[] = await res.json();
+        const historyMessages = data
+          .map(msg => mapServerMessage(msg, currentUser))
+          .filter(msg => msg.text || msg.image || msg.messageType === 'CALL');
+
+        setHasEarlierMessages(data.length === LIMIT);
+
+        if (beforeTimestamp) {
+          setMessages(prev =>
+            GiftedChat.prepend(prev, historyMessages).sort(
+              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+            ),
+          );
+        } else {
+          const nextMessages = [...historyMessages];
           if (lecturerStatus === 'busy') {
-             historyMsgs.unshift({
-               _id: 'auto-1',
-               text: '⏰ Tự động phản hồi: Giảng viên hiện đang bận. Tin nhắn sẽ được phản hồi sớm.',
-               createdAt: new Date(),
-               user: { _id: recipientId, name: recipientName },
-               system: true,
-               isAutoReply: true,
-             });
+            nextMessages.push({
+              _id: 'auto-busy-reply',
+              text: 'Lecturer is busy now. Your message will be replied to later.',
+              createdAt: new Date(),
+              user: {
+                _id: recipientId,
+                name: recipientName,
+              },
+              system: true,
+              isAutoReply: true,
+            });
           }
-          setMessages(historyMsgs);
+          setMessages(nextMessages);
         }
       } catch (error) {
         console.error('Failed to fetch history', error);
       }
-    };
+    },
+    [conversationId, currentUser, lecturerStatus, recipientId, recipientName, token],
+  );
 
-    fetchHistory();
-  }, [conversationId, token, currentUser, recipientId, recipientName, lecturerStatus]);
+  const markMessagesAsRead = useCallback(async () => {
+    try {
+      await authFetch(
+        `${API_URL}/api/v1/chat/history/${conversationId}/read?userId=${currentUser}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+    } catch (error) {
+      console.log('Failed to mark messages as read', error);
+    }
+  }, [conversationId, currentUser, token]);
 
-  // Subscribe tới global WebSocket — chỉ nhận chat messages
-  // Incoming call được xử lý ở WebSocketProvider (global coordinator)
   useEffect(() => {
-    const listenerId = 'chat-' + conversationId;
+    fetchHistory();
+    fetchPresence();
+    markMessagesAsRead();
+  }, [fetchHistory, fetchPresence, markMessagesAsRead]);
+
+  const onLoadEarlier = useCallback(async () => {
+    if (messages.length === 0 || isLoadingEarlier) {
+      return;
+    }
+
+    setIsLoadingEarlier(true);
+    const oldest = messages[messages.length - 1];
+    const oldestTimestamp = new Date(oldest.createdAt).getTime();
+    await fetchHistory(oldestTimestamp);
+    setIsLoadingEarlier(false);
+  }, [fetchHistory, isLoadingEarlier, messages]);
+
+  useEffect(() => {
+    const listenerId = `chat-${conversationId}`;
 
     const handler = (data: any) => {
-      // Bỏ qua call signals — đã xử lý ở global level
-      if (isCallSignal(data)) return;
+      if (isCallSignal(data)) {
+        return;
+      }
 
-      // Chỉ nhận message thuộc conversation hiện tại
-      if (data.conversationId !== conversationId) return;
+      if (isReactionEvent(data)) {
+        if (data.conversationId === conversationId) {
+          applyReactionEvent(data);
+        }
+        return;
+      }
 
-      const isStickerImage = data.messageType === 'STICKER' && data.content && data.content.startsWith('http');
-      const isCallMsg = data.messageType === 'CALL';
-      const incomingMessage: ExtendedMessage = {
-        _id: `${data.conversationId}-${data.timestamp}-${Date.now()}`,
-        text: isCallMsg ? data.content
-            : data.messageType === 'IMAGE' ? '📷 Hình ảnh'
-            : data.messageType === 'VIDEO' ? '🎬 Video'
-            : data.messageType === 'FILE' ? '📎 ' + (data.fileName || 'Tệp')
-            : isStickerImage ? ''
-            : data.content,
-        createdAt: new Date(data.timestamp || Date.now()),
-        user: {
-          _id: data.senderId,
-          name: data.senderId,
-        },
-        status: 'delivered' as MessageStatus,
-        image: data.messageType === 'IMAGE' ? data.mediaUrl : (isStickerImage ? data.content : undefined),
-        messageType: data.messageType || 'TEXT',
-        mediaUrl: data.mediaUrl,
-        fileName: data.fileName,
-        fileSize: data.fileSize,
-        mimeType: data.mimeType,
-      };
-      setMessages((prev) => GiftedChat.append(prev, [incomingMessage]));
+      if (data.conversationId !== conversationId) {
+        return;
+      }
+
+      const incoming = mapServerMessage(data, currentUser);
+      mergeMessageIntoState(incoming);
+
+      if (navigation.isFocused?.()) {
+        markMessagesAsRead();
+      }
     };
 
     addListener(listenerId, handler);
     return () => removeListener(listenerId);
-  }, [conversationId, addListener, removeListener]);
+  }, [
+    addListener,
+    applyReactionEvent,
+    conversationId,
+    currentUser,
+    markMessagesAsRead,
+    mergeMessageIntoState,
+    navigation,
+    removeListener,
+  ]);
+
+  const resolvePersistedMessageId = useCallback(
+    async (message: ExtendedMessage) => {
+      if (isPersistedMessageId(message)) {
+        return message.serverId || String(message._id);
+      }
+
+      const res = await authFetch(
+        `${API_URL}/api/v1/chat/history/${conversationId}?limit=50`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (!res.ok) {
+        throw new Error(`Cannot resolve message id: ${res.status}`);
+      }
+
+      const data: ServerMessage[] = await res.json();
+      const senderId = message.user._id === 'me' ? currentUser : String(message.user._id);
+      const targetTimestamp = new Date(message.createdAt).getTime();
+
+      const matched = data.find(item => {
+        const timestampDelta = Math.abs(item.timestamp - targetTimestamp);
+        const sameSender = item.senderId === senderId;
+        const sameType = (item.messageType || 'TEXT') === (message.messageType || 'TEXT');
+        const sameMedia = (item.mediaUrl || '') === (message.mediaUrl || '');
+        const sameText =
+          (item.content || '') === (message.rawContent || message.text || '') ||
+          normalizeMessageText(item.messageType, item.content, item.fileName) === message.text;
+
+        return sameSender && sameType && sameMedia && sameText && timestampDelta < 20000;
+      });
+
+      if (!matched?.id) {
+        return null;
+      }
+
+      setMessages(prev =>
+        prev.map(item =>
+          item._id === message._id
+            ? {
+                ...item,
+                _id: matched.id as string,
+                serverId: matched.id as string,
+                rawContent: matched.content,
+                reactions: matched.reactions || item.reactions,
+              }
+            : item,
+        ),
+      );
+
+      return matched.id;
+    },
+    [conversationId, currentUser, token],
+  );
+
+  const toggleReactionLocally = useCallback(
+    (messageId: string | number, emoji: string) => {
+      setMessages(prev =>
+        prev.map(item => {
+          if (item._id !== messageId) {
+            return item;
+          }
+
+          const nextReactions: ReactionMap = { ...(item.reactions || {}) };
+          const currentUsers = nextReactions[emoji] || [];
+
+          if (currentUsers.includes(currentUser)) {
+            const filtered = currentUsers.filter(user => user !== currentUser);
+            if (filtered.length === 0) {
+              delete nextReactions[emoji];
+            } else {
+              nextReactions[emoji] = filtered;
+            }
+          } else {
+            nextReactions[emoji] = [...currentUsers, currentUser];
+          }
+
+          return {
+            ...item,
+            reactions: nextReactions,
+          };
+        }),
+      );
+    },
+    [currentUser],
+  );
+
+  const handleReaction = useCallback(
+    async (emoji: string) => {
+      if (!selectedMessage) {
+        return;
+      }
+
+      const messageSnapshot = selectedMessage;
+      toggleReactionLocally(messageSnapshot._id, emoji);
+      setShowMessageActions(false);
+      setSelectedMessage(null);
+
+      try {
+        const persistedId = await resolvePersistedMessageId(messageSnapshot);
+        if (!persistedId) {
+          throw new Error('Message has not been persisted yet');
+        }
+
+        const res = await authFetch(
+          `${API_URL}/api/v1/chat/messages/${persistedId}/react?userId=${currentUser}&emoji=${encodeURIComponent(emoji)}`,
+          {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        if (!res.ok) {
+          throw new Error(`Reaction failed: ${res.status}`);
+        }
+
+        const updated: ServerMessage = await res.json();
+        const mapped = mapServerMessage(updated, currentUser);
+        mergeMessageIntoState(mapped);
+      } catch (error) {
+        console.log('Failed to persist reaction', error);
+        await fetchHistory();
+        Alert.alert('Reaction failed', 'This message is not ready for reaction yet. Please try again.');
+      }
+    },
+    [
+      currentUser,
+      fetchHistory,
+      mergeMessageIntoState,
+      resolvePersistedMessageId,
+      selectedMessage,
+      token,
+      toggleReactionLocally,
+    ],
+  );
+
+  const handleMessageLongPress = useCallback((message: ExtendedMessage) => {
+    if (message.system || message.messageType === 'CALL') {
+      return;
+    }
+    setSelectedMessage(message);
+    setShowMessageActions(true);
+  }, []);
+
+  const handleReply = useCallback(() => {
+    if (!selectedMessage) {
+      return;
+    }
+    setReplyTo(selectedMessage);
+    setShowMessageActions(false);
+    setSelectedMessage(null);
+  }, [selectedMessage]);
+
+  const handleCopyText = useCallback(() => {
+    setShowMessageActions(false);
+    setSelectedMessage(null);
+    Alert.alert('Copy', 'Clipboard is not configured in this project yet.');
+  }, []);
+
+  const handleForward = useCallback(() => {
+    setShowMessageActions(false);
+    setSelectedMessage(null);
+    Alert.alert('Forward', 'Forward flow is still under development.');
+  }, []);
 
   const onSend = useCallback(
     (newMessages: IMessage[] = []) => {
-      const extendedMessages: ExtendedMessage[] = newMessages.map((msg) => ({
+      const optimisticMessages: ExtendedMessage[] = newMessages.map(msg => ({
         ...msg,
-        status: isOffline ? ('sending' as MessageStatus) : ('sent' as MessageStatus),
-        isOffline: isOffline,
+        _id: createLocalMessageId(),
+        serverId: undefined,
+        rawContent: msg.text,
+        status: isOffline ? 'sending' : 'sent',
+        isOffline,
+        ...(replyTo
+          ? {
+              replyTo: {
+                _id: replyTo._id,
+                text: replyTo.text || '',
+                user: replyTo.user,
+              },
+            }
+          : {}),
       }));
 
-      setMessages((prev) => GiftedChat.append(prev, extendedMessages));
+      setMessages(prev => GiftedChat.append(prev, optimisticMessages));
+      setReplyTo(null);
+      setInputText('');
 
-      // Gửi qua global WebSocket
-      newMessages.forEach((msg) => {
+      optimisticMessages.forEach(message => {
         sendMessage({
           senderId: currentUser,
           receiverId: recipientId,
-          content: msg.text,
-          conversationId: conversationId,
+          content: message.text,
+          conversationId,
         });
       });
 
       if (!isOffline) {
         setTimeout(() => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              extendedMessages.find((em) => em._id === m._id)
-                ? { ...m, status: 'delivered' as MessageStatus }
-                : m,
+          setMessages(prev =>
+            prev.map(item =>
+              optimisticMessages.some(message => message._id === item._id)
+                ? { ...item, status: 'delivered' as MessageStatus }
+                : item,
             ),
           );
         }, 1000);
-
-        setTimeout(() => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              extendedMessages.find((em) => em._id === m._id)
-                ? { ...m, status: 'read' as MessageStatus }
-                : m,
-            ),
-          );
-        }, 3000);
       }
     },
-    [isOffline, currentUser, recipientId, conversationId, sendMessage],
+    [conversationId, currentUser, isOffline, recipientId, replyTo, sendMessage],
   );
 
-  // ---- Media upload & send ----
-  const handleMediaSend = useCallback(async (file: { uri: string; fileName: string; type: string; fileSize?: number }) => {
-    if (!token) return;
-    setIsUploading(true);
-    try {
-      const result = await uploadMedia(token, file);
-      const msgType = getMessageTypeFromMime(result.mimeType);
-      const msgId = `media-${Date.now()}`;
+  const handleMediaSend = useCallback(
+    async (file: {
+      uri: string;
+      fileName: string;
+      type: string;
+      fileSize?: number;
+    }) => {
+      if (!token) {
+        return;
+      }
 
-      const mediaMessage: ExtendedMessage = {
-        _id: msgId,
-        text: msgType === 'IMAGE' ? '📷 Hình ảnh' : msgType === 'VIDEO' ? '🎬 Video' : '📎 ' + result.fileName,
+      setIsUploading(true);
+      try {
+        const upload = await uploadMedia(token, file);
+        const messageType = getMessageTypeFromMime(upload.mimeType);
+        const optimisticId = createLocalMessageId();
+
+        const optimisticMessage: ExtendedMessage = {
+          _id: optimisticId,
+          text: normalizeMessageText(messageType, '', upload.fileName),
+          rawContent: normalizeMessageText(messageType, '', upload.fileName),
+          createdAt: new Date(),
+          user: { _id: 'me', name: currentUser },
+          image: messageType === 'IMAGE' ? upload.mediaUrl : undefined,
+          messageType,
+          mediaUrl: upload.mediaUrl,
+          fileName: upload.fileName,
+          fileSize: upload.fileSize,
+          mimeType: upload.mimeType,
+          status: 'sent',
+        };
+
+        setMessages(prev => GiftedChat.append(prev, [optimisticMessage]));
+
+        sendMessage({
+          senderId: currentUser,
+          receiverId: recipientId,
+          content: normalizeMessageText(messageType, '', upload.fileName),
+          conversationId,
+          messageType,
+          mediaUrl: upload.mediaUrl,
+          fileName: upload.fileName,
+          fileSize: upload.fileSize,
+          mimeType: upload.mimeType,
+        });
+      } catch (error: any) {
+        Alert.alert('Upload failed', error?.message || 'Cannot upload this file.');
+      } finally {
+        setIsUploading(false);
+        setShowAttachMenu(false);
+      }
+    },
+    [conversationId, currentUser, recipientId, sendMessage, token],
+  );
+
+  const handleStickerSend = useCallback(
+    (sticker: string, type: 'emoji' | 'sticker') => {
+      const isImageSticker = type === 'sticker';
+      const optimisticMessage: ExtendedMessage = {
+        _id: createLocalMessageId(),
+        text: isImageSticker ? '' : sticker,
+        rawContent: sticker,
+        image: isImageSticker ? sticker : undefined,
         createdAt: new Date(),
         user: { _id: 'me', name: currentUser },
-        image: msgType === 'IMAGE' ? result.mediaUrl : undefined,
-        messageType: msgType,
-        mediaUrl: result.mediaUrl,
-        fileName: result.fileName,
-        fileSize: result.fileSize,
-        mimeType: result.mimeType,
-        status: 'sent' as MessageStatus,
+        messageType: 'STICKER',
+        status: 'sent',
       };
 
-      setMessages((prev) => GiftedChat.append(prev, [mediaMessage]));
-
+      setMessages(prev => GiftedChat.append(prev, [optimisticMessage]));
       sendMessage({
         senderId: currentUser,
         receiverId: recipientId,
-        content: msgType === 'IMAGE' ? '📷 Hình ảnh' : '📎 ' + result.fileName,
+        content: sticker,
         conversationId,
-        messageType: msgType,
-        mediaUrl: result.mediaUrl,
-        fileName: result.fileName,
-        fileSize: result.fileSize,
-        mimeType: result.mimeType,
+        messageType: 'STICKER',
       });
-    } catch (error: any) {
-      Alert.alert('Lỗi upload', error.message || 'Không thể upload file');
-    } finally {
-      setIsUploading(false);
-      setShowAttachMenu(false);
-    }
-  }, [token, currentUser, recipientId, conversationId, sendMessage]);
+    },
+    [conversationId, currentUser, recipientId, sendMessage],
+  );
 
-  // ---- Sticker send ----
-  const handleStickerSend = useCallback((sticker: string, type: 'emoji' | 'sticker') => {
-    const msgId = `sticker-${Date.now()}`;
-    const isImageSticker = type === 'sticker';
-    
-    const stickerMessage: ExtendedMessage = {
-      _id: msgId,
-      text: isImageSticker ? '' : sticker,
-      image: isImageSticker ? sticker : undefined,
-      createdAt: new Date(),
-      user: { _id: 'me', name: currentUser },
-      messageType: 'STICKER',
-      status: 'sent' as MessageStatus,
-    };
-    setMessages((prev) => GiftedChat.append(prev, [stickerMessage]));
-    sendMessage({
-      senderId: currentUser,
-      receiverId: recipientId,
-      content: sticker,
-      conversationId,
-      messageType: 'STICKER',
-    });
-  }, [currentUser, recipientId, conversationId, sendMessage]);
-
-  // ---- Presence text helper ----
-  const getPresenceText = () => {
-    if (recipientPresence.status === 'ONLINE') return '● Đang hoạt động';
-    if (recipientPresence.lastSeen > 0) {
-      const mins = Math.floor((Date.now() - recipientPresence.lastSeen) / 60000);
-      if (mins < 1) return 'Vừa hoạt động';
-      if (mins < 60) return `Hoạt động ${mins} phút trước`;
-      const hours = Math.floor(mins / 60);
-      if (hours < 24) return `Hoạt động ${hours} giờ trước`;
-      return 'Ngoại tuyến';
-    }
-    return 'Ngoại tuyến';
-  };
-
-  // isOffline giờ dựa trên isConnected từ WebSocket — không toggle thủ công nữa
-
-  const toggleAttachMenu = () => {
-    const toValue = showAttachMenu ? 0 : 1;
+  const toggleAttachMenu = useCallback(() => {
+    const next = !showAttachMenu;
     Animated.spring(attachMenuAnim, {
-      toValue,
-      tension: 80,
-      friction: 10,
+      toValue: next ? 1 : 0,
+      tension: 90,
+      friction: 11,
       useNativeDriver: true,
     }).start();
-    setShowAttachMenu(!showAttachMenu);
-  };
+    setShowAttachMenu(next);
+  }, [attachMenuAnim, showAttachMenu]);
 
-  // Custom bubble
-  const renderBubble = (props: any) => {
-    const message = props.currentMessage as ExtendedMessage;
-    const isMine = message.user._id === 'me' || message.user._id === currentUser;
-    const messageIsOffline = message.isOffline;
-
-    return (
-      <View style={{ opacity: messageIsOffline ? 0.5 : 1, marginBottom: 2 }}>
-        <Bubble
-          {...props}
-          wrapperStyle={{
-            left: {
-              backgroundColor: message.isAutoReply
-                ? 'rgba(100, 116, 139, 0.08)'
-                : Colors.chatBubbleReceived,
-              borderRadius: 20,
-              borderBottomLeftRadius: 6,
-              paddingHorizontal: 2,
-              paddingVertical: 2,
-              ...Shadows.xs,
-            },
-            right: {
-              backgroundColor: Colors.chatBubbleSent,
-              borderRadius: 20,
-              borderBottomRightRadius: 6,
-              paddingHorizontal: 2,
-              paddingVertical: 2,
-              ...Shadows.sm,
-            },
-          }}
-          textStyle={{
-            left: {
-              color: message.isAutoReply
-                ? Colors.textMuted
-                : Colors.chatBubbleReceivedText,
-              fontSize: message.isAutoReply ? 13 : 15,
-              fontStyle: message.isAutoReply ? 'italic' : 'normal',
-              lineHeight: 21,
-            },
-            right: {
-              color: Colors.chatBubbleSentText,
-              fontSize: 15,
-              lineHeight: 21,
-            },
-          }}
-        />
-        {/* Status Ticks */}
-        {isMine && message.status && (
-          <View style={styles.tickContainer}>
-            {messageIsOffline && (
-              <Icon
-                name="clock-outline"
-                size={12}
-                color={Colors.textMuted}
-                style={{ marginRight: 4 }}
-              />
-            )}
-            <MessageTicks status={message.status} size={14} />
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  // Custom day separator
-  const renderDay = (props: any) => (
-    <Day
-      {...props}
-      containerStyle={styles.daySeparatorContainer}
-      textStyle={styles.daySeparatorText}
-      wrapperStyle={styles.daySeparatorWrapper}
-    />
-  );
-
-  // Custom input toolbar
-  const renderInputToolbar = (props: any) => (
-    <InputToolbar
-      {...props}
-      containerStyle={styles.inputToolbar}
-      primaryStyle={styles.inputToolbarPrimary}
-    />
-  );
-
-  // Custom composer
-  const renderComposer = (props: any) => (
-    <View style={styles.composerContainer}>
-      <TouchableOpacity onPress={toggleAttachMenu} style={styles.attachButton}>
-        <Icon name="plus-circle-outline" size={26} color={Colors.primary} />
-      </TouchableOpacity>
-      <Composer
-        {...props}
-        textInputStyle={styles.composerInput}
-        placeholder="Nhập tin nhắn..."
-        placeholderTextColor={Colors.textMuted}
-      />
-      <TouchableOpacity style={styles.emojiButton} onPress={() => setShowStickerPicker(true)}>
-        <Icon name="emoticon-happy-outline" size={24} color={Colors.textMuted} />
-      </TouchableOpacity>
-    </View>
-  );
-
-  // Custom send button
-  const renderSend = (props: any) => (
-    <Send {...props} containerStyle={styles.sendContainer}>
-      <LinearGradient
-        colors={['#0077CC', '#004A82']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.sendButton}
-      >
-        <Icon name="send" size={18} color={Colors.white} style={{ marginLeft: 2 }} />
-      </LinearGradient>
-    </Send>
-  );
-
-  // Custom time
-  const renderTime = (props: any) => (
-    <Time
-      {...props}
-      timeTextStyle={{
-        left: { color: Colors.textMuted, fontSize: 10, fontWeight: '400' },
-        right: { color: 'rgba(255,255,255,0.65)', fontSize: 10, fontWeight: '400' },
-      }}
-    />
-  );
-
-  // Custom system message
-  const renderSystemMessage = (props: any) => (
-    <SystemMessage
-      {...props}
-      containerStyle={styles.systemMessageContainer}
-      textStyle={styles.systemMessageText}
-    />
-  );
-
-  const renderChatFooter = () => (
-    <TypingIndicator isVisible={isTyping} />
-  );
-
-  // Custom call message bubble
-  const renderMessage = (props: any) => {
-    const message = props.currentMessage as ExtendedMessage;
-    if (message.messageType === 'CALL') {
-      let callInfo = { callStatus: 'completed', duration: 0, isIncoming: false, callerName: '' };
-      try {
-        callInfo = JSON.parse(message.text || '{}');
-      } catch { /* fallback */ }
-
-      const isMine = message.user._id === 'me' || message.user._id === currentUser;
-      const durationMins = Math.floor((callInfo.duration || 0) / 60);
-      const durationSecs = (callInfo.duration || 0) % 60;
-      const durationStr = callInfo.duration > 0 ? `${durationMins.toString().padStart(2, '0')}:${durationSecs.toString().padStart(2, '0')}` : '';
-
-      let statusIcon = 'phone';
-      let statusColor = Colors.success;
-      let statusText = '';
-
-      switch (callInfo.callStatus) {
-        case 'completed':
-          statusIcon = isMine ? 'phone-outgoing' : 'phone-incoming';
-          statusColor = Colors.success;
-          statusText = `Cuộc gọi video · ${durationStr}`;
-          break;
-        case 'missed':
-          statusIcon = 'phone-missed';
-          statusColor = Colors.danger;
-          statusText = isMine ? 'Cuộc gọi nhỡ' : 'Cuộc gọi nhỡ';
-          break;
-        case 'rejected':
-          statusIcon = 'phone-cancel';
-          statusColor = Colors.danger;
-          statusText = isMine ? 'Đối phương đã từ chối' : 'Bạn đã từ chối cuộc gọi';
-          break;
-        case 'cancelled':
-          statusIcon = 'phone-cancel';
-          statusColor = Colors.warning;
-          statusText = isMine ? 'Đã hủy cuộc gọi' : 'Cuộc gọi bị hủy';
-          break;
-        default:
-          statusText = 'Cuộc gọi video';
+  const openCamera = useCallback(async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert('Permission denied', 'Camera permission is required.');
+          return;
+        }
       }
 
-      const timeStr = new Date(message.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      const result = await launchCamera({ mediaType: 'photo', quality: 0.8 });
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        return;
+      }
+
+      await handleMediaSend({
+        uri: asset.uri,
+        fileName: asset.fileName || 'photo.jpg',
+        type: asset.type || 'image/jpeg',
+        fileSize: asset.fileSize,
+      });
+    } catch {
+      Alert.alert('Camera', 'Cannot open camera.');
+    }
+  }, [handleMediaSend]);
+
+  const openLibrary = useCallback(async () => {
+    try {
+      const result = await launchImageLibrary({ mediaType: 'mixed', quality: 0.8 });
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        return;
+      }
+
+      await handleMediaSend({
+        uri: asset.uri,
+        fileName: asset.fileName || 'media',
+        type: asset.type || 'application/octet-stream',
+        fileSize: asset.fileSize,
+      });
+    } catch {
+      Alert.alert('Gallery', 'Cannot open gallery.');
+    }
+  }, [handleMediaSend]);
+
+  const openDocumentPicker = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.pick({
+        type: [DocumentPicker.types.allFiles],
+      });
+      const file = result[0];
+      await handleMediaSend({
+        uri: file.uri,
+        fileName: file.name || 'document',
+        type: file.type || 'application/octet-stream',
+        fileSize: file.size || undefined,
+      });
+    } catch (error: any) {
+      if (!DocumentPicker.isCancel(error)) {
+        Alert.alert('Files', 'Cannot pick this document.');
+      }
+    }
+  }, [handleMediaSend]);
+
+  const renderCallBubble = useCallback((message: ExtendedMessage, isMine: boolean) => {
+    let callInfo = {
+      callStatus: 'completed',
+      duration: 0,
+    };
+
+    try {
+      callInfo = JSON.parse(message.text || '{}');
+    } catch {
+      // keep fallback
+    }
+
+    const durationMinutes = Math.floor((callInfo.duration || 0) / 60);
+    const durationSeconds = (callInfo.duration || 0) % 60;
+    const durationText =
+      callInfo.duration > 0
+        ? `${durationMinutes.toString().padStart(2, '0')}:${durationSeconds.toString().padStart(2, '0')}`
+        : '';
+
+    let icon = isMine ? 'phone-outgoing' : 'phone-incoming';
+    let color = '#4CAF50';
+    let title = durationText ? `Video call • ${durationText}` : 'Video call';
+
+    if (callInfo.callStatus === 'missed') {
+      icon = 'phone-missed';
+      color = '#F44336';
+      title = 'Missed call';
+    } else if (callInfo.callStatus === 'rejected') {
+      icon = 'phone-cancel';
+      color = '#F97316';
+      title = 'Call rejected';
+    } else if (callInfo.callStatus === 'cancelled') {
+      icon = 'phone-cancel';
+      color = '#F59E0B';
+      title = 'Call cancelled';
+    }
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onLongPress={() => handleMessageLongPress(message)}
+        delayLongPress={260}
+        style={styles.callMessageContainer}
+      >
+        <View
+          style={[
+            styles.callCard,
+            isMine ? styles.callCardRight : styles.callCardLeft,
+          ]}
+        >
+          <View style={[styles.callIconCircle, { backgroundColor: `${color}18` }]}>
+            <Icon name={icon} size={22} color={color} />
+          </View>
+          <View style={styles.callTextWrap}>
+            <Text
+              style={[
+                styles.callTitle,
+                isMine && styles.callTitleRight,
+              ]}
+            >
+              {title}
+            </Text>
+            <Text
+              style={[
+                styles.callTime,
+                isMine && styles.callTimeRight,
+              ]}
+            >
+              {new Date(message.createdAt).toLocaleTimeString('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }, [handleMessageLongPress]);
+
+  const renderBubble = useCallback(
+    (props: any) => {
+      const message = props.currentMessage as ExtendedMessage;
+      const nextMessage = props.nextMessage as ExtendedMessage | undefined;
+      const isMine = message.user._id === 'me' || message.user._id === currentUser;
+      const reactionEntries = Object.entries(message.reactions || {}).filter(
+        ([, users]) => users.length > 0,
+      );
+
+      // Chỉ hiện avatar ở tin nhắn CUỐI của mỗi nhóm
+      const isLastInGroup =
+        !nextMessage ||
+        nextMessage?.user?._id !== message.user._id ||
+        nextMessage.messageType === 'CALL' ||
+        nextMessage.system === true;
+
+      if (message.messageType === 'CALL') {
+        return (
+          <View style={[styles.messageContainer, { marginBottom: 4 }]}>
+            <View style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowOther]}>
+              {!isMine && (
+                isLastInGroup
+                  ? <Avatar name={displayRecipientName} uri={recipientAvatar} size="small" />
+                  : <View style={styles.avatarSpacer} />
+              )}
+              {renderCallBubble(message, isMine)}
+            </View>
+          </View>
+        );
+      }
+
+      // Dùng GiftedChat Bubble gốc cho media (image, video, sticker...)
+      const isMediaMessage =
+        message.messageType === 'IMAGE' ||
+        message.messageType === 'VIDEO' ||
+        message.messageType === 'STICKER' ||
+        message.messageType === 'FILE' ||
+        !!message.image;
+
+      const timeText = new Date(message.createdAt).toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 
       return (
-        <View style={styles.callMessageContainer}>
-          <View style={[styles.callMessageCard, { borderLeftColor: statusColor }]}>
-            <View style={[styles.callIconCircle, { backgroundColor: statusColor + '18' }]}>
-              <Icon name={statusIcon} size={20} color={statusColor} />
+        <View
+          style={[
+            styles.messageContainer,
+            { marginBottom: reactionEntries.length > 0 ? 16 : 4 },
+          ]}
+        >
+          {message.replyTo && (
+            <View
+              style={[
+                styles.replySnippet,
+                isMine ? styles.replySnippetMine : styles.replySnippetOther,
+              ]}
+            >
+              <View style={styles.replySnippetBar} />
+              <View style={styles.replySnippetContent}>
+                <Text style={styles.replySnippetName} numberOfLines={1}>
+                  {message.replyTo.user.name || 'Message'}
+                </Text>
+                <Text style={styles.replySnippetText} numberOfLines={1}>
+                  {message.replyTo.text || 'Attachment'}
+                </Text>
+              </View>
             </View>
-            <View style={styles.callMessageContent}>
-              <Text style={styles.callMessageStatus}>{statusText}</Text>
-              <Text style={styles.callMessageTime}>{timeStr}</Text>
+          )}
+
+          <View style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowOther]}>
+            {!isMine && (
+              isLastInGroup
+                ? <Avatar name={displayRecipientName} uri={recipientAvatar} size="small" />
+                : <View style={styles.avatarSpacer} />
+            )}
+
+            <View style={styles.messageBubbleWrapper}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onLongPress={() => handleMessageLongPress(message)}
+                delayLongPress={260}
+              >
+                {isMediaMessage ? (
+                  // Media: dùng Bubble gốc của GiftedChat
+                  <Bubble
+                    {...props}
+                    wrapperStyle={{
+                      left: styles.bubbleWrapperLeft,
+                      right: styles.bubbleWrapperRight,
+                    }}
+                    textStyle={{
+                      left: styles.bubbleTextLeft,
+                      right: styles.bubbleTextRight,
+                    }}
+                  />
+                ) : (
+                  // Text: custom bubble — nội dung trên, thời gian dưới, hẹp theo nội dung
+                  <View style={isMine ? styles.bubbleWrapperRight : styles.bubbleWrapperLeft}>
+                    <Text style={isMine ? styles.bubbleTextRight : styles.bubbleTextLeft}>
+                      {message.text}
+                    </Text>
+                    <View style={styles.bubbleBottom}>
+                      <Text style={isMine ? styles.timeRight : styles.timeLeft}>
+                        {timeText}
+                      </Text>
+                      {isMine && message.status && (
+                        <MessageTicks
+                          status={message.status}
+                          size={12}
+                          color="rgba(255,255,255,0.8)"
+                        />
+                      )}
+                    </View>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {reactionEntries.length > 0 && (
+                <View
+                  style={[
+                    styles.reactionRow,
+                    isMine ? styles.reactionRowMine : styles.reactionRowOther,
+                  ]}
+                >
+                  {reactionEntries.map(([emoji, users]) => (
+                    <View key={emoji} style={styles.reactionBadge}>
+                      <Text style={styles.reactionEmoji}>{emoji}</Text>
+                      {users.length > 1 && (
+                        <Text style={styles.reactionCount}>{users.length}</Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           </View>
         </View>
       );
-    }
+    },
+    [currentUser, displayRecipientName, handleMessageLongPress, recipientAvatar, renderCallBubble],
+  );
 
-    // Default rendering for other message types
-    return <Message {...props} />;
-  };
+  const renderDay = useCallback(
+    (props: any) => (
+      <Day
+        {...props}
+        containerStyle={styles.dayContainer}
+        wrapperStyle={styles.dayWrapper}
+        textStyle={styles.dayText}
+      />
+    ),
+    [],
+  );
+
+  const renderSystemMessage = useCallback(
+    (props: any) => (
+      <SystemMessage
+        {...props}
+        containerStyle={styles.systemMessageContainer}
+        textStyle={styles.systemMessageText}
+      />
+    ),
+    [],
+  );
+
+  const renderTime = useCallback(
+    (props: any) => (
+      <Time
+        {...props}
+        timeTextStyle={{
+          left: styles.timeLeft,
+          right: styles.timeRight,
+        }}
+      />
+    ),
+    [],
+  );
+
+  const renderChatFooter = useCallback(() => <TypingIndicator isVisible={isTyping} />, [isTyping]);
+
+  const renderInputToolbar = useCallback(
+    (props: any) => (
+      <View>
+        {replyTo && (
+          <View style={styles.replyBar}>
+            <View style={styles.replyBarAccent} />
+            <View style={styles.replyBarContent}>
+              <Text style={styles.replyBarName} numberOfLines={1}>
+                {replyTo.user._id === 'me' || replyTo.user._id === currentUser
+                  ? 'You'
+                  : replyTo.user.name || recipientName}
+              </Text>
+              <Text style={styles.replyBarText} numberOfLines={1}>
+                {replyTo.text || 'Attachment'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.replyBarClose}
+              onPress={() => setReplyTo(null)}
+            >
+              <Icon name="close" size={18} color="#7C8A9A" />
+            </TouchableOpacity>
+          </View>
+        )}
+        <InputToolbar
+          {...props}
+          containerStyle={styles.inputToolbar}
+          primaryStyle={styles.inputToolbarPrimary}
+        />
+      </View>
+    ),
+    [currentUser, recipientName, replyTo],
+  );
+
+  const renderComposer = useCallback(
+    (props: any) => (
+      <View style={styles.composerShell}>
+        <TouchableOpacity
+          onPress={toggleAttachMenu}
+          style={styles.composerIconButton}
+          activeOpacity={0.7}
+        >
+          <Icon name="paperclip" size={22} color="#7A8CA3" />
+        </TouchableOpacity>
+        <Composer
+          {...props}
+          placeholder="Message"
+          placeholderTextColor="#9AABBF"
+          textInputStyle={styles.composerInput}
+          onTextChanged={(text: string) => {
+            setInputText(text);
+            props.onTextChanged?.(text);
+          }}
+        />
+        {!inputText && (
+          <TouchableOpacity
+            onPress={() => setShowStickerPicker(true)}
+            style={styles.composerIconButton}
+            activeOpacity={0.7}
+          >
+            <Icon name="sticker-emoji" size={22} color="#7A8CA3" />
+          </TouchableOpacity>
+        )}
+      </View>
+    ),
+    [inputText, toggleAttachMenu],
+  );
+
+  const renderSend = useCallback(
+    (props: any) => {
+      if (!inputText.trim()) {
+        return (
+          <View style={styles.sendContainer}>
+            <TouchableOpacity style={styles.actionFab} activeOpacity={0.84}>
+              <Icon name="microphone" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      return (
+        <Send {...props} containerStyle={styles.sendContainer}>
+          <View style={styles.actionFab}>
+            <Icon name="send" size={18} color="#FFFFFF" style={{ marginLeft: 2 }} />
+          </View>
+        </Send>
+      );
+    },
+    [inputText],
+  );
+
+  const attachmentItems = useMemo(
+    () => [
+      { icon: 'image-multiple', label: 'Gallery', color: '#2D7FF9', onPress: openLibrary },
+      { icon: 'camera', label: 'Camera', color: '#EC4899', onPress: openCamera },
+      { icon: 'file-document-outline', label: 'File', color: '#FB923C', onPress: openDocumentPicker },
+      {
+        icon: 'video-outline',
+        label: 'Video',
+        color: '#8B5CF6',
+        onPress: async () => {
+          try {
+            const result = await launchImageLibrary({ mediaType: 'video', quality: 0.8 });
+            const asset = result.assets?.[0];
+            if (!asset?.uri) {
+              return;
+            }
+
+            await handleMediaSend({
+              uri: asset.uri,
+              fileName: asset.fileName || 'video.mp4',
+              type: asset.type || 'video/mp4',
+              fileSize: asset.fileSize,
+            });
+          } catch {
+            Alert.alert('Video', 'Cannot pick video.');
+          }
+        },
+      },
+      {
+        icon: 'sticker-emoji',
+        label: 'Sticker',
+        color: '#F59E0B',
+        onPress: () => {
+          toggleAttachMenu();
+          setShowStickerPicker(true);
+        },
+      },
+      {
+        icon: 'map-marker-outline',
+        label: 'Location',
+        color: '#22C55E',
+        onPress: () => Alert.alert('Coming soon', 'Location sharing is not ready yet.'),
+      },
+    ],
+    [handleMediaSend, openCamera, openDocumentPicker, openLibrary, toggleAttachMenu],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primaryDark} />
+      <StatusBar barStyle="light-content" backgroundColor="#165EA8" />
 
-      {/* Chat Header */}
-      <Animated.View style={{ opacity: headerAnim }}>
+      <View style={styles.wallpaperLayer} />
+
+      <Animated.View style={[styles.headerWrap, { opacity: headerAnim }]}>
         <LinearGradient
-          colors={['#004A82', '#0066B3']}
+          colors={['#1459A2', '#1C74D8']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Icon name="arrow-left" size={24} color={Colors.white} />
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Icon name="arrow-left" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.headerProfile} 
-            activeOpacity={0.7}
+          <TouchableOpacity
+            style={styles.headerMain}
+            activeOpacity={0.82}
             onPress={() => {
               if (isGroup) {
-                navigation.navigate('GroupSettings', { conversationId, groupName: recipientName });
+                navigation.navigate('GroupSettings', {
+                  conversationId,
+                  groupName: displayRecipientName,
+                });
               }
             }}
           >
             <Avatar
-              name={recipientName}
+              name={displayRecipientName}
               uri={recipientAvatar}
               size="medium"
               isOnline={recipientPresence.status === 'ONLINE'}
               showOnlineStatus
             />
             <View style={styles.headerInfo}>
-              <Text style={styles.headerName} numberOfLines={1}>
-                {recipientName}
+              <Text numberOfLines={1} style={styles.headerName}>
+                {displayRecipientName}
               </Text>
-              <View style={styles.headerStatusRow}>
+              <View style={styles.headerMetaRow}>
                 {lecturerStatus ? (
                   <StatusBadge status={lecturerStatus} compact />
                 ) : (
-                  <Text style={[styles.headerStatus, recipientPresence.status === 'ONLINE' && {color: '#4ADE80'}]}>
-                    {getPresenceText()}
-                  </Text>
+                  <Text style={styles.headerMetaText}>{presenceText}</Text>
                 )}
               </View>
             </View>
@@ -613,81 +1290,103 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
           <View style={styles.headerActions}>
             <TouchableOpacity
-              style={styles.headerActionButton}
+              style={styles.headerIcon}
               onPress={() => {
                 const roomName = `IUHConnect_${recipientId}_${Date.now()}`;
                 navigation.navigate('Meeting', {
                   callerId: recipientId,
-                  callerName: recipientName,
+                  callerName: displayRecipientName,
                   callerAvatar: recipientAvatar,
-                  roomName: roomName,
-                  conversationId: conversationId,
+                  roomName,
+                  conversationId,
                 });
               }}
             >
-              <Icon name="video-outline" size={22} color={Colors.white} />
+              <Icon name="video-outline" size={22} color="#FFFFFF" />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerActionButton}
-              onPress={() => {}}
-            >
-              <Icon
-                name={isOffline ? 'wifi-off' : 'dots-vertical'}
-                size={20}
-                color={Colors.white}
-              />
+            <TouchableOpacity style={styles.headerIcon}>
+              <Icon name={isOffline ? 'wifi-off' : 'dots-vertical'} size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </LinearGradient>
       </Animated.View>
 
-      {/* Offline Banner */}
-      <OfflineBanner isOffline={isOffline} onRetry={() => {}} />
+      <OfflineBanner isOffline={isOffline} />
 
-      {/* Busy Notice */}
       {lecturerStatus === 'busy' && (
-        <View style={styles.busyNotice}>
-          <Icon name="clock-alert-outline" size={16} color={Colors.warning} />
-          <Text style={styles.busyNoticeText}>
-            Giảng viên đang bận — Tin nhắn sẽ được tự động phản hồi
+        <View style={styles.busyBanner}>
+          <Icon name="clock-alert-outline" size={16} color="#B45309" />
+          <Text style={styles.busyBannerText}>
+            Lecturer is busy now. Messages may be answered later.
           </Text>
         </View>
       )}
 
-      {/* Quick Reactions Bar */}
-      <View style={styles.reactionsBar}>
-        {QUICK_REACTIONS.map((emoji, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.reactionButton}
-            activeOpacity={0.6}
-          >
-            <Text style={styles.reactionEmoji}>{emoji}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Chat Messages */}
       <GiftedChat
         messages={messages}
-        onSend={(newMessages: IMessage[]) => onSend(newMessages)}
+        onSend={newMessages => onSend(newMessages)}
         user={{ _id: 'me', name: currentUser }}
+        loadEarlier={hasEarlierMessages}
+        isLoadingEarlier={isLoadingEarlier}
+        onLoadEarlier={onLoadEarlier}
         renderBubble={renderBubble}
+        renderDay={renderDay}
+        renderSystemMessage={renderSystemMessage}
+        renderTime={renderTime}
         renderInputToolbar={renderInputToolbar}
         renderComposer={renderComposer}
         renderSend={renderSend}
-        renderTime={renderTime}
-        renderDay={renderDay}
-        renderSystemMessage={renderSystemMessage}
-        renderMessage={renderMessage}
         renderChatFooter={renderChatFooter}
+        renderAvatar={() => null}
+        onInputTextChanged={setInputText}
         messagesContainerStyle={styles.messagesContainer}
         listViewProps={{
           showsVerticalScrollIndicator: false,
+          contentContainerStyle: styles.listContentContainer,
         }}
+        alwaysShowSend
+        scrollToBottom
       />
 
-      {/* Attachment Menu Modal */}
+      <Modal
+        visible={showMessageActions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMessageActions(false)}
+      >
+        <TouchableOpacity
+          style={styles.actionModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMessageActions(false)}
+        >
+          <View style={styles.actionModal}>
+            <View style={styles.reactionPickerRow}>
+              {REACTION_EMOJIS.map(emoji => (
+                <TouchableOpacity
+                  key={emoji}
+                  style={styles.reactionPickerButton}
+                  onPress={() => handleReaction(emoji)}
+                >
+                  <Text style={styles.reactionPickerEmoji}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.actionItem} onPress={handleReply}>
+              <Icon name="reply-outline" size={20} color="#1D6FD7" />
+              <Text style={styles.actionItemText}>Reply</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={handleForward}>
+              <Icon name="share-outline" size={20} color="#1D6FD7" />
+              <Text style={styles.actionItemText}>Forward</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={handleCopyText}>
+              <Icon name="content-copy" size={20} color="#1D6FD7" />
+              <Text style={styles.actionItemText}>Copy</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <Modal
         visible={showAttachMenu}
         transparent
@@ -695,83 +1394,42 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         onRequestClose={toggleAttachMenu}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={styles.attachOverlay}
           activeOpacity={1}
           onPress={toggleAttachMenu}
         >
           <Animated.View
             style={[
-              styles.attachMenuContainer,
+              styles.attachSheet,
               {
-                transform: [{
-                  translateY: attachMenuAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [300, 0],
-                  }),
-                }],
                 opacity: attachMenuAnim,
+                transform: [
+                  {
+                    translateY: attachMenuAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [280, 0],
+                    }),
+                  },
+                ],
               },
             ]}
           >
-            <View style={styles.attachMenuHandle} />
-            <Text style={styles.attachMenuTitle}>Đính kèm tệp</Text>
-            <View style={styles.attachMenuGrid}>
-              {[
-                { icon: 'image', label: 'Ảnh', color: '#4CAF50', hint: 'Từ thư viện', onPress: async () => {
-                  try {
-                    const result = await launchImageLibrary({ mediaType: 'mixed', quality: 0.8 });
-                    if (result.assets && result.assets[0]) {
-                      const asset = result.assets[0];
-                      handleMediaSend({ uri: asset.uri!, fileName: asset.fileName || 'image.jpg', type: asset.type || 'image/jpeg', fileSize: asset.fileSize });
-                    }
-                  } catch (e) { Alert.alert('Lỗi', 'Không thể mở thư viện ảnh'); }
-                }},
-                { icon: 'file-document-outline', label: 'Tài liệu', color: '#2196F3', hint: 'PDF, DOCX', onPress: async () => {
-                  try {
-                    const result = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
-                    const file = result[0];
-                    handleMediaSend({ uri: file.uri, fileName: file.name || 'document', type: file.type || 'application/octet-stream', fileSize: file.size || undefined });
-                  } catch (e: any) {
-                    if (!DocumentPicker.isCancel(e)) Alert.alert('Lỗi', 'Không thể chọn tài liệu');
-                  }
-                }},
-                { icon: 'camera-outline', label: 'Camera', color: '#FF9800', hint: 'Chụp ảnh', onPress: async () => {
-                  try {
-                    if (Platform.OS === 'android') {
-                      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
-                      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-                        Alert.alert('Quyền bị từ chối', 'Ứng dụng cần quyền Camera để chụp ảnh');
-                        return;
-                      }
-                    }
-                    const result = await launchCamera({ mediaType: 'photo', quality: 0.8 });
-                    if (result.assets && result.assets[0]) {
-                      const asset = result.assets[0];
-                      handleMediaSend({ uri: asset.uri!, fileName: asset.fileName || 'photo.jpg', type: asset.type || 'image/jpeg', fileSize: asset.fileSize });
-                    }
-                  } catch (e) { Alert.alert('Lỗi', 'Không thể mở camera'); }
-                }},
-                { icon: 'video-outline', label: 'Video', color: '#E91E63', hint: 'Quay/Chọn', onPress: async () => {
-                  try {
-                    const result = await launchImageLibrary({ mediaType: 'video', quality: 0.8 });
-                    if (result.assets && result.assets[0]) {
-                      const asset = result.assets[0];
-                      handleMediaSend({ uri: asset.uri!, fileName: asset.fileName || 'video.mp4', type: asset.type || 'video/mp4', fileSize: asset.fileSize });
-                    }
-                  } catch (e) { Alert.alert('Lỗi', 'Không thể chọn video'); }
-                }},
-                { icon: 'sticker-emoji', label: 'Sticker', color: '#9C27B0', hint: 'Emoji', onPress: () => { toggleAttachMenu(); setShowStickerPicker(true); }},
-                { icon: 'emoticon-happy-outline', label: 'Emoji', color: '#00BCD4', hint: 'Biểu tượng', onPress: () => { toggleAttachMenu(); setShowStickerPicker(true); }},
-              ].map((item, index) => (
-                <TouchableOpacity key={index} style={styles.attachMenuItem} onPress={item.onPress}>
+            <View style={styles.attachHandle} />
+            <Text style={styles.attachTitle}>Attachments</Text>
+            <View style={styles.attachGrid}>
+              {attachmentItems.map(item => (
+                <TouchableOpacity
+                  key={item.label}
+                  style={styles.attachItem}
+                  onPress={item.onPress}
+                >
                   <LinearGradient
                     colors={[item.color, `${item.color}DD`]}
-                    style={styles.attachMenuIcon}
+                    style={styles.attachIconWrap}
                   >
-                    <Icon name={item.icon} size={26} color={Colors.white} />
+                    <Icon name={item.icon} size={25} color="#FFFFFF" />
                   </LinearGradient>
-                  <Text style={styles.attachMenuLabel}>{item.label}</Text>
-                  <Text style={styles.attachMenuHint}>{item.hint}</Text>
+                  <Text style={styles.attachLabel}>{item.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -779,19 +1437,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         </TouchableOpacity>
       </Modal>
 
-      {/* Sticker Picker */}
       <StickerPicker
         visible={showStickerPicker}
         onClose={() => setShowStickerPicker(false)}
         onSelectSticker={(sticker, type) => handleStickerSend(sticker, type)}
       />
 
-      {/* Upload Indicator */}
       {isUploading && (
         <View style={styles.uploadOverlay}>
-          <View style={styles.uploadBox}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.uploadText}>Đang tải lên...</Text>
+          <View style={styles.uploadCard}>
+            <ActivityIndicator size="large" color="#1D6FD7" />
+            <Text style={styles.uploadText}>Uploading...</Text>
           </View>
         </View>
       )}
@@ -802,291 +1458,590 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.chatBackground,
+    backgroundColor: '#DCE6F2',
   },
-  // Header
+  wallpaperLayer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#DCE6F2',
+    opacity: 1,
+  },
+  headerWrap: {
+    zIndex: 5,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 12,
   },
   backButton: {
-    padding: Spacing.sm,
-    marginRight: Spacing.xs,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  headerProfile: {
+  headerMain: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
   },
   headerInfo: {
-    marginLeft: Spacing.md,
     flex: 1,
+    marginLeft: 10,
   },
   headerName: {
-    fontSize: Typography.body,
-    fontWeight: Typography.bold,
-    color: Colors.white,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.15,
   },
-  headerStatusRow: {
+  headerMetaRow: {
+    marginTop: 2,
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
   },
-  headerStatus: {
-    fontSize: Typography.caption,
-    color: 'rgba(255, 255, 255, 0.8)',
+  headerMetaText: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 12,
+    fontWeight: '500',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: 4,
   },
-  headerActionButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Busy notice
-  busyNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.warningLight,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.warningSoft,
-  },
-  busyNoticeText: {
-    fontSize: Typography.caption,
-    color: Colors.warning,
-    fontWeight: Typography.medium,
-    flex: 1,
-  },
-  // Quick reactions
-  reactionsBar: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    backgroundColor: Colors.white,
-    paddingVertical: Spacing.xs + 2,
-    paddingHorizontal: Spacing.md,
-    gap: Spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  reactionButton: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-  },
-  reactionEmoji: {
-    fontSize: 18,
-  },
-  // Messages
-  messagesContainer: {
-    paddingBottom: Spacing.xs,
-  },
-  // Tick container
-  tickContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingRight: Spacing.sm,
-    marginTop: -4,
-    marginBottom: 4,
-  },
-  // Day separator
-  daySeparatorContainer: {
-    marginVertical: Spacing.md,
-  },
-  daySeparatorWrapper: {
-    backgroundColor: Colors.chatDateBadge,
-    borderRadius: BorderRadius.round,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-  },
-  daySeparatorText: {
-    fontSize: Typography.tiny,
-    color: Colors.textSecondary,
-    fontWeight: Typography.medium,
-  },
-  // Input toolbar
-  inputToolbar: {
-    backgroundColor: Colors.white,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-  },
-  inputToolbarPrimary: {
-    alignItems: 'center',
-  },
-  composerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  attachButton: {
-    padding: Spacing.sm,
-  },
-  emojiButton: {
-    padding: Spacing.sm,
-  },
-  composerInput: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.xxl,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 10 : 8,
-    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
-    fontSize: Typography.bodySmall,
-    color: Colors.textPrimary,
-    maxHeight: 100,
-    marginRight: Spacing.xs,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  sendContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.xs,
-    marginBottom: Spacing.xs,
-  },
-  sendButton: {
+  headerIcon: {
     width: 38,
     height: 38,
     borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // System message
-  systemMessageContainer: {
-    marginBottom: Spacing.md,
+  busyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF7E8',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F7D7A1',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
-  systemMessageText: {
-    fontSize: Typography.caption,
-    color: Colors.textMuted,
-    fontStyle: 'italic',
-    textAlign: 'center',
-  },
-  // Modal
-  modalOverlay: {
+  busyBannerText: {
     flex: 1,
-    backgroundColor: Colors.overlay,
+    color: '#9A5B08',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  listContentContainer: {
+    paddingTop: 10,
+    paddingBottom: 16,
+  },
+  messagesContainer: {
+    paddingHorizontal: 6,
+  },
+  messageBlock: {
+    opacity: 1,
+  },
+  messageContainer: {
+    width: '100%',
+    opacity: 1,
+  },
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    width: '100%',
+    gap: 6,
+  },
+  messageRowMine: {
+    justifyContent: 'flex-end',
+    paddingRight: 8,
+  },
+  messageRowOther: {
+    justifyContent: 'flex-start',
+    paddingLeft: 8,
+  },
+  messageBubbleWrapper: {
+    flexShrink: 1,
+    alignItems: 'flex-start',
+  },
+  avatarSpacer: {
+    width: 36,
+    height: 36,
+    flexShrink: 0,
+  },
+  bubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    gap: 6,
+    marginVertical: 2,
+  },
+  bubbleRowReverse: {
+    flexDirection: 'row-reverse',
     justifyContent: 'flex-end',
   },
-  attachMenuContainer: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: BorderRadius.xxl,
-    borderTopRightRadius: BorderRadius.xxl,
-    paddingHorizontal: Spacing.xxl,
-    paddingBottom: Spacing.huge,
-    paddingTop: Spacing.md,
+  avatarWrapper: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
   },
-  attachMenuHandle: {
-    width: 40,
+  bubbleContent: {
+    flexShrink: 1,
+    maxWidth: '85%',
+  },
+  bubbleWrapperLeft: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+    maxWidth: 260,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    ...Shadows.xs,
+  },
+  bubbleWrapperRight: {
+    backgroundColor: '#1D6FD7',
+    borderRadius: 18,
+    borderBottomRightRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-end',
+    maxWidth: 260,
+    shadowColor: '#1D6FD7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  bubbleBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+    marginTop: 4,
+  },
+  bubbleLeft: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderBottomLeftRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+    ...Shadows.xs,
+  },
+  bubbleRight: {
+    backgroundColor: '#1976D2',
+    borderRadius: 20,
+    borderBottomRightRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    shadowColor: '#1976D2',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  bubbleTextLeft: {
+    color: '#192537',
+    fontSize: 15,
+    lineHeight: 22,
+    letterSpacing: 0.08,
+  },
+  bubbleTextRight: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    lineHeight: 22,
+    letterSpacing: 0.08,
+  },
+  tickWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  timeLeft: {
+    color: '#7B8A9D',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  timeRight: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  dayContainer: {
+    marginVertical: 10,
+  },
+  dayWrapper: {
+    backgroundColor: 'rgba(103, 122, 145, 0.18)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  dayText: {
+    color: '#56657A',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  systemMessageContainer: {
+    marginBottom: 10,
+  },
+  systemMessageText: {
+    color: '#7A8DA4',
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  replyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F6FAFE',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  replyBarAccent: {
+    width: 3,
+    minHeight: 34,
+    borderRadius: 3,
+    backgroundColor: '#1D6FD7',
+    marginRight: 10,
+  },
+  replyBarContent: {
+    flex: 1,
+  },
+  replyBarName: {
+    color: '#1D6FD7',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  replyBarText: {
+    color: '#64748B',
+    fontSize: 13,
+    marginTop: 1,
+  },
+  replyBarClose: {
+    padding: 6,
+    marginLeft: 8,
+  },
+  replySnippet: {
+    flexDirection: 'row',
+    maxWidth: '84%',
+    marginBottom: 6,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  replySnippetMine: {
+    alignSelf: 'flex-end',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  replySnippetOther: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(25, 111, 212, 0.08)',
+  },
+  replySnippetBar: {
+    width: 3,
+    borderRadius: 3,
+    backgroundColor: '#1D6FD7',
+    marginRight: 8,
+  },
+  replySnippetContent: {
+    flex: 1,
+  },
+  replySnippetName: {
+    color: '#1D6FD7',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  replySnippetText: {
+    color: '#6B7A8D',
+    fontSize: 12,
+    marginTop: 1,
+  },
+  reactionRow: {
+    position: 'absolute',
+    bottom: -10,
+    flexDirection: 'row',
+    gap: 3,
+    flexWrap: 'wrap',
+  },
+  reactionRowMine: {
+    right: -8,
+  },
+  reactionRowOther: {
+    left: -8,
+  },
+  reactionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  reactionEmoji: {
+    fontSize: 13,
+  },
+  reactionCount: {
+    marginLeft: 3,
+    color: '#617286',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  composerShell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 24,
+    backgroundColor: '#F3F6F9',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    paddingHorizontal: 4,
+    marginRight: 6,
+  },
+  composerIconButton: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  composerInput: {
+    flex: 1,
+    color: '#1F2937',
+    fontSize: 15,
+    lineHeight: 20,
+    paddingTop: Platform.OS === 'ios' ? 10 : 8,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+    backgroundColor: 'transparent',
+  },
+  inputToolbar: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 0,
+    paddingHorizontal: 6,
+    paddingTop: 6,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  inputToolbarPrimary: {
+    alignItems: 'center',
+    minHeight: 46,
+  },
+  sendContainer: {
+    height: 46,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionFab: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#1D6FD7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#1D6FD7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  callMessageContainer: {
+    maxWidth: '78%',
+    marginVertical: 4,
+    paddingHorizontal: 2,
+    alignSelf: 'flex-start',
+  },
+  callCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 58,
+    maxWidth: 260,
+  },
+  callCardLeft: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    borderBottomLeftRadius: 6,
+    ...Shadows.xs,
+  },
+  callCardRight: {
+    backgroundColor: '#1D6FD7',
+    borderBottomRightRadius: 6,
+  },
+  callIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  callTextWrap: {
+    flexShrink: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  callTitle: {
+    color: '#1F2937',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  callTitleRight: {
+    color: '#FFFFFF',
+  },
+  callTime: {
+    color: '#7A8A9E',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  callTimeRight: {
+    color: 'rgba(255,255,255,0.72)',
+  },
+  actionModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  actionModal: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  reactionPickerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+    marginBottom: 4,
+  },
+  reactionPickerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reactionPickerEmoji: {
+    fontSize: 22,
+  },
+  actionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  actionItemText: {
+    marginLeft: 14,
+    color: '#172233',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  attachOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.34)',
+  },
+  attachSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+    paddingTop: 12,
+  },
+  attachHandle: {
+    width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.border,
+    backgroundColor: '#D5DEE8',
     alignSelf: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: 18,
   },
-  attachMenuTitle: {
-    fontSize: Typography.h4,
-    fontWeight: Typography.bold,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xl,
+  attachTitle: {
+    color: '#172233',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 18,
   },
-  attachMenuGrid: {
+  attachGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  attachMenuItem: {
-    alignItems: 'center',
+  attachItem: {
     width: '30%',
-    marginBottom: Spacing.xxl,
+    alignItems: 'center',
+    marginBottom: 18,
   },
-  attachMenuIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 16,
+  attachIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: 8,
   },
-  attachMenuLabel: {
-    fontSize: Typography.bodySmall,
-    fontWeight: Typography.medium,
-    color: Colors.textPrimary,
+  attachLabel: {
+    color: '#425466',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
-  attachMenuHint: {
-    fontSize: Typography.tiny,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  // Upload overlay
   uploadOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.28)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 999,
   },
-  uploadBox: {
-    backgroundColor: Colors.white,
-    borderRadius: 16,
-    paddingHorizontal: 32,
-    paddingVertical: 24,
+  uploadCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 36,
+    paddingVertical: 28,
     alignItems: 'center',
     ...Shadows.lg,
   },
   uploadText: {
+    color: '#475569',
+    fontSize: 14,
+    fontWeight: '600',
     marginTop: 12,
-    fontSize: Typography.bodySmall,
-    color: Colors.textSecondary,
-    fontWeight: Typography.medium as any,
-  },
-  // Call message styles
-  callMessageContainer: {
-    alignItems: 'center',
-    marginVertical: Spacing.sm,
-    paddingHorizontal: Spacing.xl,
-  },
-  callMessageCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    borderLeftWidth: 3,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    minWidth: 220,
-    ...Shadows.sm,
-  },
-  callIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
-  },
-  callMessageContent: {
-    flex: 1,
-  },
-  callMessageStatus: {
-    fontSize: Typography.bodySmall,
-    fontWeight: Typography.semiBold,
-    color: Colors.textPrimary,
-  },
-  callMessageTime: {
-    fontSize: Typography.caption,
-    color: Colors.textMuted,
-    marginTop: 2,
   },
 });
 

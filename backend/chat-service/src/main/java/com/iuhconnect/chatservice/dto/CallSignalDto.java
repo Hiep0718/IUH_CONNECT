@@ -14,6 +14,7 @@ public class CallSignalDto {
     private String signalType;     // giá trị từ CallSignalType
     private String meetingId;
     private String roomName;
+    private String conversationId;
     private String senderId;       // backend override từ authenticated session
     private String senderName;
     private String receiverId;

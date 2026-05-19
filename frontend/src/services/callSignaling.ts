@@ -8,6 +8,7 @@ export interface CallSignal {
   signalType: string;
   meetingId?: string;
   roomName?: string;
+  conversationId?: string;
   senderId?: string;
   senderName?: string;
   receiverId: string;
@@ -23,11 +24,15 @@ export const isCallSignal = (data: any): data is CallSignal => {
 export const createCallInvite = (
   receiverId: string,
   roomName: string,
+  conversationId?: string,
+  senderName?: string,
 ): CallSignal => ({
   type: 'CALL_SIGNAL',
   signalType: 'CALL_INVITE',
   receiverId,
   roomName,
+  conversationId,
+  senderName,
   timestamp: Date.now(),
 });
 

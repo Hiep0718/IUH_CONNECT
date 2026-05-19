@@ -15,6 +15,7 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/the
 import Avatar from '../components/Avatar';
 
 import { API_URL } from '../config/env';
+import { useWebSocket } from '../services/WebSocketProvider';
 
 interface GroupsScreenProps {
   navigation: any;
@@ -59,9 +60,21 @@ const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser }) 
 
   React.useEffect(() => {
     loadGroups();
-    const interval = setInterval(loadGroups, 5000);
-    return () => clearInterval(interval);
   }, [loadGroups]);
+
+  const { addListener, removeListener } = useWebSocket();
+
+  React.useEffect(() => {
+    const listenerId = 'groups-screen';
+    const handler = (data: any) => {
+      // Reload on new messages or contact events
+      if (!data.type || data.type === 'CHAT_MESSAGE' || data.type === 'CONTACT_EVENT' || data.type === 'PRESENCE_UPDATE') {
+        loadGroups();
+      }
+    };
+    addListener(listenerId, handler);
+    return () => removeListener(listenerId);
+  }, [addListener, removeListener, loadGroups]);
 
   const renderGroup = ({ item, index }: { item: any; index: number }) => {
     const itemAnim = new Animated.Value(0);

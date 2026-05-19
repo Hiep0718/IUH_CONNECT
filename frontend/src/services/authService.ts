@@ -15,11 +15,11 @@ export const onAuthExpired = (listener: LogoutListener) => {
 
 let isLoggingOut = false;
 
-const triggerAutoLogout = async () => {
+export const triggerAutoLogout = async (reason?: string) => {
   if (isLoggingOut) return; // Tránh gọi nhiều lần liên tiếp
   isLoggingOut = true;
 
-  console.log('⏰ [AuthService] Token expired — auto logging out');
+  console.log('⏰ [AuthService] Auto logging out, reason:', reason || 'Token expired');
 
   // Xóa session khỏi AsyncStorage
   try {
@@ -30,8 +30,10 @@ const triggerAutoLogout = async () => {
 
   // Thông báo cho user
   Alert.alert(
-    'Phiên đăng nhập hết hạn',
-    'Vui lòng đăng nhập lại để tiếp tục sử dụng.',
+    reason === 'SESSION_REVOKED' ? 'Đăng xuất' : 'Phiên đăng nhập hết hạn',
+    reason === 'SESSION_REVOKED' 
+      ? 'Tài khoản của bạn đã được đăng nhập ở một nơi khác.' 
+      : 'Vui lòng đăng nhập lại để tiếp tục sử dụng.',
     [{ text: 'OK' }],
   );
 
@@ -51,18 +53,41 @@ const triggerAutoLogout = async () => {
 };
 
 // ── Giải mã JWT payload (không cần thư viện bên ngoài) ──
+const decodeBase64Url = (str: string) => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  let output = '';
+  str = String(str).replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+  
+  if (str.length % 4 === 1) return '';
+  for (
+    let bc = 0, bs = 0, buffer, i = 0;
+    (buffer = str.charAt(i++));
+    ~buffer && ((bs = bc % 4 ? bs * 64 + buffer : buffer), bc++ % 4)
+      ? (output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6))))
+      : 0
+  ) {
+    buffer = chars.indexOf(buffer);
+  }
+  return output;
+};
+
 export const decodeJwtPayload = (token: string): any | null => {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
 
-    // Base64url → Base64 → decode
-    const payload = parts[1]
-      .replace(/-/g, '+')
-      .replace(/_/g, '/');
+    const payload = parts[1];
+    let decoded = '';
 
-    const decoded = atob(payload);
-    return JSON.parse(decoded);
+    // Check if atob is globally available
+    if (typeof atob === 'function') {
+      decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    } else {
+      decoded = decodeBase64Url(payload);
+    }
+    
+    // handle uri encoded string
+    return JSON.parse(decodeURIComponent(escape(decoded)));
   } catch (e) {
     console.log('Failed to decode JWT', e);
     return null;

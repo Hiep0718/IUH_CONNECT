@@ -7,9 +7,10 @@ import type { MessageStatus } from '../types/types';
 interface MessageTicksProps {
   status: MessageStatus;
   size?: number;
+  color?: string;
 }
 
-const MessageTicks: React.FC<MessageTicksProps> = ({ status, size = 16 }) => {
+const MessageTicks: React.FC<MessageTicksProps> = ({ status, size = 16, color }) => {
   const scaleAnim = useRef(new Animated.Value(0.5)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
@@ -32,15 +33,15 @@ const MessageTicks: React.FC<MessageTicksProps> = ({ status, size = 16 }) => {
   const getIcon = () => {
     switch (status) {
       case 'sending':
-        return <Icon name="clock-outline" size={size - 2} color={Colors.textMuted} />;
+        return <Icon name="clock-outline" size={size - 2} color={color || Colors.textMuted} />;
       case 'sent':
-        return <Icon name="check" size={size} color={Colors.textSecondary} />;
+        return <Icon name="check" size={size} color={color || Colors.textSecondary} />;
       case 'delivered':
-        return <Icon name="check-all" size={size} color={Colors.textSecondary} />;
+        return <Icon name="check-all" size={size} color={color || Colors.textSecondary} />;
       case 'read':
-        return <Icon name="check-all" size={size} color={Colors.accent} />;
+        return <Icon name="check-all" size={size} color={color || Colors.accent} />;
       case 'failed':
-        return <Icon name="alert-circle-outline" size={size} color={Colors.danger} />;
+        return <Icon name="alert-circle-outline" size={size} color={color || Colors.danger} />;
       default:
         return null;
     }

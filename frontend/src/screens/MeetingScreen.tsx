@@ -97,7 +97,7 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token,
     callHistorySentRef.current = true;
 
     // Tính conversationId nếu chưa được truyền (cuộc gọi đến)
-    const resolvedConvId = conversationId || `${currentUser}-${callerId}`;
+    const resolvedConvId = conversationId || `${callerId}-${currentUser}`;
 
     if (!currentUser) {
       console.log('[Meeting] No currentUser, skipping call history');
@@ -224,7 +224,14 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token,
       if (!roomNameRef.current) {
         roomNameRef.current = `IUHConnect_${callerId}_${Date.now()}`;
       }
-      sendMessage(createCallInvite(callerId, roomNameRef.current));
+      sendMessage(
+        createCallInvite(
+          callerId,
+          roomNameRef.current,
+          conversationId,
+          currentUser,
+        ),
+      );
       setCallStatus('Đang gọi...');
       
       // Phát âm đổ chuông (lặp lại)
