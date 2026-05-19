@@ -1,12 +1,15 @@
 package com.iuhconnect.authservice.service;
 
 import com.iuhconnect.authservice.dto.ContactDto;
+import com.iuhconnect.authservice.dto.ContactEventDto;
 import com.iuhconnect.authservice.model.Friendship;
 import com.iuhconnect.authservice.model.FriendshipStatus;
 import com.iuhconnect.authservice.model.User;
 import com.iuhconnect.authservice.repository.FriendshipRepository;
 import com.iuhconnect.authservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,8 +21,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ContactService {
 
+    private static final Logger log = LoggerFactory.getLogger(ContactService.class);
+
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
+    private final UserEventProducer userEventProducer;
 
     @Transactional
     public void sendFriendRequest(String currentUsername, String targetUsername) {
@@ -43,6 +49,21 @@ public class ContactService {
                 .status(FriendshipStatus.PENDING)
                 .build();
         friendshipRepository.save(friendship);
+
+        // Publish Kafka event for real-time notification
+        try {
+            ContactEventDto event = ContactEventDto.builder()
+                    .eventType("FRIEND_REQUEST_SENT")
+                    .senderUsername(sender.getUsername())
+                    .senderFullName(sender.getFullName() != null ? sender.getFullName() : sender.getUsername())
+                    .receiverUsername(receiver.getUsername())
+                    .receiverFullName(receiver.getFullName() != null ? receiver.getFullName() : receiver.getUsername())
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            userEventProducer.publishContactEvent(event);
+        } catch (Exception e) {
+            log.error("Failed to publish friend request event", e);
+        }
     }
 
     @Transactional
@@ -62,6 +83,21 @@ public class ContactService {
 
         friendship.setStatus(FriendshipStatus.ACCEPTED);
         friendshipRepository.save(friendship);
+
+        // Publish Kafka event for real-time notification (notify the original sender)
+        try {
+            ContactEventDto event = ContactEventDto.builder()
+                    .eventType("FRIEND_REQUEST_ACCEPTED")
+                    .senderUsername(receiver.getUsername())  // person who accepted
+                    .senderFullName(receiver.getFullName() != null ? receiver.getFullName() : receiver.getUsername())
+                    .receiverUsername(sender.getUsername())  // original requester gets notified
+                    .receiverFullName(sender.getFullName() != null ? sender.getFullName() : sender.getUsername())
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            userEventProducer.publishContactEvent(event);
+        } catch (Exception e) {
+            log.error("Failed to publish friend accepted event", e);
+        }
     }
 
     public List<ContactDto> getPendingRequests(String currentUsername) {
@@ -100,3 +136,4 @@ public class ContactService {
         }).collect(Collectors.toList());
     }
 }
+

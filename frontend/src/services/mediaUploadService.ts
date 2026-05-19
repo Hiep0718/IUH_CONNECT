@@ -1,5 +1,6 @@
 import { API_URL, HOST } from '../config/env';
 import { Platform } from 'react-native';
+import { authFetch } from './authService';
 
 export interface MediaUploadResult {
   mediaUrl: string;
@@ -88,7 +89,7 @@ export async function uploadMedia(
   const presignedApiUrl = `${API_URL}/api/v1/files/presigned-url?fileName=${encodeURIComponent(file.fileName)}&contentType=${encodeURIComponent(file.type)}&clientHost=${HOST}`;
   console.log('[MediaUpload] Requesting presigned URL from:', presignedApiUrl);
 
-  const presignedRes = await fetch(presignedApiUrl, {
+  const presignedRes = await authFetch(presignedApiUrl, {
     headers: { Authorization: `Bearer ${token}` },
   });
 

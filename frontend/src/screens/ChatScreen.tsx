@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import DocumentPicker from 'react-native-document-picker';
-import { GiftedChat, IMessage, Bubble, InputToolbar, Composer, Send, Time, SystemMessage, Day } from 'react-native-gifted-chat';
+import { GiftedChat, IMessage, Bubble, InputToolbar, Composer, Send, Time, SystemMessage, Day, Message } from 'react-native-gifted-chat';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/theme';
@@ -32,6 +32,7 @@ import { API_URL } from '../config/env';
 import { useWebSocket } from '../services/WebSocketProvider';
 import { isCallSignal } from '../services/callSignaling';
 import { uploadMedia, getMessageTypeFromMime } from '../services/mediaUploadService';
+import { authFetch } from '../services/authService';
 
 interface ChatScreenProps {
   navigation: any;
@@ -122,16 +123,18 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/v1/chat/history/${conversationId}`, {
+        const res = await authFetch(`${API_URL}/api/v1/chat/history/${conversationId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) {
           const data = await res.json();
           const historyMsgs: ExtendedMessage[] = data.map((msg: any) => {
             const isStickerImage = msg.messageType === 'STICKER' && msg.content && msg.content.startsWith('http');
+            const isCallMsg = msg.messageType === 'CALL';
             return {
               _id: msg.id,
-              text: msg.messageType === 'IMAGE' ? '📷 Hình ảnh'
+              text: isCallMsg ? msg.content
+                  : msg.messageType === 'IMAGE' ? '📷 Hình ảnh'
                   : msg.messageType === 'VIDEO' ? '🎬 Video'
                   : msg.messageType === 'FILE' ? '📎 ' + (msg.fileName || 'Tệp')
                   : isStickerImage ? ''
@@ -184,9 +187,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       if (data.conversationId !== conversationId) return;
 
       const isStickerImage = data.messageType === 'STICKER' && data.content && data.content.startsWith('http');
+      const isCallMsg = data.messageType === 'CALL';
       const incomingMessage: ExtendedMessage = {
         _id: `${data.conversationId}-${data.timestamp}-${Date.now()}`,
-        text: data.messageType === 'IMAGE' ? '📷 Hình ảnh'
+        text: isCallMsg ? data.content
+            : data.messageType === 'IMAGE' ? '📷 Hình ảnh'
             : data.messageType === 'VIDEO' ? '🎬 Video'
             : data.messageType === 'FILE' ? '📎 ' + (data.fileName || 'Tệp')
             : isStickerImage ? ''
@@ -490,6 +495,70 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     <TypingIndicator isVisible={isTyping} />
   );
 
+  // Custom call message bubble
+  const renderMessage = (props: any) => {
+    const message = props.currentMessage as ExtendedMessage;
+    if (message.messageType === 'CALL') {
+      let callInfo = { callStatus: 'completed', duration: 0, isIncoming: false, callerName: '' };
+      try {
+        callInfo = JSON.parse(message.text || '{}');
+      } catch { /* fallback */ }
+
+      const isMine = message.user._id === 'me' || message.user._id === currentUser;
+      const durationMins = Math.floor((callInfo.duration || 0) / 60);
+      const durationSecs = (callInfo.duration || 0) % 60;
+      const durationStr = callInfo.duration > 0 ? `${durationMins.toString().padStart(2, '0')}:${durationSecs.toString().padStart(2, '0')}` : '';
+
+      let statusIcon = 'phone';
+      let statusColor = Colors.success;
+      let statusText = '';
+
+      switch (callInfo.callStatus) {
+        case 'completed':
+          statusIcon = isMine ? 'phone-outgoing' : 'phone-incoming';
+          statusColor = Colors.success;
+          statusText = `Cuộc gọi video · ${durationStr}`;
+          break;
+        case 'missed':
+          statusIcon = 'phone-missed';
+          statusColor = Colors.danger;
+          statusText = isMine ? 'Cuộc gọi nhỡ' : 'Cuộc gọi nhỡ';
+          break;
+        case 'rejected':
+          statusIcon = 'phone-cancel';
+          statusColor = Colors.danger;
+          statusText = isMine ? 'Đối phương đã từ chối' : 'Bạn đã từ chối cuộc gọi';
+          break;
+        case 'cancelled':
+          statusIcon = 'phone-cancel';
+          statusColor = Colors.warning;
+          statusText = isMine ? 'Đã hủy cuộc gọi' : 'Cuộc gọi bị hủy';
+          break;
+        default:
+          statusText = 'Cuộc gọi video';
+      }
+
+      const timeStr = new Date(message.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+      return (
+        <View style={styles.callMessageContainer}>
+          <View style={[styles.callMessageCard, { borderLeftColor: statusColor }]}>
+            <View style={[styles.callIconCircle, { backgroundColor: statusColor + '18' }]}>
+              <Icon name={statusIcon} size={20} color={statusColor} />
+            </View>
+            <View style={styles.callMessageContent}>
+              <Text style={styles.callMessageStatus}>{statusText}</Text>
+              <Text style={styles.callMessageTime}>{timeStr}</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    // Default rendering for other message types
+    return <Message {...props} />;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primaryDark} />
@@ -552,6 +621,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                   callerName: recipientName,
                   callerAvatar: recipientAvatar,
                   roomName: roomName,
+                  conversationId: conversationId,
                 });
               }}
             >
@@ -609,6 +679,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         renderTime={renderTime}
         renderDay={renderDay}
         renderSystemMessage={renderSystemMessage}
+        renderMessage={renderMessage}
         renderChatFooter={renderChatFooter}
         messagesContainerStyle={styles.messagesContainer}
         listViewProps={{
@@ -978,6 +1049,44 @@ const styles = StyleSheet.create({
     fontSize: Typography.bodySmall,
     color: Colors.textSecondary,
     fontWeight: Typography.medium as any,
+  },
+  // Call message styles
+  callMessageContainer: {
+    alignItems: 'center',
+    marginVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+  },
+  callMessageCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    borderLeftWidth: 3,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    minWidth: 220,
+    ...Shadows.sm,
+  },
+  callIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.md,
+  },
+  callMessageContent: {
+    flex: 1,
+  },
+  callMessageStatus: {
+    fontSize: Typography.bodySmall,
+    fontWeight: Typography.semiBold,
+    color: Colors.textPrimary,
+  },
+  callMessageTime: {
+    fontSize: Typography.caption,
+    color: Colors.textMuted,
+    marginTop: 2,
   },
 });
 

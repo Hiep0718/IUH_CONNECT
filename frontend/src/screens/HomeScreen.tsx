@@ -18,6 +18,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/theme';
 import { API_URL } from '../config/env';
+import { authFetch } from '../services/authService';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -123,7 +124,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, currentUser, token 
     const fetchRole = async () => {
       if (!token) return;
       try {
-        const response = await fetch(`${API_URL}/api/v1/users/me`, {
+        const response = await authFetch(`${API_URL}/api/v1/users/me`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (response.ok) {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -48,12 +48,14 @@ interface MeetingScreenProps {
       isIncoming?: boolean;
       roomName?: string;
       meetingId?: string;
+      conversationId?: string;
     };
   };
   token: string | null;
+  currentUser: string;
 }
 
-const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token }) => {
+const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token, currentUser }) => {
   const {
     callerId,
     callerName,
@@ -61,6 +63,7 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
     isIncoming = false,
     roomName: initialRoomName,
     meetingId: initialMeetingId,
+    conversationId,
   } = route.params;
 
   const { sendMessage, addListener, removeListener } = useWebSocket();
@@ -82,6 +85,42 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
   const roomNameRef = useRef<string>(initialRoomName || '');
   const meetingIdRef = useRef<string>(initialMeetingId || '');
   const jitsiOpenedRef = useRef(false);
+  const callHistorySentRef = useRef(false);
+  const callDurationRef = useRef(0);
+
+  /**
+   * Gửi tin nhắn lịch sử cuộc gọi vào conversation.
+   * messageType = 'CALL' được xử lý đặc biệt bởi ChatScreen.
+   */
+  const sendCallHistoryMessage = useCallback((status: 'completed' | 'missed' | 'rejected' | 'cancelled', durationSecs: number) => {
+    if (callHistorySentRef.current) return; // Tránh gửi nhiều lần
+    callHistorySentRef.current = true;
+
+    // Tính conversationId nếu chưa được truyền (cuộc gọi đến)
+    const resolvedConvId = conversationId || `${currentUser}-${callerId}`;
+
+    if (!currentUser) {
+      console.log('[Meeting] No currentUser, skipping call history');
+      return;
+    }
+
+    const callContent = JSON.stringify({
+      callStatus: status,
+      duration: durationSecs,
+      isIncoming: isIncoming,
+      callerName: isIncoming ? callerName : currentUser,
+    });
+
+    sendMessage({
+      senderId: currentUser,
+      receiverId: callerId,
+      content: callContent,
+      conversationId: resolvedConvId,
+      messageType: 'CALL',
+    });
+
+    console.log(`📞 [Meeting] Call history sent: ${status}, duration: ${durationSecs}s`);
+  }, [conversationId, currentUser, callerId, callerName, isIncoming, sendMessage]);
 
   // Animations
   const connectingPulse = useRef(new Animated.Value(1)).current;
@@ -232,6 +271,9 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
         if (dialtoneSound.current) dialtoneSound.current.stop();
         if (ringtoneSound.current) ringtoneSound.current.stop();
         
+        // Gửi lịch sử: cuộc gọi bị từ chối
+        sendCallHistoryMessage('rejected', 0);
+
         Alert.alert('Cuộc gọi bị từ chối', 'Đối phương đã từ chối cuộc gọi.', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
@@ -239,6 +281,13 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
         if (dialtoneSound.current) dialtoneSound.current.stop();
         if (ringtoneSound.current) ringtoneSound.current.stop();
         
+        // Gửi lịch sử: cuộc gọi kết thúc từ đối phương
+        const dur = callDurationRef.current;
+        sendCallHistoryMessage(
+          dur > 0 ? 'completed' : 'missed',
+          dur
+        );
+
         Alert.alert('Cuộc gọi kết thúc', 'Đối phương đã kết thúc cuộc gọi.', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
@@ -305,7 +354,10 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
 
   useEffect(() => {
     if (!isConnected) return;
-    const timer = setInterval(() => setCallDuration((prev) => prev + 1), 1000);
+    const timer = setInterval(() => setCallDuration((prev) => {
+      callDurationRef.current = prev + 1;
+      return prev + 1;
+    }), 1000);
     return () => clearInterval(timer);
   }, [isConnected]);
 
@@ -322,6 +374,13 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token 
     if (dialtoneSound.current) dialtoneSound.current.stop();
     if (ringtoneSound.current) ringtoneSound.current.stop();
     
+    // Gửi lịch sử cuộc gọi
+    const dur = callDurationRef.current;
+    sendCallHistoryMessage(
+      dur > 0 ? 'completed' : 'cancelled',
+      dur
+    );
+
     sendMessage(createCallEnd(callerId, meetingIdRef.current));
     Animated.timing(endCallScale, {
       toValue: 0, duration: 300, useNativeDriver: true,

@@ -3,6 +3,7 @@
  */
 
 import { API_URL } from '../config/env';
+import { authFetch } from './authService';
 
 /**
  * Tạo handoff token để chuyển cuộc họp sang desktop.
@@ -12,7 +13,7 @@ export const createHandoffToken = async (
   meetingId: string,
   authToken: string,
 ): Promise<{ handoffToken: string; meetingUrl: string }> => {
-  const res = await fetch(
+  const res = await authFetch(
     `${API_URL}/api/v1/meetings/${meetingId}/handoff-token`,
     {
       method: 'POST',
@@ -37,7 +38,7 @@ export const linkDesktopSession = async (
   desktopSessionId: string,
   authToken: string,
 ): Promise<void> => {
-  const res = await fetch(
+  const res = await authFetch(
     `${API_URL}/api/v1/meetings/${meetingId}/link-desktop/${desktopSessionId}`,
     {
       method: 'POST',

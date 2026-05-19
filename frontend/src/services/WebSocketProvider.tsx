@@ -6,9 +6,10 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Alert } from 'react-native';
+import { Alert, View, StyleSheet } from 'react-native';
 import Sound from 'react-native-sound';
 import { WS_URL } from '../config/env';
+import InAppNotification, { InAppNotificationData } from '../components/InAppNotification';
 
 type MessageHandler = (data: any) => void;
 
@@ -42,12 +43,14 @@ try {
 
 interface WebSocketProviderProps {
   token: string;
+  currentUser: string;
   children: React.ReactNode;
   navigationRef?: any;
 }
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   token,
+  currentUser,
   children,
   navigationRef,
 }) => {
@@ -58,6 +61,33 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const shouldReconnectRef = useRef(false);
   const [isConnected, setIsConnected] = useState(false);
 
+  // ── In-app notification state ──
+  const [notification, setNotification] = useState<InAppNotificationData | null>(null);
+  const notificationQueue = useRef<InAppNotificationData[]>([]);
+  const isShowingNotification = useRef(false);
+
+  const showNotification = useCallback((data: InAppNotificationData) => {
+    if (isShowingNotification.current) {
+      // Xếp hàng nếu đang hiện thông báo khác
+      notificationQueue.current.push(data);
+      return;
+    }
+    isShowingNotification.current = true;
+    setNotification(data);
+  }, []);
+
+  const handleNotificationDismiss = useCallback(() => {
+    isShowingNotification.current = false;
+    setNotification(null);
+
+    // Hiện thông báo tiếp theo trong hàng đợi
+    if (notificationQueue.current.length > 0) {
+      const next = notificationQueue.current.shift()!;
+      setTimeout(() => showNotification(next), 300);
+    }
+  }, [showNotification]);
+
+  // ── Global handler for incoming call ──
   const handleGlobalIncomingCall = useCallback(
     (data: any) => {
       const callerName = data.senderName || data.senderId || 'Nguoi dung';
@@ -127,6 +157,44 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     [navigationRef],
   );
 
+  // ── Global handler for contact events (friend requests/acceptances) ──
+  const handleGlobalContactEvent = useCallback(
+    (data: any) => {
+      const eventType = data.eventType;
+      const senderName = data.senderFullName || data.senderUsername || 'Người dùng';
+
+      if (eventType === 'FRIEND_REQUEST_SENT') {
+        showNotification({
+          id: `contact-${Date.now()}`,
+          title: '👋 Lời mời kết bạn mới',
+          body: `${senderName} đã gửi lời mời kết bạn cho bạn`,
+          senderName: senderName,
+          type: 'contact',
+          onPress: () => {
+            navigationRef?.current?.navigate('MainTabs', { screen: 'Contacts' });
+          },
+        });
+      } else if (eventType === 'FRIEND_REQUEST_ACCEPTED') {
+        showNotification({
+          id: `contact-${Date.now()}`,
+          title: '🎉 Đã trở thành bạn bè',
+          body: `${senderName} đã chấp nhận lời mời kết bạn của bạn`,
+          senderName: senderName,
+          type: 'contact',
+          onPress: () => {
+            navigationRef?.current?.navigate('Chat', {
+              conversationId: `${data.receiverUsername}-${data.senderUsername}`,
+              recipientName: senderName,
+              recipientId: data.senderUsername,
+              isOnline: true,
+            });
+          },
+        });
+      }
+    },
+    [navigationRef, showNotification],
+  );
+
   const connect = useCallback(() => {
     const currentSocket = wsRef.current;
     if (
@@ -155,6 +223,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         try {
           const data = JSON.parse(event.data);
 
+          // ── Handle CALL_SIGNAL globally ──
           if (data.type === 'CALL_SIGNAL') {
             if (data.signalType === 'CALL_INVITE') {
               handleGlobalIncomingCall(data);
@@ -167,6 +236,38 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
             }
           }
 
+          // ── Handle CONTACT_EVENT globally ──
+          if (data.type === 'CONTACT_EVENT') {
+            handleGlobalContactEvent(data);
+          }
+
+          // ── Handle CHAT MESSAGE → in-app notification ──
+          if (!data.type && data.senderId && data.senderId !== currentUser && data.conversationId) {
+            const senderLabel = data.senderName || data.senderId;
+            const msgPreview = data.messageType === 'IMAGE' ? '📷 Hình ảnh'
+              : data.messageType === 'VIDEO' ? '🎬 Video'
+              : data.messageType === 'FILE' ? '📎 Tệp đính kèm'
+              : data.messageType === 'STICKER' ? '😄 Sticker'
+              : data.content || 'Tin nhắn mới';
+
+            showNotification({
+              id: `chat-${Date.now()}`,
+              title: senderLabel,
+              body: msgPreview,
+              senderName: senderLabel,
+              type: 'chat',
+              onPress: () => {
+                navigationRef?.current?.navigate('Chat', {
+                  conversationId: data.conversationId,
+                  recipientName: senderLabel,
+                  recipientId: data.senderId,
+                  isOnline: true,
+                });
+              },
+            });
+          }
+
+          // ── Broadcast to all registered listeners (screens) ──
           listenersRef.current.forEach(handler => {
             try {
               handler(data);
@@ -214,7 +315,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       console.error('[WSProvider] Failed to create WebSocket:', error);
       setIsConnected(false);
     }
-  }, [handleGlobalIncomingCall, token]);
+  }, [handleGlobalIncomingCall, handleGlobalContactEvent, showNotification, currentUser, token]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -256,7 +357,20 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     <WebSocketContext.Provider
       value={{ sendMessage, addListener, removeListener, isConnected }}
     >
-      {children}
+      <View style={styles.providerContainer}>
+        {children}
+        <InAppNotification
+          notification={notification}
+          onDismiss={handleNotificationDismiss}
+        />
+      </View>
     </WebSocketContext.Provider>
   );
 };
+
+const styles = StyleSheet.create({
+  providerContainer: {
+    flex: 1,
+  },
+});
+

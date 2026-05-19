@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/theme';
 import Avatar from '../components/Avatar';
 import { API_URL } from '../config/env';
+import { authFetch } from '../services/authService';
 
 interface CreateGroupScreenProps {
   navigation: any;
@@ -33,7 +34,7 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/v1/contacts/list`, {
+        const response = await authFetch(`${API_URL}/api/v1/contacts/list`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -73,7 +74,7 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/v1/chat/conversations/group`, {
+      const response = await authFetch(`${API_URL}/api/v1/chat/conversations/group`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -16,6 +16,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/theme';
 import Avatar from '../components/Avatar';
 import { API_URL } from '../config/env';
+import { authFetch } from '../services/authService';
 
 interface GroupSettingsScreenProps {
   navigation: any;
@@ -51,7 +52,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
 
   const fetchGroupDetails = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}`, {
+      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -121,7 +122,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
 
   const performLeave = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${currentUser}?requesterId=${currentUser}`, {
+      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${currentUser}?requesterId=${currentUser}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -141,7 +142,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
       return;
     }
     try {
-      const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/leave-transfer?requesterId=${currentUser}&successorId=${selectedSuccessor}`, {
+      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/leave-transfer?requesterId=${currentUser}&successorId=${selectedSuccessor}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -164,7 +165,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
     
     try {
       const newName = editNameInput.trim();
-      const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/name?requesterId=${currentUser}&newName=${encodeURIComponent(newName)}`, {
+      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/name?requesterId=${currentUser}&newName=${encodeURIComponent(newName)}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -192,7 +193,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
     if (selectedNewUsers.length === 0) return;
     
     try {
-      const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members?requesterId=${currentUser}`, {
+      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members?requesterId=${currentUser}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -230,7 +231,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
       { text: 'Hủy', style: 'cancel' },
       { text: actionText, onPress: async () => {
           try {
-            const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${item.id}/role?requesterId=${currentUser}&newRole=${newRole}`, {
+            const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${item.id}/role?requesterId=${currentUser}&newRole=${newRole}`, {
               method: 'PUT',
               headers: { Authorization: `Bearer ${token}` }
             });
@@ -267,7 +268,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
               { text: 'Hủy', style: 'cancel' },
               { text: 'Xóa', style: 'destructive', onPress: async () => {
                   try {
-                    const res = await fetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${item.id}?requesterId=${currentUser}`, {
+                    const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${item.id}?requesterId=${currentUser}`, {
                       method: 'DELETE',
                       headers: { Authorization: `Bearer ${token}` }
                     });

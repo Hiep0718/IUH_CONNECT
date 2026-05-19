@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, Animations } from '../theme/theme';
 import { API_URL } from '../config/env';
 
@@ -62,6 +63,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
   const circle3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Khôi phục thông tin đăng nhập đã lưu (nếu chọn "Nhớ mật khẩu")
+    const loadSavedCredentials = async () => {
+      try {
+        const savedUsername = await AsyncStorage.getItem('@saved_username');
+        const savedPassword = await AsyncStorage.getItem('@saved_password');
+        if (savedUsername && savedPassword) {
+          setUsername(savedUsername);
+          setPassword(savedPassword);
+          setRememberMe(true);
+        }
+      } catch (e) {
+        console.log('Failed to load saved credentials', e);
+      }
+    };
+    loadSavedCredentials();
+
     // Initial animations
     Animated.parallel([
       Animated.parallel([
@@ -129,6 +146,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLogin }) => {
       }
 
       if (response.ok && data.accessToken) {
+        // Lưu/Xóa thông tin đăng nhập dựa trên checkbox "Nhớ mật khẩu"
+        try {
+          if (rememberMe) {
+            await AsyncStorage.setItem('@saved_username', username.trim());
+            await AsyncStorage.setItem('@saved_password', password);
+          } else {
+            await AsyncStorage.multiRemove(['@saved_username', '@saved_password']);
+          }
+        } catch (e) {
+          console.log('Failed to save credentials', e);
+        }
+
         onLogin(data.accessToken, username.trim());
       } else {
         Alert.alert('Đăng nhập thất bại', data.message || 'Tên đăng nhập hoặc mật khẩu không đúng');

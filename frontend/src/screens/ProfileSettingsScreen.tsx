@@ -23,6 +23,7 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/the
 import Avatar from '../components/Avatar';
 import type { LecturerStatus, UserRole } from '../types/types';
 import { API_URL } from '../config/env';
+import { authFetch } from '../services/authService';
 
 interface ProfileSettingsScreenProps {
   navigation: any;
@@ -126,7 +127,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
   const fetchProfile = async () => {
     if (!token) return;
     try {
-      const response = await fetch(`${API_URL}/api/v1/users/me`, {
+      const response = await authFetch(`${API_URL}/api/v1/users/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -169,7 +170,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
     const newStatus: LecturerStatus = lecturerStatus === 'available' ? 'busy' : 'available';
     setLecturerStatus(newStatus);
     try {
-      await fetch(`${API_URL}/api/v1/users/me`, {
+      await authFetch(`${API_URL}/api/v1/users/me`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ lecturerStatus: newStatus.toUpperCase() })
@@ -216,7 +217,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
     const isoDateString = editForm.dateOfBirth.toISOString().split('T')[0];
     
     try {
-      const response = await fetch(`${API_URL}/api/v1/users/me`, {
+      const response = await authFetch(`${API_URL}/api/v1/users/me`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

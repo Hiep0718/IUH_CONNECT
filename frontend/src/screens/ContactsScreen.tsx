@@ -19,6 +19,8 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/the
 import Avatar from '../components/Avatar';
 import SectionHeader from '../components/SectionHeader';
 import { API_URL } from '../config/env';
+import { useWebSocket } from '../services/WebSocketProvider';
+import { authFetch } from '../services/authService';
 
 interface ContactsScreenProps {
   navigation: any;
@@ -32,15 +34,16 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
   const [pendings, setPendings] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [targetUsername, setTargetUsername] = useState('');
+  const { addListener, removeListener } = useWebSocket();
 
   const loadContacts = useCallback(async () => {
     try {
-      const pRes = await fetch(`${API_URL}/api/v1/contacts/pending`, {
+      const pRes = await authFetch(`${API_URL}/api/v1/contacts/pending`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (pRes.ok) setPendings(await pRes.json());
 
-      const fRes = await fetch(`${API_URL}/api/v1/contacts/list`, {
+      const fRes = await authFetch(`${API_URL}/api/v1/contacts/list`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (fRes.ok) setFriends(await fRes.json());
@@ -59,10 +62,26 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
     loadContacts();
   }, [loadContacts]);
 
+  // Listen for real-time contact events via WebSocket
+  useEffect(() => {
+    const listenerId = 'contacts-screen-ws-listener';
+
+    addListener(listenerId, (data: any) => {
+      if (data.type === 'CONTACT_EVENT') {
+        console.log('📬 [ContactsScreen] Received contact event, refreshing...', data.eventType);
+        loadContacts();
+      }
+    });
+
+    return () => {
+      removeListener(listenerId);
+    };
+  }, [addListener, removeListener, loadContacts]);
+
   const handleSendRequest = async () => {
     if (!targetUsername) return;
     try {
-      const res = await fetch(`${API_URL}/api/v1/contacts/request?targetUsername=${targetUsername}`, {
+      const res = await authFetch(`${API_URL}/api/v1/contacts/request?targetUsername=${targetUsername}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -81,7 +100,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
 
   const handleAcceptRequest = async (senderUsername: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/contacts/accept?senderUsername=${senderUsername}`, {
+      const res = await authFetch(`${API_URL}/api/v1/contacts/accept?senderUsername=${senderUsername}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });

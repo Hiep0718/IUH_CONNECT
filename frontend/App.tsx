@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -21,6 +22,7 @@ import ProfileSettingsScreen from './src/screens/ProfileSettingsScreen';
 
 // Services
 import { WebSocketProvider } from './src/services/WebSocketProvider';
+import { isTokenExpired, onAuthExpired } from './src/services/authService';
 import {
   requestUserPermission,
   getFCMToken,
@@ -360,11 +362,55 @@ export default function App() {
   const [token, setToken] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<string>('');
   const [showSplash, setShowSplash] = useState(true);
+  const [isRestoring, setIsRestoring] = useState(true);
   const navigationRef = useRef<any>(null);
 
-  const handleLogin = (accessToken: string, username: string) => {
+  // Khôi phục session từ AsyncStorage khi mở app
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const savedToken = await AsyncStorage.getItem('@auth_token');
+        const savedUser = await AsyncStorage.getItem('@auth_username');
+        if (savedToken && savedUser) {
+          // Kiểm tra token đã hết hạn chưa
+          if (isTokenExpired(savedToken)) {
+            console.log('⚠️ Token expired, clearing session');
+            await AsyncStorage.multiRemove(['@auth_token', '@auth_username']);
+          } else {
+            console.log('🔄 Restoring session for:', savedUser);
+            setToken(savedToken);
+            setCurrentUser(savedUser);
+          }
+        }
+      } catch (e) {
+        console.log('Failed to restore session', e);
+      } finally {
+        setIsRestoring(false);
+      }
+    };
+    restoreSession();
+  }, []);
+
+  // Subscribe auto-logout khi bất kỳ API call nào nhận 401 (token expired)
+  useEffect(() => {
+    const unsubscribe = onAuthExpired(() => {
+      console.log('🚫 [App] Auth expired event received, logging out...');
+      setToken(null);
+      setCurrentUser('');
+    });
+    return unsubscribe;
+  }, []);
+
+  const handleLogin = async (accessToken: string, username: string) => {
     setToken(accessToken);
     setCurrentUser(username);
+    // Lưu session vào AsyncStorage để lần sau mở app tự đăng nhập
+    try {
+      await AsyncStorage.setItem('@auth_token', accessToken);
+      await AsyncStorage.setItem('@auth_username', username);
+    } catch (e) {
+      console.log('Failed to save session', e);
+    }
   };
 
   // Thiết lập Firebase Cloud Messaging sau khi người dùng đăng nhập thành công
@@ -393,12 +439,19 @@ export default function App() {
     };
   }, [token]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setToken(null);
     setCurrentUser('');
+    // Xóa session khỏi AsyncStorage
+    try {
+      await AsyncStorage.multiRemove(['@auth_token', '@auth_username']);
+    } catch (e) {
+      console.log('Failed to clear session', e);
+    }
   };
 
-  if (showSplash) {
+  // Hiện splash khi đang restore hoặc splash chưa xong
+  if (showSplash || isRestoring) {
     return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
 
@@ -474,7 +527,7 @@ export default function App() {
                 gestureEnabled: false,
               }}
             >
-              {(props) => <MeetingScreen {...props} token={token} />}
+              {(props) => <MeetingScreen {...props} token={token} currentUser={currentUser} />}
             </Stack.Screen>
 
             <Stack.Screen
@@ -498,7 +551,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       {token ? (
-        <WebSocketProvider token={token} navigationRef={navigationRef}>
+        <WebSocketProvider token={token} currentUser={currentUser} navigationRef={navigationRef}>
           {renderNavigation()}
         </WebSocketProvider>
       ) : (
