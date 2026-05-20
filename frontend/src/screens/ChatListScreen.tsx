@@ -32,12 +32,7 @@ interface PresenceInfo {
   lastSeen: number;
 }
 
-const ONLINE_PREVIEW_USERS = [
-  { id: 'u1', name: 'Van An', isOnline: true },
-  { id: 'u2', name: 'Thi Binh', isOnline: true },
-  { id: 'u3', name: 'Hoang Minh', isOnline: true },
-  { id: 'u4', name: 'Thi Lan', isOnline: true },
-];
+// Remove hardcoded preview users
 
 const formatTimeAgo = (date: Date) => {
   const diff = Date.now() - date.getTime();
@@ -238,6 +233,19 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
       if (data?.type === 'CALL_SIGNAL') {
         return;
       }
+
+      if (data?.type === 'PRESENCE_UPDATE') {
+        const { userId, status } = data;
+        setConversations(prev =>
+          prev.map(conv =>
+            conv.targetUserId === userId
+              ? { ...conv, isOnline: status === 'ONLINE' }
+              : conv,
+          ),
+        );
+        return;
+      }
+
       loadConversations();
     };
 
@@ -282,37 +290,47 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
     [navigation],
   );
 
-  const renderOnlineStrip = () => (
-    <View style={styles.onlineStrip}>
-      <Text style={styles.stripTitle}>Active now</Text>
-      <View style={styles.stripUsers}>
-        {ONLINE_PREVIEW_USERS.map(user => (
-          <TouchableOpacity
-            key={user.id}
-            style={styles.stripUser}
-            onPress={() =>
-              navigation.navigate('Chat', {
-                conversationId: `chat-${currentUser}-${user.id}`,
-                recipientName: user.name,
-                recipientId: user.id,
-                isOnline: user.isOnline,
-              })
-            }
-          >
-            <Avatar
-              name={user.name}
-              size="medium"
-              isOnline={user.isOnline}
-              showOnlineStatus
-            />
-            <Text style={styles.stripUserName} numberOfLines={1}>
-              {user.name.split(' ').slice(-1)[0]}
-            </Text>
-          </TouchableOpacity>
-        ))}
+  const renderOnlineStrip = () => {
+    const onlineUsers = conversations
+      .filter(c => c.isOnline && !c.isGroup)
+      .map(c => ({ id: c.targetUserId!, name: c.name, isOnline: true }));
+
+    if (onlineUsers.length === 0) {
+      return null;
+    }
+
+    return (
+      <View style={styles.onlineStrip}>
+        <Text style={styles.stripTitle}>Active now</Text>
+        <View style={styles.stripUsers}>
+          {onlineUsers.slice(0, 4).map(user => (
+            <TouchableOpacity
+              key={user.id}
+              style={styles.stripUser}
+              onPress={() =>
+                navigation.navigate('Chat', {
+                  conversationId: buildDirectConversationKey(currentUser, user.id),
+                  recipientName: user.name,
+                  recipientId: user.id,
+                  isOnline: user.isOnline,
+                })
+              }
+            >
+              <Avatar
+                name={user.name}
+                size="medium"
+                isOnline={user.isOnline}
+                showOnlineStatus
+              />
+              <Text style={styles.stripUserName} numberOfLines={1}>
+                {user.name.split(' ').slice(-1)[0]}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderConversationItem = ({
     item,

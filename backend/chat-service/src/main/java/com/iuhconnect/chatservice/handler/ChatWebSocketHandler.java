@@ -61,6 +61,20 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             JsonNode jsonNode = objectMapper.readTree(message.getPayload());
             String type = jsonNode.has("type") ? jsonNode.get("type").asText() : "CHAT";
 
+            // ===== Presence Heartbeat — PING/PONG =====
+            if ("PING".equals(type)) {
+                String username = (String) session.getAttributes().get("username");
+                if (username != null) {
+                    presenceService.refreshHeartbeat(username);
+                }
+                try {
+                    session.sendMessage(new TextMessage("{\"type\":\"PONG\"}"));
+                } catch (Exception e) {
+                    log.warn("⚠️ Failed to send PONG to session {}: {}", session.getId(), e.getMessage());
+                }
+                return;
+            }
+
             if ("CALL_SIGNAL".equals(type)) {
                 // ===== Meeting Call Signaling (new contract) =====
                 String senderUsername = (String) session.getAttributes().get("username");

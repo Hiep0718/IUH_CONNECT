@@ -4,6 +4,7 @@ import {
   Alert,
   Animated,
   Modal,
+  PanResponder,
   PermissionsAndroid,
   Platform,
   SafeAreaView,
@@ -214,6 +215,93 @@ const formatPresenceText = (presence: { status: string; lastSeen: number }) => {
 
 const isReactionEvent = (data: any): data is ChatReactionEvent =>
   data?.type === 'CHAT_REACTION' && !!data?.messageId;
+
+const SWIPE_THRESHOLD = 50;
+
+const SwipeableMessage = ({ children, onReply }: { children: React.ReactNode; onReply: () => void }) => {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const hasTriggered = useRef(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only capture horizontal right-swipes, ignore vertical scrolls
+        return gestureState.dx > 8 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
+      },
+      onPanResponderGrant: () => {
+        hasTriggered.current = false;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx > 0) {
+          // Dampen the movement so it feels bounded
+          const clamped = Math.min(gestureState.dx * 0.5, 80);
+          translateX.setValue(clamped);
+
+          if (gestureState.dx >= SWIPE_THRESHOLD && !hasTriggered.current) {
+            hasTriggered.current = true;
+          }
+        }
+      },
+      onPanResponderRelease: () => {
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 120,
+          friction: 10,
+        }).start();
+
+        if (hasTriggered.current) {
+          onReply();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 120,
+          friction: 10,
+        }).start();
+      },
+    }),
+  ).current;
+
+  const replyIconOpacity = translateX.interpolate({
+    inputRange: [0, 20, 40],
+    outputRange: [0, 0.5, 1],
+    extrapolate: 'clamp',
+  });
+
+  const replyIconScale = translateX.interpolate({
+    inputRange: [0, 30, 50],
+    outputRange: [0.5, 0.8, 1],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={styles.swipeableWrapper}>
+      {/* Reply icon behind the message */}
+      <Animated.View
+        style={[
+          styles.swipeReplyAction,
+          { opacity: replyIconOpacity, transform: [{ scale: replyIconScale }] },
+        ]}
+        pointerEvents="none"
+      >
+        <View style={styles.swipeReplyIconCircle}>
+          <Icon name="reply" size={18} color="#1D6FD7" />
+        </View>
+      </Animated.View>
+
+      {/* Message content */}
+      <Animated.View
+        style={{ transform: [{ translateX }], width: '100%' }}
+        {...panResponder.panHandlers}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+};
 
 const ChatScreen: React.FC<ChatScreenProps> = ({
   navigation,
@@ -428,6 +516,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
     const handler = (data: any) => {
       if (isCallSignal(data)) {
+        return;
+      }
+
+      if (data?.type === 'PRESENCE_UPDATE') {
+        if (data.userId === recipientId) {
+          setRecipientPresence({
+            status: data.status,
+            lastSeen: data.lastSeen,
+          });
+        }
         return;
       }
 
@@ -663,6 +761,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
           receiverId: recipientId,
           content: message.text,
           conversationId,
+          ...(replyTo
+            ? {
+                replyToId: String(replyTo._id),
+                replyToText: replyTo.text,
+                replyToSender: String(replyTo.user._id),
+              }
+            : {}),
         });
       });
 
@@ -711,9 +816,19 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
           fileSize: upload.fileSize,
           mimeType: upload.mimeType,
           status: 'sent',
+          ...(replyTo
+            ? {
+                replyTo: {
+                  _id: replyTo._id,
+                  text: replyTo.text || '',
+                  user: replyTo.user,
+                },
+              }
+            : {}),
         };
 
         setMessages(prev => GiftedChat.append(prev, [optimisticMessage]));
+        setReplyTo(null);
 
         sendMessage({
           senderId: currentUser,
@@ -725,6 +840,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
           fileName: upload.fileName,
           fileSize: upload.fileSize,
           mimeType: upload.mimeType,
+          ...(replyTo
+            ? {
+                replyToId: String(replyTo._id),
+                replyToText: replyTo.text,
+                replyToSender: String(replyTo.user._id),
+              }
+            : {}),
         });
       } catch (error: any) {
         Alert.alert('Upload failed', error?.message || 'Cannot upload this file.');
@@ -748,15 +870,33 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         user: { _id: 'me', name: currentUser },
         messageType: 'STICKER',
         status: 'sent',
+        ...(replyTo
+          ? {
+              replyTo: {
+                _id: replyTo._id,
+                text: replyTo.text || '',
+                user: replyTo.user,
+              },
+            }
+          : {}),
       };
 
       setMessages(prev => GiftedChat.append(prev, [optimisticMessage]));
+      setReplyTo(null);
+
       sendMessage({
         senderId: currentUser,
         receiverId: recipientId,
         content: sticker,
         conversationId,
         messageType: 'STICKER',
+        ...(replyTo
+          ? {
+              replyToId: String(replyTo._id),
+              replyToText: replyTo.text,
+              replyToSender: String(replyTo.user._id),
+            }
+          : {}),
       });
     },
     [conversationId, currentUser, recipientId, sendMessage],
@@ -919,6 +1059,36 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     );
   }, [handleMessageLongPress]);
 
+  const renderAvatar = useCallback(
+    (props: any) => {
+      const message = props.currentMessage as ExtendedMessage;
+      const nextMessage = props.nextMessage as ExtendedMessage | undefined;
+      const isMine = message.user._id === 'me' || message.user._id === currentUser;
+
+      if (isMine) return null;
+
+      const isLastInGroup =
+        !nextMessage ||
+        nextMessage?.user?._id !== message.user._id ||
+        nextMessage.messageType === 'CALL' ||
+        nextMessage.system === true;
+
+      if (!isLastInGroup) {
+        // Spacer giữ chỗ để các bubble trên thẳng hàng với bubble dưới có avatar
+        return <View style={styles.avatarSpacer} />;
+      }
+
+      return (
+        <Avatar
+          name={displayRecipientName}
+          uri={recipientAvatar}
+          size="small"
+        />
+      );
+    },
+    [currentUser, displayRecipientName, recipientAvatar],
+  );
+
   const renderBubble = useCallback(
     (props: any) => {
       const message = props.currentMessage as ExtendedMessage;
@@ -928,7 +1098,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         ([, users]) => users.length > 0,
       );
 
-      // Chỉ hiện avatar ở tin nhắn CUỐI của mỗi nhóm
       const isLastInGroup =
         !nextMessage ||
         nextMessage?.user?._id !== message.user._id ||
@@ -936,21 +1105,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         nextMessage.system === true;
 
       if (message.messageType === 'CALL') {
-        return (
-          <View style={[styles.messageContainer, { marginBottom: 4 }]}>
-            <View style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowOther]}>
-              {!isMine && (
-                isLastInGroup
-                  ? <Avatar name={displayRecipientName} uri={recipientAvatar} size="small" />
-                  : <View style={styles.avatarSpacer} />
-              )}
-              {renderCallBubble(message, isMine)}
-            </View>
-          </View>
-        );
+        return renderCallBubble(message, isMine);
       }
 
-      // Dùng GiftedChat Bubble gốc cho media (image, video, sticker...)
       const isMediaMessage =
         message.messageType === 'IMAGE' ||
         message.messageType === 'VIDEO' ||
@@ -964,102 +1121,89 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       });
 
       return (
-        <View
-          style={[
-            styles.messageContainer,
-            { marginBottom: reactionEntries.length > 0 ? 16 : 4 },
-          ]}
-        >
-          {message.replyTo && (
-            <View
-              style={[
-                styles.replySnippet,
-                isMine ? styles.replySnippetMine : styles.replySnippetOther,
-              ]}
-            >
-              <View style={styles.replySnippetBar} />
-              <View style={styles.replySnippetContent}>
-                <Text style={styles.replySnippetName} numberOfLines={1}>
-                  {message.replyTo.user.name || 'Message'}
-                </Text>
-                <Text style={styles.replySnippetText} numberOfLines={1}>
-                  {message.replyTo.text || 'Attachment'}
-                </Text>
+        <SwipeableMessage onReply={() => {
+          setReplyTo(message);
+        }}>
+          <View style={{ marginBottom: reactionEntries.length > 0 ? 16 : 2 }}>
+            {message.replyTo && (
+              <View
+                style={[
+                  styles.replySnippet,
+                  isMine ? styles.replySnippetMine : styles.replySnippetOther,
+                ]}
+              >
+                <View style={styles.replySnippetBar} />
+                <View style={styles.replySnippetContent}>
+                  <Text style={styles.replySnippetName} numberOfLines={1}>
+                    {message.replyTo.user.name || 'Message'}
+                  </Text>
+                  <Text style={styles.replySnippetText} numberOfLines={1}>
+                    {message.replyTo.text || 'Attachment'}
+                  </Text>
+                </View>
               </View>
-            </View>
-          )}
-
-          <View style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowOther]}>
-            {!isMine && (
-              isLastInGroup
-                ? <Avatar name={displayRecipientName} uri={recipientAvatar} size="small" />
-                : <View style={styles.avatarSpacer} />
             )}
 
-            <View style={styles.messageBubbleWrapper}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onLongPress={() => handleMessageLongPress(message)}
-                delayLongPress={260}
-              >
-                {isMediaMessage ? (
-                  // Media: dùng Bubble gốc của GiftedChat
-                  <Bubble
-                    {...props}
-                    wrapperStyle={{
-                      left: styles.bubbleWrapperLeft,
-                      right: styles.bubbleWrapperRight,
-                    }}
-                    textStyle={{
-                      left: styles.bubbleTextLeft,
-                      right: styles.bubbleTextRight,
-                    }}
-                  />
-                ) : (
-                  // Text: custom bubble — nội dung trên, thời gian dưới, hẹp theo nội dung
-                  <View style={isMine ? styles.bubbleWrapperRight : styles.bubbleWrapperLeft}>
-                    <Text style={isMine ? styles.bubbleTextRight : styles.bubbleTextLeft}>
-                      {message.text}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onLongPress={() => handleMessageLongPress(message)}
+              delayLongPress={260}
+            >
+              {isMediaMessage ? (
+                <Bubble
+                  {...props}
+                  wrapperStyle={{
+                    left: styles.bubbleWrapperLeft,
+                    right: styles.bubbleWrapperRight,
+                  }}
+                  textStyle={{
+                    left: styles.bubbleTextLeft,
+                    right: styles.bubbleTextRight,
+                  }}
+                />
+              ) : (
+                <View style={isMine ? styles.bubbleWrapperRight : styles.bubbleWrapperLeft}>
+                  <Text style={isMine ? styles.bubbleTextRight : styles.bubbleTextLeft}>
+                    {message.text}
+                  </Text>
+                  <View style={styles.bubbleBottom}>
+                    <Text style={isMine ? styles.timeRight : styles.timeLeft}>
+                      {timeText}
                     </Text>
-                    <View style={styles.bubbleBottom}>
-                      <Text style={isMine ? styles.timeRight : styles.timeLeft}>
-                        {timeText}
-                      </Text>
-                      {isMine && message.status && (
-                        <MessageTicks
-                          status={message.status}
-                          size={12}
-                          color="rgba(255,255,255,0.8)"
-                        />
-                      )}
-                    </View>
+                    {isMine && message.status && (
+                      <MessageTicks
+                        status={message.status}
+                        size={12}
+                        color="rgba(255,255,255,0.8)"
+                      />
+                    )}
                   </View>
-                )}
-              </TouchableOpacity>
-
-              {reactionEntries.length > 0 && (
-                <View
-                  style={[
-                    styles.reactionRow,
-                    isMine ? styles.reactionRowMine : styles.reactionRowOther,
-                  ]}
-                >
-                  {reactionEntries.map(([emoji, users]) => (
-                    <View key={emoji} style={styles.reactionBadge}>
-                      <Text style={styles.reactionEmoji}>{emoji}</Text>
-                      {users.length > 1 && (
-                        <Text style={styles.reactionCount}>{users.length}</Text>
-                      )}
-                    </View>
-                  ))}
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
+
+            {reactionEntries.length > 0 && (
+              <View
+                style={[
+                  styles.reactionRow,
+                  isMine ? styles.reactionRowMine : styles.reactionRowOther,
+                ]}
+              >
+                {reactionEntries.map(([emoji, users]) => (
+                  <View key={emoji} style={styles.reactionBadge}>
+                    <Text style={styles.reactionEmoji}>{emoji}</Text>
+                    {users.length > 1 && (
+                      <Text style={styles.reactionCount}>{users.length}</Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
-        </View>
+        </SwipeableMessage>
       );
     },
-    [currentUser, displayRecipientName, handleMessageLongPress, recipientAvatar, renderCallBubble],
+    [currentUser, handleMessageLongPress, renderCallBubble],
   );
 
   const renderDay = useCallback(
@@ -1105,22 +1249,39 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       <View>
         {replyTo && (
           <View style={styles.replyBar}>
-            <View style={styles.replyBarAccent} />
-            <View style={styles.replyBarContent}>
-              <Text style={styles.replyBarName} numberOfLines={1}>
-                {replyTo.user._id === 'me' || replyTo.user._id === currentUser
-                  ? 'You'
-                  : replyTo.user.name || recipientName}
-              </Text>
-              <Text style={styles.replyBarText} numberOfLines={1}>
-                {replyTo.text || 'Attachment'}
-              </Text>
+            <View style={styles.replyBarLeft}>
+              <View style={styles.replyBarAccent} />
+              <View style={styles.replyBarContent}>
+                <View style={styles.replyBarHeader}>
+                  <Icon name="reply" size={14} color="#1D6FD7" style={{ marginRight: 4 }} />
+                  <Text style={styles.replyBarLabel}>Trả lời </Text>
+                  <Text style={styles.replyBarName} numberOfLines={1}>
+                    {replyTo.user._id === 'me' || replyTo.user._id === currentUser
+                      ? 'Bạn'
+                      : replyTo.user.name || recipientName}
+                  </Text>
+                </View>
+                <Text style={styles.replyBarText} numberOfLines={2}>
+                  {replyTo.messageType === 'IMAGE'
+                    ? '📷 Hình ảnh'
+                    : replyTo.messageType === 'VIDEO'
+                      ? '🎬 Video'
+                      : replyTo.messageType === 'FILE'
+                        ? `📎 ${(replyTo as any).fileName || 'Tệp đính kèm'}`
+                        : replyTo.messageType === 'STICKER'
+                          ? '😄 Sticker'
+                          : replyTo.text || 'Tệp đính kèm'}
+                </Text>
+              </View>
             </View>
             <TouchableOpacity
               style={styles.replyBarClose}
               onPress={() => setReplyTo(null)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Icon name="close" size={18} color="#7C8A9A" />
+              <View style={styles.replyBarCloseCircle}>
+                <Icon name="close" size={14} color="#64748B" />
+              </View>
             </TouchableOpacity>
           </View>
         )}
@@ -1337,8 +1498,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         renderComposer={renderComposer}
         renderSend={renderSend}
         renderChatFooter={renderChatFooter}
-        renderAvatar={() => null}
+        renderAvatar={renderAvatar}
         onInputTextChanged={setInputText}
+        extraData={replyTo}
         messagesContainerStyle={styles.messagesContainer}
         listViewProps={{
           showsVerticalScrollIndicator: false,
@@ -1702,35 +1864,65 @@ const styles = StyleSheet.create({
   replyBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F6FAFE',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0F6FF',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderTopColor: 'rgba(29, 111, 215, 0.12)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.04)',
+    paddingRight: 8,
+    paddingVertical: 0,
+    minHeight: 52,
+  },
+  replyBarLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    overflow: 'hidden',
   },
   replyBarAccent: {
-    width: 3,
-    minHeight: 34,
-    borderRadius: 3,
+    width: 3.5,
     backgroundColor: '#1D6FD7',
-    marginRight: 10,
+    borderRadius: 0,
   },
   replyBarContent: {
     flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+  },
+  replyBarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  replyBarLabel: {
+    color: '#64748B',
+    fontSize: 12.5,
+    fontWeight: '500',
   },
   replyBarName: {
     color: '#1D6FD7',
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
+    flexShrink: 1,
   },
   replyBarText: {
-    color: '#64748B',
-    fontSize: 13,
-    marginTop: 1,
+    color: '#475569',
+    fontSize: 13.5,
+    lineHeight: 19,
   },
   replyBarClose: {
-    padding: 6,
-    marginLeft: 8,
+    padding: 4,
+    marginLeft: 4,
+  },
+  replyBarCloseCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(100, 116, 139, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   replySnippet: {
     flexDirection: 'row',
@@ -2042,6 +2234,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginTop: 12,
+  },
+  swipeableWrapper: {
+    position: 'relative',
+  },
+  swipeReplyAction: {
+    position: 'absolute',
+    left: -8,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 44,
+  },
+  swipeReplyIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(29, 111, 215, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

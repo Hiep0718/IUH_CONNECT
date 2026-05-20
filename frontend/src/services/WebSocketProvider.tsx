@@ -58,6 +58,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const wsRef = useRef<WebSocket | null>(null);
   const listenersRef = useRef<Map<string, MessageHandler>>(new Map());
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const isMountedRef = useRef(false);
   const shouldReconnectRef = useRef(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -87,6 +88,21 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       setTimeout(() => showNotification(next), 300);
     }
   }, [showNotification]);
+
+  // ── Start/Stop heartbeat ──
+  const startHeartbeat = useCallback(() => {
+    clearInterval(heartbeatIntervalRef.current);
+    heartbeatIntervalRef.current = setInterval(() => {
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'PING' }));
+      }
+    }, 30000); // Every 30 seconds
+  }, []);
+
+  const stopHeartbeat = useCallback(() => {
+    clearInterval(heartbeatIntervalRef.current);
+  }, []);
 
   // ── Global handler for incoming call ──
   const handleGlobalIncomingCall = useCallback(
@@ -219,12 +235,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
         console.log('✅ [WSProvider] WebSocket connected');
         setIsConnected(true);
+        startHeartbeat();
       };
 
       ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
           
+          // Ignore heartbeat PONG responses
+          if (data.type === 'PONG') {
+            return;
+          }
+
           if (data.type === 'SESSION_REVOKED') {
             console.log('🚫 [WSProvider] Session revoked due to new login');
             triggerAutoLogout('SESSION_REVOKED');
@@ -295,6 +317,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
         console.error('[WSProvider] WebSocket error:', error);
         setIsConnected(false);
+        stopHeartbeat();
       };
 
       ws.onclose = () => {
@@ -308,6 +331,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
         console.log('🔌 [WSProvider] WebSocket disconnected');
         setIsConnected(false);
+        stopHeartbeat();
 
         if (!shouldReconnectRef.current) {
           return;
@@ -323,7 +347,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       console.error('[WSProvider] Failed to create WebSocket:', error);
       setIsConnected(false);
     }
-  }, [handleGlobalIncomingCall, handleGlobalContactEvent, showNotification, currentUser, token]);
+  }, [handleGlobalIncomingCall, handleGlobalContactEvent, showNotification, currentUser, token, startHeartbeat, stopHeartbeat]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -334,6 +358,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       isMountedRef.current = false;
       shouldReconnectRef.current = false;
       clearTimeout(reconnectTimeoutRef.current);
+      stopHeartbeat();
 
       if (wsRef.current) {
         wsRef.current.onclose = null;

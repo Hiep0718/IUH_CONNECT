@@ -61,6 +61,9 @@ public class ChatMessageKafkaConsumer {
                     .fileName(message.getFileName())
                     .fileSize(message.getFileSize())
                     .mimeType(message.getMimeType())
+                    .replyToId(message.getReplyToId())
+                    .replyToText(message.getReplyToText())
+                    .replyToSender(message.getReplyToSender())
                     .build();
 
             entity = messageRepository.save(entity);

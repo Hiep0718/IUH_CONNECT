@@ -35,4 +35,9 @@ public class ChatMessageDto {
 
     /** MIME type, e.g. image/png, video/mp4 */
     private String mimeType;
+
+    // ---- Reply ----
+    private String replyToId;
+    private String replyToText;
+    private String replyToSender;
 }
