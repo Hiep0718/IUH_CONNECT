@@ -7,7 +7,6 @@ import {
   PanResponder,
   PermissionsAndroid,
   Platform,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
@@ -1174,7 +1173,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                       <MessageTicks
                         status={message.status}
                         size={12}
-                        color="rgba(255,255,255,0.8)"
+                        color="#5B9BD5"
                       />
                     )}
                   </View>
@@ -1246,8 +1245,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const renderInputToolbar = useCallback(
     (props: any) => (
-      <View>
-        {replyTo && (
+      <InputToolbar
+        {...props}
+        containerStyle={styles.inputToolbar}
+        primaryStyle={styles.inputToolbarPrimary}
+        renderAccessory={replyTo ? () => (
           <View style={styles.replyBar}>
             <View style={styles.replyBarLeft}>
               <View style={styles.replyBarAccent} />
@@ -1284,46 +1286,41 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
               </View>
             </TouchableOpacity>
           </View>
-        )}
-        <InputToolbar
-          {...props}
-          containerStyle={styles.inputToolbar}
-          primaryStyle={styles.inputToolbarPrimary}
-        />
-      </View>
+        ) : undefined}
+      />
     ),
     [currentUser, recipientName, replyTo],
   );
 
   const renderComposer = useCallback(
     (props: any) => (
-      <View style={styles.composerShell}>
+      <View style={styles.composerRow}>
         <TouchableOpacity
           onPress={toggleAttachMenu}
-          style={styles.composerIconButton}
-          activeOpacity={0.7}
+          style={styles.attachBtn}
+          activeOpacity={0.6}
         >
-          <Icon name="paperclip" size={22} color="#7A8CA3" />
+          <Icon name="paperclip" size={24} color="#8E99A4" />
         </TouchableOpacity>
-        <Composer
-          {...props}
-          placeholder="Message"
-          placeholderTextColor="#9AABBF"
-          textInputStyle={styles.composerInput}
-          onTextChanged={(text: string) => {
-            setInputText(text);
-            props.onTextChanged?.(text);
-          }}
-        />
-        {!inputText && (
+        <View style={styles.composerShell}>
+          <Composer
+            {...props}
+            placeholder="Nhập tin nhắn..."
+            placeholderTextColor="#A0AEC0"
+            textInputStyle={styles.composerInput}
+            onTextChanged={(text: string) => {
+              setInputText(text);
+              props.onTextChanged?.(text);
+            }}
+          />
           <TouchableOpacity
             onPress={() => setShowStickerPicker(true)}
-            style={styles.composerIconButton}
-            activeOpacity={0.7}
+            style={styles.emojiBtn}
+            activeOpacity={0.6}
           >
-            <Icon name="sticker-emoji" size={22} color="#7A8CA3" />
+            <Icon name="emoticon-outline" size={24} color="#8E99A4" />
           </TouchableOpacity>
-        )}
+        </View>
       </View>
     ),
     [inputText, toggleAttachMenu],
@@ -1334,8 +1331,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       if (!inputText.trim()) {
         return (
           <View style={styles.sendContainer}>
-            <TouchableOpacity style={styles.actionFab} activeOpacity={0.84}>
-              <Icon name="microphone" size={20} color="#FFFFFF" />
+            <TouchableOpacity style={styles.actionFab} activeOpacity={0.7}>
+              <Icon name="microphone" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         );
@@ -1344,7 +1341,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       return (
         <Send {...props} containerStyle={styles.sendContainer}>
           <View style={styles.actionFab}>
-            <Icon name="send" size={18} color="#FFFFFF" style={{ marginLeft: 2 }} />
+            <Icon name="send" size={20} color="#FFFFFF" style={{ marginLeft: 2 }} />
           </View>
         </Send>
       );
@@ -1400,14 +1397,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#165EA8" />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#004A82" />
 
       <View style={styles.wallpaperLayer} />
 
       <Animated.View style={[styles.headerWrap, { opacity: headerAnim }]}>
         <LinearGradient
-          colors={['#1459A2', '#1C74D8']}
+          colors={['#004A82', '#0066B3']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.header}
@@ -1501,6 +1498,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         renderAvatar={renderAvatar}
         onInputTextChanged={setInputText}
         extraData={replyTo}
+        bottomOffset={0}
+        minInputToolbarHeight={62}
         messagesContainerStyle={styles.messagesContainer}
         listViewProps={{
           showsVerticalScrollIndicator: false,
@@ -1508,6 +1507,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         }}
         alwaysShowSend
         scrollToBottom
+        scrollToBottomStyle={styles.scrollToBottomBtn}
       />
 
       <Modal
@@ -1613,18 +1613,18 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
           </View>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#DCE6F2',
+    backgroundColor: '#E8ECF1',
   },
   wallpaperLayer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#DCE6F2',
+    backgroundColor: '#E8ECF1',
     opacity: 1,
   },
   headerWrap: {
@@ -1634,8 +1634,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
-    paddingTop: 10,
-    paddingBottom: 12,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
   backButton: {
     width: 40,
@@ -1654,9 +1654,9 @@ const styles = StyleSheet.create({
   },
   headerName: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#FFFFFF',
-    letterSpacing: 0.15,
+    letterSpacing: 0.1,
   },
   headerMetaRow: {
     marginTop: 2,
@@ -1697,11 +1697,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContentContainer: {
-    paddingTop: 10,
-    paddingBottom: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
   messagesContainer: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
+  },
+  scrollToBottomBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D1D5DB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   messageBlock: {
     opacity: 1,
@@ -1762,24 +1772,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     alignSelf: 'flex-start',
-    maxWidth: 260,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    ...Shadows.xs,
+    maxWidth: 280,
   },
   bubbleWrapperRight: {
-    backgroundColor: '#1D6FD7',
+    backgroundColor: '#D4E8FC',
     borderRadius: 18,
     borderBottomRightRadius: 4,
     paddingHorizontal: 12,
     paddingVertical: 8,
     alignSelf: 'flex-end',
-    maxWidth: 260,
-    shadowColor: '#1D6FD7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
+    maxWidth: 280,
   },
   bubbleBottom: {
     flexDirection: 'row',
@@ -1811,13 +1813,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   bubbleTextLeft: {
-    color: '#192537',
+    color: '#0F172A',
     fontSize: 15,
     lineHeight: 22,
     letterSpacing: 0.08,
   },
   bubbleTextRight: {
-    color: '#FFFFFF',
+    color: '#0F172A',
     fontSize: 15,
     lineHeight: 22,
     letterSpacing: 0.08,
@@ -1829,29 +1831,29 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   timeLeft: {
-    color: '#7B8A9D',
+    color: '#94A3B8',
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   timeRight: {
-    color: 'rgba(255,255,255,0.75)',
+    color: '#6B8BB5',
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   dayContainer: {
     marginVertical: 10,
   },
   dayWrapper: {
-    backgroundColor: 'rgba(103, 122, 145, 0.18)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
   dayText: {
-    color: '#56657A',
+    color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
   systemMessageContainer: {
     marginBottom: 10,
@@ -1996,66 +1998,72 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  composerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    flex: 1,
+  },
+  attachBtn: {
+    width: 40,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   composerShell: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    minHeight: 46,
-    borderRadius: 24,
-    backgroundColor: '#F3F6F9',
+    minHeight: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    paddingHorizontal: 4,
-    marginRight: 6,
+    borderColor: '#D1D5DB',
+    paddingLeft: 12,
+    paddingRight: 4,
   },
-  composerIconButton: {
-    width: 36,
-    height: 36,
+  emojiBtn: {
+    width: 38,
+    height: 38,
     justifyContent: 'center',
     alignItems: 'center',
   },
   composerInput: {
     flex: 1,
     color: '#1F2937',
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 20,
     paddingTop: Platform.OS === 'ios' ? 10 : 8,
     paddingBottom: Platform.OS === 'ios' ? 10 : 8,
     backgroundColor: 'transparent',
+    marginLeft: 0,
+    marginRight: 0,
   },
   inputToolbar: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#E8ECF1',
     borderTopWidth: 0,
-    paddingHorizontal: 6,
-    paddingTop: 6,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 5,
-    elevation: 8,
+    paddingHorizontal: 4,
+    paddingTop: 5,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 5,
   },
   inputToolbarPrimary: {
-    alignItems: 'center',
-    minHeight: 46,
+    alignItems: 'flex-end',
+    minHeight: 52,
   },
   sendContainer: {
-    height: 46,
-    justifyContent: 'center',
+    height: 52,
+    justifyContent: 'flex-end',
     alignItems: 'center',
+    paddingBottom: 5,
+    paddingLeft: 4,
+    paddingRight: 2,
   },
   actionFab: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#1D6FD7',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1D6FD7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 4,
   },
   callMessageContainer: {
     maxWidth: '78%',
