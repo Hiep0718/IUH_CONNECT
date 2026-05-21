@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   FlatList,
+  Modal,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -156,6 +158,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
   const [refreshing, setRefreshing] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread'>('all');
+  const [longPressItem, setLongPressItem] = useState<Conversation | null>(null);
   const headerAnim = useRef(new Animated.Value(0)).current;
   const listAnim = useRef(new Animated.Value(0)).current;
   const presenceAvailableRef = useRef(true);
@@ -381,6 +384,8 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
           style={styles.row}
           activeOpacity={0.6}
           onPress={() => openConversation(item)}
+          onLongPress={() => setLongPressItem(item)}
+          delayLongPress={400}
         >
           <Avatar
             name={item.name}
@@ -597,6 +602,109 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {/* ── Long-press context menu ── */}
+      <Modal
+        visible={!!longPressItem}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLongPressItem(null)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setLongPressItem(null)}
+        >
+          <View style={styles.menuSheet}>
+            {/* Header */}
+            <View style={styles.menuHeader}>
+              <Avatar name={longPressItem?.name} size="medium" />
+              <View style={styles.menuHeaderInfo}>
+                <Text style={styles.menuHeaderName} numberOfLines={1}>
+                  {longPressItem?.name}
+                </Text>
+                <Text style={styles.menuHeaderSub} numberOfLines={1}>
+                  {longPressItem?.lastMessage?.text || 'Cuộc trò chuyện'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.menuDivider} />
+
+            {/* Actions */}
+            {[
+              { icon: 'pin-outline', label: 'Ghim cuộc trò chuyện', color: '#0066B3', action: async () => {
+                const convId = longPressItem?.id;
+                setLongPressItem(null);
+                try {
+                  await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${convId}/pin`, { method: 'PUT' });
+                  Alert.alert('Ghim', `Đã ghim cuộc trò chuyện với ${longPressItem?.name}`);
+                } catch { Alert.alert('Lỗi', 'Không thể ghim cuộc trò chuyện'); }
+              }},
+              { icon: 'volume-off', label: 'Tắt thông báo', color: '#64748B', action: async () => {
+                const convId = longPressItem?.id;
+                setLongPressItem(null);
+                try {
+                  await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${convId}/mute`, { method: 'PUT' });
+                  Alert.alert('Tắt thông báo', `Đã tắt thông báo cho ${longPressItem?.name}`);
+                } catch { Alert.alert('Lỗi', 'Không thể tắt thông báo'); }
+              }},
+              { icon: 'check-all', label: 'Đánh dấu đã đọc', color: '#059669', action: async () => {
+                const convId = longPressItem?.id;
+                setLongPressItem(null);
+                try {
+                  await fetch(`${API_URL}/api/v1/chat/history/${convId}/read?userId=${currentUser}`);
+                  setConversations(prev => prev.map(c => c.id === convId ? { ...c, unreadCount: 0 } : c));
+                } catch { Alert.alert('Lỗi', 'Không thể đánh dấu đã đọc'); }
+              }},
+              { icon: 'archive-outline', label: 'Lưu trữ', color: '#7C3AED', action: async () => {
+                const convId = longPressItem?.id;
+                setLongPressItem(null);
+                try {
+                  await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${convId}/archive`, { method: 'PUT' });
+                  setConversations(prev => prev.filter(c => c.id !== convId));
+                  Alert.alert('Lưu trữ', `Đã lưu trữ cuộc trò chuyện với ${longPressItem?.name}`);
+                } catch { Alert.alert('Lỗi', 'Không thể lưu trữ'); }
+              }},
+              { icon: 'delete-outline', label: 'Xóa cuộc trò chuyện', color: '#DC2626', action: () => {
+                const convId = longPressItem?.id;
+                const convName = longPressItem?.name;
+                setLongPressItem(null);
+                Alert.alert(
+                  'Xóa cuộc trò chuyện',
+                  `Bạn có chắc muốn xóa cuộc trò chuyện với ${convName}?`,
+                  [
+                    { text: 'Hủy', style: 'cancel' },
+                    { text: 'Xóa', style: 'destructive', onPress: async () => {
+                      try {
+                        await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${convId}`, { method: 'DELETE' });
+                        setConversations(prev => prev.filter(c => c.id !== convId));
+                      } catch { Alert.alert('Lỗi', 'Không thể xóa cuộc trò chuyện'); }
+                    }},
+                  ],
+                );
+              }},
+            ].map((menuItem, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={styles.menuItem}
+                activeOpacity={0.6}
+                onPress={menuItem.action}
+              >
+                <View style={[styles.menuIconWrap, { backgroundColor: `${menuItem.color}12` }]}>
+                  <Icon name={menuItem.icon} size={20} color={menuItem.color} />
+                </View>
+                <Text style={[
+                  styles.menuItemText,
+                  menuItem.color === '#DC2626' && { color: '#DC2626' },
+                ]}>
+                  {menuItem.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -831,6 +939,70 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // ── Context menu ──
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  menuSheet: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  menuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  menuHeaderInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  menuHeaderName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  menuHeaderSub: {
+    fontSize: 13,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  menuDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 16,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  menuIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  menuItemText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1E293B',
   },
 });
 
