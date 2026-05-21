@@ -19,6 +19,7 @@ import StatusBadge from '../components/StatusBadge';
 import { API_URL } from '../config/env';
 import { useWebSocket } from '../services/WebSocketProvider';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../theme/theme';
+import { chatCache } from '../services/chatCache';
 import type { Conversation } from '../types/types';
 
 interface ChatListScreenProps {
@@ -218,8 +219,18 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
       }
 
       setConversations(sanitized);
+
+      // Cache danh sách conversations khi fetch thành công
+      chatCache.saveConversations(sanitized);
     } catch (error) {
       console.log('Error loading conversations', error);
+
+      // Fallback: load từ cache khi mất mạng
+      const cached = await chatCache.loadConversations();
+      if (cached.length > 0) {
+        console.log(`📦 [ChatList] Loaded ${cached.length} conversations from cache`);
+        setConversations(cached);
+      }
     }
   }, [currentUser]);
 

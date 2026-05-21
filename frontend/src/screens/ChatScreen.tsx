@@ -40,6 +40,7 @@ import { authFetch } from '../services/authService';
 import { isCallSignal } from '../services/callSignaling';
 import { uploadMedia, getMessageTypeFromMime } from '../services/mediaUploadService';
 import { useWebSocket } from '../services/WebSocketProvider';
+import { chatCache } from '../services/chatCache';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../theme/theme';
 import type { LecturerStatus, MessageStatus } from '../types/types';
 
@@ -334,7 +335,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const headerAnim = useRef(new Animated.Value(0)).current;
   const attachMenuAnim = useRef(new Animated.Value(0)).current;
 
-  const { sendMessage, addListener, removeListener, isConnected } = useWebSocket();
+  const { sendMessage, addListener, removeListener, isConnected, wasReconnected } = useWebSocket();
   const isOffline = !isConnected;
 
   const presenceText = useMemo(
@@ -469,9 +470,21 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             });
           }
           setMessages(nextMessages);
+
+          // Cache tin nhắn khi fetch thành công
+          chatCache.saveMessages(conversationId, nextMessages);
         }
       } catch (error) {
         console.error('Failed to fetch history', error);
+
+        // Fallback: load từ cache khi mất mạng
+        if (!beforeTimestamp) {
+          const cached = await chatCache.loadMessages(conversationId);
+          if (cached.length > 0) {
+            console.log(`📦 [ChatScreen] Loaded ${cached.length} messages from cache`);
+            setMessages(cached);
+          }
+        }
       }
     },
     [conversationId, currentUser, lecturerStatus, recipientId, recipientName, token],
@@ -498,6 +511,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     fetchPresence();
     markMessagesAsRead();
   }, [fetchHistory, fetchPresence, markMessagesAsRead]);
+
+  // Re-sync tin nhắn khi reconnect sau mất mạng
+  useEffect(() => {
+    if (wasReconnected && isConnected) {
+      console.log('🔄 [ChatScreen] Reconnected — syncing missed messages');
+      fetchHistory();
+      markMessagesAsRead();
+    }
+  }, [wasReconnected, isConnected, fetchHistory, markMessagesAsRead]);
 
   const onLoadEarlier = useCallback(async () => {
     if (messages.length === 0 || isLoadingEarlier) {
