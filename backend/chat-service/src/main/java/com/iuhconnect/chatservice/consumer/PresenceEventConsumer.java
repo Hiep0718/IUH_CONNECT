@@ -48,6 +48,7 @@ public class PresenceEventConsumer {
         wsPayload.put("userId", event.getUserId());
         wsPayload.put("status", event.getStatus());
         wsPayload.put("lastSeen", event.getLastSeen());
+        wsPayload.put("workStatus", event.getWorkStatus());
 
         // Notify all participants in those conversations (excluding the user themselves)
         conversations.stream()

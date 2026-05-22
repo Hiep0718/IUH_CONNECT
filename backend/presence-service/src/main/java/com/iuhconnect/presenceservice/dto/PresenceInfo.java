@@ -16,4 +16,11 @@ public class PresenceInfo {
 
     /** Unix timestamp in millis — last time user was seen online */
     private long lastSeen;
+
+    /** Lecturer work status: "BUSY", "AVAILABLE", or "NONE" */
+    @Builder.Default
+    private String workStatus = "NONE";
+
+    /** Whether auto-reply is currently active (only when BUSY) */
+    private boolean autoReplyEnabled;
 }

@@ -16,4 +16,7 @@ public class PresenceEventDto {
 
     /** Unix timestamp in millis */
     private long lastSeen;
+
+    /** Lecturer work status: "BUSY", "AVAILABLE", or null */
+    private String workStatus;
 }

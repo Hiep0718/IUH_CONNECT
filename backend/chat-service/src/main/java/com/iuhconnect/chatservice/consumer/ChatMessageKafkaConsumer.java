@@ -6,6 +6,7 @@ import com.iuhconnect.chatservice.model.MessageEntity;
 import com.iuhconnect.chatservice.repository.MessageRepository;
 import com.iuhconnect.chatservice.repository.ConversationRepository;
 import com.iuhconnect.chatservice.service.RealtimeEventService;
+import com.iuhconnect.chatservice.service.AutoReplyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -21,15 +22,18 @@ public class ChatMessageKafkaConsumer {
     private final MessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
     private final RealtimeEventService realtimeEventService;
+    private final AutoReplyService autoReplyService;
 
     public ChatMessageKafkaConsumer(
             MessageRepository messageRepository,
             ConversationRepository conversationRepository,
-            RealtimeEventService realtimeEventService
+            RealtimeEventService realtimeEventService,
+            AutoReplyService autoReplyService
     ) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
         this.realtimeEventService = realtimeEventService;
+        this.autoReplyService = autoReplyService;
     }
 
     @KafkaListener(
@@ -43,10 +47,11 @@ public class ChatMessageKafkaConsumer {
         }
 
         log.info(
-                "Received chat message from Kafka [from={}, to={}, conv={}]",
+                "Received chat message from Kafka [from={}, to={}, conv={}, type={}]",
                 message.getSenderId(),
                 message.getReceiverId(),
-                message.getConversationId()
+                message.getConversationId(),
+                message.getMessageType()
         );
 
         try {
@@ -85,6 +90,13 @@ public class ChatMessageKafkaConsumer {
                 realtimeEventService.sendToUser(message.getReceiverId(), message);
                 log.info("Delivered chat message to receiver [{}]", message.getReceiverId());
             }
+
+            // ===== UC11: Auto-Reply Check =====
+            // Only check for non-auto-reply messages to prevent infinite loop
+            if (!"AUTO_REPLY".equals(message.getMessageType())) {
+                autoReplyService.checkAndSendAutoReply(message);
+            }
+
         } catch (Exception e) {
             log.error("Failed to process chat message: {}", e.getMessage(), e);
         }
