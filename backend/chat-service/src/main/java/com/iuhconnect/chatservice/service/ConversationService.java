@@ -10,15 +10,30 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Lazy;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class ConversationService {
 
     private final ConversationRepository conversationRepository;
+    private final RealtimeEventService realtimeEventService;
+
+    public ConversationService(ConversationRepository conversationRepository, @Lazy RealtimeEventService realtimeEventService) {
+        this.conversationRepository = conversationRepository;
+        this.realtimeEventService = realtimeEventService;
+    }
+
+    private void broadcastGroupUpdate(ConversationEntity group) {
+        for (GroupMember member : group.getMembers()) {
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("type", "GROUP_UPDATED");
+            payload.put("conversation", group);
+            realtimeEventService.sendToUser(member.getUserId(), payload);
+        }
+    }
 
     public ConversationEntity createGroup(CreateGroupRequest request) {
         long now = System.currentTimeMillis();
@@ -83,7 +98,9 @@ public class ConversationService {
 
         group.setName(newName);
         group.setUpdatedAt(System.currentTimeMillis());
-        return conversationRepository.save(group);
+        ConversationEntity saved = conversationRepository.save(group);
+        broadcastGroupUpdate(saved);
+        return saved;
     }
 
     @CacheEvict(value = "conversations", key = "#conversationId")
@@ -115,7 +132,9 @@ public class ConversationService {
         }
 
         group.setUpdatedAt(now);
-        return conversationRepository.save(group);
+        ConversationEntity saved = conversationRepository.save(group);
+        broadcastGroupUpdate(saved);
+        return saved;
     }
 
     @CacheEvict(value = "conversations", key = "#conversationId")
@@ -187,7 +206,16 @@ public class ConversationService {
         }
 
         group.setUpdatedAt(System.currentTimeMillis());
-        return conversationRepository.save(group);
+        ConversationEntity saved = conversationRepository.save(group);
+        
+        // Notify the kicked/left member so they can remove it from their UI
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("type", "GROUP_UPDATED");
+        payload.put("conversation", saved);
+        realtimeEventService.sendToUser(targetUserId, payload);
+        
+        broadcastGroupUpdate(saved);
+        return saved;
     }
 
     @CacheEvict(value = "conversations", key = "#conversationId")
@@ -217,7 +245,16 @@ public class ConversationService {
         group.getMembers().removeIf(m -> m.getUserId().equals(requesterId));
 
         group.setUpdatedAt(System.currentTimeMillis());
-        return conversationRepository.save(group);
+        ConversationEntity saved = conversationRepository.save(group);
+        
+        // Notify the leaving admin
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("type", "GROUP_UPDATED");
+        payload.put("conversation", saved);
+        realtimeEventService.sendToUser(requesterId, payload);
+        
+        broadcastGroupUpdate(saved);
+        return saved;
     }
 
     @CacheEvict(value = "conversations", key = "#conversationId")
@@ -244,6 +281,8 @@ public class ConversationService {
         targetMember.setRole(newRole);
 
         group.setUpdatedAt(System.currentTimeMillis());
-        return conversationRepository.save(group);
+        ConversationEntity saved = conversationRepository.save(group);
+        broadcastGroupUpdate(saved);
+        return saved;
     }
 }

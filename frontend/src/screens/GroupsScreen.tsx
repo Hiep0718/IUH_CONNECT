@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -44,6 +45,21 @@ const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser, to
       const res = await authFetch(`${API_URL}/api/v1/chat/conversations/user/${currentUser}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      let settingsMap: Record<string, boolean> = {};
+      try {
+        const settingsRes = await authFetch(`${API_URL}/api/v1/chat/settings/${currentUser}`, {
+           headers: { Authorization: `Bearer ${token}` }
+        });
+        if (settingsRes.ok) {
+           const settings = await settingsRes.json();
+           settings.forEach((s: any) => {
+             settingsMap[s.conversationId] = s.muted;
+           });
+        }
+      } catch (e) {
+         console.log('Error fetching user settings in GroupsScreen', e);
+      }
+
       if (res.ok) {
         const data = await res.json();
         console.log('Groups fetch data:', JSON.stringify(data));
@@ -54,7 +70,8 @@ const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser, to
           name: g.name,
           members: g.members?.length || 0,
           lastActive: 'Hoạt động gần đây',
-          icon: g.avatar ? '🖼️' : '👥'
+          icon: g.avatar ? '🖼️' : '👥',
+          isMuted: settingsMap[g.id] || false
         }));
         setGroups(mappedGroups);
       } else {
@@ -73,9 +90,11 @@ const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser, to
     loadGroups();
   }, [loadGroups]);
 
-  React.useEffect(() => {
-    loadGroups();
-  }, [loadGroups]);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadGroups();
+    }, [loadGroups])
+  );
 
   const { addListener, removeListener } = useWebSocket();
 
@@ -83,7 +102,7 @@ const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser, to
     const listenerId = 'groups-screen';
     const handler = (data: any) => {
       // Reload on new messages or contact events
-      if (!data.type || data.type === 'CHAT_MESSAGE' || data.type === 'CONTACT_EVENT' || data.type === 'PRESENCE_UPDATE') {
+      if (!data.type || data.type === 'CHAT_MESSAGE' || data.type === 'CONTACT_EVENT' || data.type === 'PRESENCE_UPDATE' || data.type === 'GROUP_UPDATED') {
         loadGroups();
       }
     };
@@ -118,7 +137,12 @@ const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser, to
             <Text style={styles.groupEmoji}>{item.icon}</Text>
           </View>
           <View style={styles.groupInfo}>
-            <Text style={styles.groupName} numberOfLines={1}>{item.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.groupName} numberOfLines={1}>{item.name}</Text>
+              {item.isMuted && (
+                <Icon name="bell-off-outline" size={14} color={Colors.textMuted} style={{ marginLeft: 4 }} />
+              )}
+            </View>
             <View style={styles.groupMeta}>
               <Icon name="account-group" size={14} color={Colors.textMuted} />
               <Text style={styles.groupMembers}>{item.members} thành viên</Text>

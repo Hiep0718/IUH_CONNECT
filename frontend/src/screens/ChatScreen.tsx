@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
@@ -317,7 +318,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     lecturerStatus,
     isGroup = false,
   } = route.params;
-  const displayRecipientName = recipientName || recipientId || 'Người dùng';
+  const [displayRecipientName, setDisplayRecipientName] = useState(recipientName || recipientId || 'Người dùng');
 
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -513,21 +514,23 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       });
       if (res.ok) {
         const data = await res.json();
-        setIsMuted(data.isMuted);
+        setIsMuted(data.muted);
       }
     } catch (e) {
       console.log('Failed to fetch settings', e);
     }
   }, [currentUser, conversationId, token]);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchSettings();
+    }, [fetchSettings])
+  );
+
   useEffect(() => {
     fetchHistory();
     fetchPresence();
     markMessagesAsRead();
-    fetchSettings();
-  }, [fetchHistory, fetchPresence, markMessagesAsRead, fetchSettings]);
-
-  useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchSettings();
     });
@@ -562,6 +565,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       if (isCallSignal(data)) {
         return;
       }
+
+      if (data?.type === 'GROUP_UPDATED') {
+        const conv = data.conversation;
+        if (conv && conv.id === conversationId && conv.name) {
+          setDisplayRecipientName(conv.name);
+        }
+        return;
+      }
+
 
       if (data?.type === 'PRESENCE_UPDATE') {
         if (data.userId === recipientId) {
@@ -1467,6 +1479,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                   conversationId,
                   groupName: displayRecipientName,
                 });
+              } else {
+                // Future profile settings navigation for 1-1 chat
               }
             }}
           >

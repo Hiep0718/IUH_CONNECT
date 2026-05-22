@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Alert,
   Animated,
@@ -100,7 +101,7 @@ const formatCallPreview = (content?: string) => {
   }
 };
 
-const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<string, any>): Conversation | null => {
+const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<string, any>, settingsMap: Record<string, boolean>): Conversation | null => {
   const groupInfo = groupMap[msg.conversationId];
   if (groupInfo) {
     let preview = msg.content;
@@ -123,6 +124,7 @@ const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<
       },
       unreadCount: msg.unreadCount || 0,
       isOnline: false,
+      isMuted: settingsMap[msg.conversationId] || false,
     };
   }
 
@@ -152,6 +154,7 @@ const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<
     },
     unreadCount: msg.unreadCount || 0,
     isOnline: false,
+    isMuted: settingsMap[msg.conversationId] || false,
   };
 };
 
@@ -235,9 +238,24 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         return;
       }
 
+      let settingsMap: Record<string, boolean> = {};
+      try {
+        const settingsRes = await authFetch(`${API_URL}/api/v1/chat/settings/${currentUser}`, {
+           headers: { Authorization: `Bearer ${token}` }
+        });
+        if (settingsRes.ok) {
+           const settings = await settingsRes.json();
+           settings.forEach((s: any) => {
+             settingsMap[s.conversationId] = s.muted;
+           });
+        }
+      } catch (e) {
+         console.log('Error fetching user settings in ChatList', e);
+      }
+
       const data = await res.json();
       const mapped = data
-        .map((msg: any) => mapConversationPreview(msg, currentUser, groupMap))
+        .map((msg: any) => mapConversationPreview(msg, currentUser, groupMap, settingsMap))
         .filter(Boolean) as Conversation[];
       const sanitized = sanitizeConversations(mapped, currentUser);
 
@@ -275,9 +293,11 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
     }
   }, [currentUser]);
 
-  useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
+  useFocusEffect(
+    useCallback(() => {
+      loadConversations();
+    }, [loadConversations])
+  );
 
   useEffect(() => {
     const listenerId = 'chat-list-screen';
@@ -454,6 +474,9 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
                 >
                   {item.name}
                 </Text>
+                {item.isMuted && (
+                  <Icon name="bell-off-outline" size={14} color={Colors.textMuted} style={{ marginLeft: 4 }} />
+                )}
                 {item.lecturerStatus && (
                   <StatusBadge status={item.lecturerStatus} compact />
                 )}

@@ -81,7 +81,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
       });
       if (settingsRes.ok) {
         const settingsData = await settingsRes.json();
-        setIsMuted(settingsData.isMuted);
+        setIsMuted(settingsData.muted);
         setMutedUntil(settingsData.mutedUntil);
       }
     } catch (error) {
@@ -127,7 +127,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
       
       if (res.ok) {
         const updated = await res.json();
-        setIsMuted(updated.isMuted);
+        setIsMuted(updated.muted);
         setMutedUntil(updated.mutedUntil);
         setIsMuteModalVisible(false);
       } else {

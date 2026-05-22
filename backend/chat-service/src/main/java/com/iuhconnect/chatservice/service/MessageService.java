@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 public class MessageService {
 
     private final MessageRepository messageRepository;
+    private final com.iuhconnect.chatservice.repository.ConversationRepository conversationRepository;
 
     public List<MessageEntity> getHistory(String conversationId, Long before, int limit) {
         Pageable pageable = PageRequest.of(0, limit);
@@ -26,7 +27,9 @@ public class MessageService {
     }
 
     public List<com.iuhconnect.chatservice.dto.ConversationSummaryDto> getRecentConversations(String username) {
-        return messageRepository.findRecentConversationsForUser(username);
+        List<String> groupIds = conversationRepository.findByMembersUserId(username)
+                .stream().map(com.iuhconnect.chatservice.model.ConversationEntity::getId).toList();
+        return messageRepository.findRecentConversationsForUser(username, groupIds);
     }
 
     public void markAsRead(String conversationId, String userId) {
