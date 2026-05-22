@@ -1465,7 +1465,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             >
               <Icon name="video-outline" size={22} color="#FFFFFF" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerIcon}>
+            <TouchableOpacity
+              style={styles.headerIcon}
+              onPress={() => {
+                if (!isOffline && isGroup) {
+                  navigation.navigate('GroupSettings', {
+                    conversationId,
+                    groupName: displayRecipientName,
+                  });
+                }
+              }}
+            >
               <Icon name={isOffline ? 'wifi-off' : 'dots-vertical'} size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
