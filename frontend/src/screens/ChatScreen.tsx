@@ -172,6 +172,7 @@ const mapServerMessage = (
           ? msg.content
           : undefined,
     messageType: msg.messageType || 'TEXT',
+    isAutoReply: msg.messageType === 'AUTO_REPLY',
     mediaUrl: msg.mediaUrl,
     fileName: msg.fileName,
     fileSize: msg.fileSize,
@@ -191,6 +192,14 @@ const mapServerMessage = (
 };
 
 const formatPresenceText = (presence: { status: string; lastSeen: number }) => {
+  if (presence.status === 'BUSY') {
+    return 'Đang bận';
+  }
+
+  if (presence.status === 'AVAILABLE') {
+    return 'Sẵn sàng';
+  }
+
   if (presence.status === 'ONLINE') {
     return 'Online';
   }
@@ -1148,6 +1157,25 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         nextMessage.messageType === 'CALL' ||
         nextMessage.system === true;
 
+      if (message.messageType === 'AUTO_REPLY' || message.isAutoReply) {
+        const autoReplyTimeText = new Date(message.createdAt).toLocaleTimeString('vi-VN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        return (
+          <View style={styles.autoReplyBubbleWrap}>
+            <View style={styles.autoReplyBubble}>
+              <View style={styles.autoReplyBubbleHeader}>
+                <Icon name="robot" size={14} color="#6366F1" />
+                <Text style={styles.autoReplyBubbleLabel}>Phản hồi tự động</Text>
+              </View>
+              <Text style={styles.autoReplyBubbleText}>{message.text}</Text>
+              <Text style={styles.autoReplyBubbleTime}>{autoReplyTimeText}</Text>
+            </View>
+          </View>
+        );
+      }
+
       if (message.messageType === 'CALL') {
         return renderCallBubble(message, isMine);
       }
@@ -1531,11 +1559,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
       <OfflineBanner isOffline={isOffline} />
 
-      {lecturerStatus === 'busy' && (
+      {(lecturerStatus === 'busy' || recipientPresence.status === 'BUSY') && (
         <View style={styles.busyBanner}>
           <Icon name="clock-alert-outline" size={16} color="#B45309" />
           <Text style={styles.busyBannerText}>
-            Lecturer is busy now. Messages may be answered later.
+            Giảng viên đang bận. Tin nhắn sẽ được phản hồi tự động.
           </Text>
         </View>
       )}
@@ -2322,6 +2350,48 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(29, 111, 215, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  // UC11: Auto-Reply Bubble Styles
+  autoReplyBubbleWrap: {
+    alignItems: 'flex-start',
+    marginVertical: 4,
+    marginHorizontal: 8,
+  },
+  autoReplyBubble: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 16,
+    borderTopLeftRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    maxWidth: '80%',
+    borderLeftWidth: 3,
+    borderLeftColor: '#6366F1',
+  },
+  autoReplyBubbleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  autoReplyBubbleLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6366F1',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  autoReplyBubbleText: {
+    fontSize: 14,
+    color: '#374151',
+    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+  autoReplyBubbleTime: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 4,
+    alignSelf: 'flex-end',
   },
 });
 

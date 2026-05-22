@@ -24,6 +24,7 @@ import Avatar from '../components/Avatar';
 import type { LecturerStatus, UserRole } from '../types/types';
 import { API_URL } from '../config/env';
 import { authFetch } from '../services/authService';
+import { setWorkStatus, clearWorkStatus, getWorkStatus, AUTO_REPLY_TEMPLATES, WorkStatusInfo } from '../services/presenceApi';
 
 interface ProfileSettingsScreenProps {
   navigation: any;
@@ -120,6 +121,12 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
 
+  // UC10/UC11: Work Status & Auto-Reply
+  const [autoReplyMessage, setAutoReplyMessage] = useState('');
+  const [showAutoReplyModal, setShowAutoReplyModal] = useState(false);
+  const [isStatusSaving, setIsStatusSaving] = useState(false);
+  const [customReplyText, setCustomReplyText] = useState('');
+
   const headerScale = useRef(new Animated.Value(0)).current;
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const statsAnim = useRef(new Animated.Value(0)).current;
@@ -139,6 +146,23 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
           gender: data.gender || 'OTHER'
         });
         setLecturerStatus(data.lecturerStatus ? data.lecturerStatus.toLowerCase() : 'available');
+
+        // UC10: Fetch work status from Presence Service for lecturers
+        if (data.role && data.role.toLowerCase() === 'lecturer' && token) {
+          try {
+            const wsInfo = await getWorkStatus(token, data.username);
+            if (wsInfo.workStatus === 'BUSY') {
+              setLecturerStatus('busy');
+              if (wsInfo.autoReplyMessage) {
+                setAutoReplyMessage(wsInfo.autoReplyMessage);
+              }
+            } else if (wsInfo.workStatus === 'AVAILABLE') {
+              setLecturerStatus('available');
+            }
+          } catch (wsErr) {
+            console.log('Could not fetch work status (non-critical)', wsErr);
+          }
+        }
       }
     } catch (error) {
       console.log('Error fetching user profile', error);
@@ -167,16 +191,41 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
   const isLecturer = profile?.role === 'lecturer';
 
   const handleStatusToggle = async () => {
-    const newStatus: LecturerStatus = lecturerStatus === 'available' ? 'busy' : 'available';
-    setLecturerStatus(newStatus);
+    if (lecturerStatus === 'available') {
+      // Switching to BUSY → show auto-reply configuration modal
+      setShowAutoReplyModal(true);
+    } else {
+      // Switching back to AVAILABLE → clear work status
+      setIsStatusSaving(true);
+      try {
+        if (token) {
+          await setWorkStatus(token, 'AVAILABLE');
+        }
+        setLecturerStatus('available');
+        setAutoReplyMessage('');
+      } catch (e) {
+        console.log('Failed to clear work status', e);
+        Alert.alert('Lỗi', 'Không thể cập nhật trạng thái. Vui lòng thử lại.');
+      } finally {
+        setIsStatusSaving(false);
+      }
+    }
+  };
+
+  const handleConfirmBusy = async (replyMsg: string) => {
+    setIsStatusSaving(true);
+    setShowAutoReplyModal(false);
     try {
-      await authFetch(`${API_URL}/api/v1/users/me`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lecturerStatus: newStatus.toUpperCase() })
-      });
+      if (token) {
+        await setWorkStatus(token, 'BUSY', replyMsg);
+      }
+      setLecturerStatus('busy');
+      setAutoReplyMessage(replyMsg);
     } catch (e) {
-      console.log('Failed to save status', e);
+      console.log('Failed to set BUSY status', e);
+      Alert.alert('Lỗi', 'Không thể cập nhật trạng thái. Vui lòng thử lại.');
+    } finally {
+      setIsStatusSaving(false);
     }
   };
 
@@ -392,10 +441,120 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
                     <Text style={styles.statusDescription}>{lecturerStatus === 'available' ? 'Sinh viên có thể liên hệ trực tiếp' : 'Tin nhắn sẽ tự động phản hồi'}</Text>
                   </View>
                 </View>
-                <Switch value={lecturerStatus === 'available'} onValueChange={handleStatusToggle} trackColor={{ false: Colors.dangerSoft, true: Colors.successSoft }} thumbColor={lecturerStatus === 'available' ? Colors.success : Colors.danger} />
+                {isStatusSaving ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : (
+                  <Switch value={lecturerStatus === 'available'} onValueChange={handleStatusToggle} trackColor={{ false: Colors.dangerSoft, true: Colors.successSoft }} thumbColor={lecturerStatus === 'available' ? Colors.success : Colors.danger} />
+                )}
               </View>
+
+              {/* Auto-Reply Preview (shown when BUSY) */}
+              {lecturerStatus === 'busy' && autoReplyMessage ? (
+                <TouchableOpacity
+                  style={styles.autoReplyPreview}
+                  onPress={() => setShowAutoReplyModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.autoReplyPreviewHeader}>
+                    <Icon name="robot" size={18} color={Colors.primary} />
+                    <Text style={styles.autoReplyPreviewTitle}>Tin nhắn tự động</Text>
+                    <Icon name="pencil-outline" size={16} color={Colors.textMuted} />
+                  </View>
+                  <Text style={styles.autoReplyPreviewText} numberOfLines={2}>"{autoReplyMessage}"</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           )}
+
+          {/* Auto-Reply Configuration Modal */}
+          <Modal
+            visible={showAutoReplyModal}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setShowAutoReplyModal(false)}
+          >
+            <View style={styles.autoReplyModalOverlay}>
+              <View style={styles.autoReplyModalContainer}>
+                <View style={styles.autoReplyModalHeader}>
+                  <Text style={styles.autoReplyModalTitle}>Cấu hình phản hồi tự động</Text>
+                  <TouchableOpacity onPress={() => setShowAutoReplyModal(false)} hitSlop={{top:10,bottom:10,left:10,right:10}}>
+                    <Icon name="close" size={22} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.autoReplyModalSubtitle}>
+                  Khi bạn đặt trạng thái "Đang bận", hệ thống sẽ tự động gửi tin nhắn này cho sinh viên nhắn tin đến.
+                </Text>
+
+                <ScrollView style={styles.autoReplyTemplateList} showsVerticalScrollIndicator={false}>
+                  <Text style={styles.autoReplyTemplateLabel}>Chọn mẫu tin nhắn:</Text>
+                  {AUTO_REPLY_TEMPLATES.map((tpl, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.autoReplyTemplateItem,
+                        autoReplyMessage === tpl && styles.autoReplyTemplateItemActive,
+                      ]}
+                      onPress={() => { setAutoReplyMessage(tpl); setCustomReplyText(''); }}
+                      activeOpacity={0.7}
+                    >
+                      <Icon
+                        name={autoReplyMessage === tpl ? 'radiobox-marked' : 'radiobox-blank'}
+                        size={20}
+                        color={autoReplyMessage === tpl ? Colors.primary : Colors.textMuted}
+                      />
+                      <Text style={[
+                        styles.autoReplyTemplateText,
+                        autoReplyMessage === tpl && styles.autoReplyTemplateTextActive,
+                      ]}>{tpl}</Text>
+                    </TouchableOpacity>
+                  ))}
+
+                  <Text style={[styles.autoReplyTemplateLabel, {marginTop: 16}]}>Hoặc tùy chỉnh:</Text>
+                  <TextInput
+                    style={styles.autoReplyCustomInput}
+                    placeholder="Nhập tin nhắn tự động..."
+                    placeholderTextColor={Colors.textMuted}
+                    value={customReplyText}
+                    onChangeText={(text) => {
+                      setCustomReplyText(text);
+                      setAutoReplyMessage(text);
+                    }}
+                    onFocus={() => {
+                      // If a template was selected, clear it to allow custom input
+                      if (AUTO_REPLY_TEMPLATES.includes(autoReplyMessage)) {
+                        setCustomReplyText(autoReplyMessage);
+                        setAutoReplyMessage(autoReplyMessage);
+                      }
+                    }}
+                    multiline
+                    maxLength={200}
+                  />
+                  <Text style={styles.autoReplyCharCount}>{autoReplyMessage.length}/200</Text>
+                </ScrollView>
+
+                <View style={styles.autoReplyModalFooter}>
+                  <TouchableOpacity
+                    style={styles.autoReplyBtnCancel}
+                    onPress={() => setShowAutoReplyModal(false)}
+                  >
+                    <Text style={styles.autoReplyBtnCancelText}>Hủy</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.autoReplyBtnConfirm,
+                      !autoReplyMessage.trim() && styles.autoReplyBtnDisabled,
+                    ]}
+                    onPress={() => autoReplyMessage.trim() && handleConfirmBusy(autoReplyMessage.trim())}
+                    disabled={!autoReplyMessage.trim()}
+                  >
+                    <Icon name="check" size={18} color={Colors.white} />
+                    <Text style={styles.autoReplyBtnConfirmText}>Bật "Đang bận"</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
           {/* Account */}
           <View style={styles.section}>
@@ -637,6 +796,35 @@ const styles = StyleSheet.create({
   segmentActive: { backgroundColor: Colors.white, ...Shadows.sm },
   segmentText: { fontSize: Typography.bodySmall, color: Colors.textSecondary, fontWeight: Typography.medium },
   segmentTextActive: { color: Colors.primary, fontWeight: Typography.bold },
+
+  // UC10/UC11: Auto-Reply Styles
+  autoReplyPreview: { backgroundColor: Colors.white, borderRadius: BorderRadius.xl, padding: Spacing.lg, marginTop: Spacing.md, ...Shadows.sm, borderLeftWidth: 3, borderLeftColor: Colors.primary },
+  autoReplyPreviewHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.xs },
+  autoReplyPreviewTitle: { flex: 1, fontSize: Typography.bodySmall, fontWeight: Typography.semiBold, color: Colors.primary },
+  autoReplyPreviewText: { fontSize: Typography.bodySmall, color: Colors.textSecondary, fontStyle: 'italic', lineHeight: 20 },
+
+  autoReplyModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  autoReplyModalContainer: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: Spacing.lg, paddingBottom: Spacing.xxl, maxHeight: '85%' },
+  autoReplyModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.xl, marginBottom: Spacing.sm },
+  autoReplyModalTitle: { fontSize: Typography.h4, fontWeight: Typography.bold, color: Colors.textPrimary },
+  autoReplyModalSubtitle: { fontSize: Typography.bodySmall, color: Colors.textSecondary, paddingHorizontal: Spacing.xl, marginBottom: Spacing.lg, lineHeight: 20 },
+
+  autoReplyTemplateList: { paddingHorizontal: Spacing.xl, maxHeight: 350 },
+  autoReplyTemplateLabel: { fontSize: Typography.caption, fontWeight: Typography.bold, color: Colors.textSecondary, marginBottom: Spacing.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  autoReplyTemplateItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing.md, borderRadius: BorderRadius.lg, marginBottom: Spacing.xs, backgroundColor: Colors.background },
+  autoReplyTemplateItemActive: { backgroundColor: `${Colors.primary}10`, borderWidth: 1, borderColor: `${Colors.primary}30` },
+  autoReplyTemplateText: { flex: 1, fontSize: Typography.bodySmall, color: Colors.textPrimary, lineHeight: 20 },
+  autoReplyTemplateTextActive: { color: Colors.primary, fontWeight: Typography.medium },
+
+  autoReplyCustomInput: { backgroundColor: Colors.background, borderRadius: BorderRadius.lg, padding: Spacing.md, fontSize: Typography.body, color: Colors.textPrimary, minHeight: 80, textAlignVertical: 'top', marginTop: Spacing.xs, borderWidth: 1, borderColor: Colors.borderLight },
+  autoReplyCharCount: { fontSize: Typography.tiny, color: Colors.textMuted, textAlign: 'right', marginTop: 4 },
+
+  autoReplyModalFooter: { flexDirection: 'row', gap: Spacing.md, paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, borderTopWidth: 1, borderTopColor: Colors.borderLight, marginTop: Spacing.md },
+  autoReplyBtnCancel: { flex: 1, paddingVertical: Spacing.md, borderRadius: BorderRadius.lg, backgroundColor: Colors.background, alignItems: 'center' },
+  autoReplyBtnCancelText: { fontSize: Typography.body, fontWeight: Typography.semiBold, color: Colors.textSecondary },
+  autoReplyBtnConfirm: { flex: 2, flexDirection: 'row', paddingVertical: Spacing.md, borderRadius: BorderRadius.lg, backgroundColor: Colors.danger, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  autoReplyBtnConfirmText: { fontSize: Typography.body, fontWeight: Typography.bold, color: Colors.white },
+  autoReplyBtnDisabled: { backgroundColor: Colors.textMuted, opacity: 0.5 },
 });
 
 export default ProfileSettingsScreen;

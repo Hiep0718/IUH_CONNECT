@@ -308,6 +308,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
               : data.messageType === 'VIDEO' ? '🎬 Video'
               : data.messageType === 'FILE' ? '📎 Tệp đính kèm'
               : data.messageType === 'STICKER' ? '😄 Sticker'
+              : data.messageType === 'AUTO_REPLY' ? '🤖 ' + (data.content || 'Phản hồi tự động')
               : data.content || 'Tin nhắn mới';
 
             showNotification({

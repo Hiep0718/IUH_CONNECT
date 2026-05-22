@@ -9,6 +9,7 @@ import lombok.*;
 @Builder
 public class PresenceEventDto {
     private String userId;
-    private String status; // ONLINE or OFFLINE
+    private String status; // ONLINE, OFFLINE, BUSY, AVAILABLE
     private long lastSeen;
+    private String workStatus; // BUSY, AVAILABLE, or null
 }

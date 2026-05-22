@@ -47,14 +47,17 @@ public class PresenceService {
         // 1. Internal routing key — which chat-service instance hosts this session
         redisTemplate.opsForValue().set(INSTANCE_KEY_PREFIX + userId, currentInstanceId, 24, TimeUnit.HOURS);
 
-        // 2. Presence keys — same keys that presence-service REST API reads
-        redisTemplate.opsForValue().set(PRESENCE_KEY_PREFIX + userId, "ONLINE", 90, TimeUnit.SECONDS);
+        // 2. Presence keys — respect manual work status if set
+        String workStatus = redisTemplate.opsForValue().get("workstatus:" + userId);
+        String presenceValue = ("BUSY".equals(workStatus) || "AVAILABLE".equals(workStatus))
+                ? workStatus : "ONLINE";
+        redisTemplate.opsForValue().set(PRESENCE_KEY_PREFIX + userId, presenceValue, 90, TimeUnit.SECONDS);
         redisTemplate.opsForValue().set(LAST_SEEN_KEY_PREFIX + userId, String.valueOf(now));
 
-        log.info("🟢 User ONLINE (via chat-ws): {}", userId);
+        log.info("🟢 User ONLINE (via chat-ws): {} (presence={})", userId, presenceValue);
 
         // 3. Publish presence event to Kafka → other users get PRESENCE_UPDATE via WebSocket
-        publishPresenceEvent(userId, "ONLINE", now);
+        publishPresenceEvent(userId, presenceValue, now);
     }
 
     public void userDisconnected(String userId) {
@@ -86,12 +89,15 @@ public class PresenceService {
             redisTemplate.opsForValue().set(LAST_SEEN_KEY_PREFIX + userId,
                     String.valueOf(System.currentTimeMillis()));
         } else {
-            // Key expired (e.g., no heartbeat for >90s) — re-establish as ONLINE
+            // Key expired (e.g., no heartbeat for >90s) — re-establish with correct status
             long now = System.currentTimeMillis();
-            redisTemplate.opsForValue().set(presenceKey, "ONLINE", 90, TimeUnit.SECONDS);
+            String workStatus = redisTemplate.opsForValue().get("workstatus:" + userId);
+            String presenceValue = ("BUSY".equals(workStatus) || "AVAILABLE".equals(workStatus))
+                    ? workStatus : "ONLINE";
+            redisTemplate.opsForValue().set(presenceKey, presenceValue, 90, TimeUnit.SECONDS);
             redisTemplate.opsForValue().set(LAST_SEEN_KEY_PREFIX + userId, String.valueOf(now));
-            log.info("🔄 Re-established presence for {} (key had expired)", userId);
-            publishPresenceEvent(userId, "ONLINE", now);
+            log.info("🔄 Re-established presence for {} (key had expired, status={})", userId, presenceValue);
+            publishPresenceEvent(userId, presenceValue, now);
         }
 
         // Also refresh the routing key
