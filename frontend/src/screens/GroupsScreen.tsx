@@ -8,6 +8,7 @@ import {
   StatusBar,
   FlatList,
   Animated,
+  RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -16,16 +17,19 @@ import Avatar from '../components/Avatar';
 
 import { API_URL } from '../config/env';
 import { useWebSocket } from '../services/WebSocketProvider';
+import { authFetch } from '../services/authService';
 
 interface GroupsScreenProps {
   navigation: any;
   currentUser: string;
+  token: string | null;
 }
 
-const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser }) => {
+const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser, token }) => {
   const headerAnim = useRef(new Animated.Value(0)).current;
   const [groups, setGroups] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [refreshing, setRefreshing] = React.useState(false);
 
   React.useEffect(() => {
     Animated.timing(headerAnim, {
@@ -37,10 +41,13 @@ const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser }) 
 
   const loadGroups = React.useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/chat/conversations/user/${currentUser}`);
+      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/user/${currentUser}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
-        const groupChats = data.filter((conv: any) => conv.type === 'GROUP');
+        console.log('Groups fetch data:', JSON.stringify(data));
+        const groupChats = data.filter((conv: any) => conv.type === 'GROUP' || conv.type === 'group');
         
         const mappedGroups = groupChats.map((g: any) => ({
           id: g.id,
@@ -50,13 +57,21 @@ const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser }) 
           icon: g.avatar ? '🖼️' : '👥'
         }));
         setGroups(mappedGroups);
+      } else {
+        console.log('Failed to fetch groups, status:', res.status);
       }
     } catch (e) {
       console.log('Error loading groups', e);
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
-  }, [currentUser]);
+  }, [currentUser, token]);
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    loadGroups();
+  }, [loadGroups]);
 
   React.useEffect(() => {
     loadGroups();
@@ -148,6 +163,14 @@ const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser }) 
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#0077CC']}
+            tintColor="#0077CC"
+          />
+        }
       />
     </SafeAreaView>
   );

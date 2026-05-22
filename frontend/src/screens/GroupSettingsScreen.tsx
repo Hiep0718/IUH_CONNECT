@@ -45,6 +45,10 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNewUsers, setSelectedNewUsers] = useState<string[]>([]);
+  
+  const [isMuted, setIsMuted] = useState(false);
+  const [mutedUntil, setMutedUntil] = useState<number | null>(null);
+  const [isMuteModalVisible, setIsMuteModalVisible] = useState(false);
 
   useEffect(() => {
     fetchGroupDetails();
@@ -68,12 +72,17 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
         }));
         setMembers(mappedMembers);
       } else {
-        // Fallback nếu API lỗi (chưa khởi động lại backend)
         console.log('API returned not ok');
-        setMembers([
-          { id: currentUser, name: currentUser, role: 'ADMIN' },
-          { id: 'mock_user_1', name: 'Thành viên Test 1', role: 'MEMBER' }
-        ]);
+      }
+      
+      // Fetch settings
+      const settingsRes = await authFetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${conversationId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        setIsMuted(settingsData.isMuted);
+        setMutedUntil(settingsData.mutedUntil);
       }
     } catch (error) {
       console.error('Failed to fetch group details:', error);
@@ -85,12 +94,50 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
     }
   };
 
-  const isLeader = members.find(m => m.id === currentUser)?.role === 'ADMIN';
-  const isDeputy = members.find(m => m.id === currentUser)?.role === 'DEPUTY';
+  const currentUserLower = currentUser?.toLowerCase() || '';
+  const isLeader = members.find(m => m.id?.toLowerCase() === currentUserLower)?.role?.toUpperCase() === 'ADMIN';
+  const isDeputy = members.find(m => m.id?.toLowerCase() === currentUserLower)?.role?.toUpperCase() === 'DEPUTY';
   const hasPrivilege = isLeader || isDeputy;
 
   const [isTransferModalVisible, setIsTransferModalVisible] = useState(false);
   const [selectedSuccessor, setSelectedSuccessor] = useState<string | null>(null);
+  const [selectedMemberAction, setSelectedMemberAction] = useState<any>(null);
+
+  const handleMuteOption = async (option: 'UNMUTE' | '1H' | '8H' | 'FOREVER') => {
+    try {
+      let url = `${API_URL}/api/v1/chat/settings/${currentUser}/${conversationId}/mute`;
+      
+      if (option === 'UNMUTE') {
+        if (!isMuted) {
+          setIsMuteModalVisible(false);
+          return;
+        }
+      } else if (option === 'FOREVER') {
+        url += `?mutedUntil=-1`;
+      } else if (option === '1H') {
+        url += `?mutedUntil=${Date.now() + 60 * 60 * 1000}`;
+      } else if (option === '8H') {
+        url += `?mutedUntil=${Date.now() + 8 * 60 * 60 * 1000}`;
+      }
+      
+      const res = await authFetch(url, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        const updated = await res.json();
+        setIsMuted(updated.isMuted);
+        setMutedUntil(updated.mutedUntil);
+        setIsMuteModalVisible(false);
+      } else {
+        Alert.alert('Lỗi', 'Không thể cập nhật cài đặt');
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Lỗi', 'Lỗi kết nối');
+    }
+  };
 
   const handleLeaveGroup = () => {
     // Nếu là Trưởng nhóm
@@ -247,11 +294,38 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
     ]);
   };
 
+  const handleKickMember = (item: any) => {
+    Alert.alert('Xóa thành viên', `Bạn muốn xóa ${item.name} khỏi nhóm?`, [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Xóa', style: 'destructive', onPress: async () => {
+          try {
+            const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${item.id}?requesterId=${currentUser}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+              setMembers(members.filter(m => m.id !== item.id));
+              setSelectedMemberAction(null);
+            } else {
+              Alert.alert('Lỗi', 'Không thể xóa thành viên');
+            }
+          } catch (error) {
+            console.error('Kick member error:', error);
+          }
+        }
+      }
+    ]);
+  };
+
   const renderMember = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.memberItem}
-      activeOpacity={isLeader && item.id !== currentUser && item.role !== 'ADMIN' ? 0.7 : 1}
-      onPress={() => handleChangeRole(item)}
+      activeOpacity={0.7}
+      onPress={() => {
+        if (item.id !== currentUser) {
+          setSelectedMemberAction(item);
+        }
+      }}
     >
       <Avatar name={item.name} size="medium" />
       <View style={styles.memberInfo}>
@@ -263,27 +337,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
       {item.id !== currentUser && (isLeader || (isDeputy && item.role === 'MEMBER')) && (
         <TouchableOpacity 
           style={styles.kickButton} 
-          onPress={() => {
-            Alert.alert('Xóa thành viên', `Bạn muốn xóa ${item.name} khỏi nhóm?`, [
-              { text: 'Hủy', style: 'cancel' },
-              { text: 'Xóa', style: 'destructive', onPress: async () => {
-                  try {
-                    const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/members/${item.id}?requesterId=${currentUser}`, {
-                      method: 'DELETE',
-                      headers: { Authorization: `Bearer ${token}` }
-                    });
-                    if (res.ok) {
-                      setMembers(members.filter(m => m.id !== item.id));
-                    } else {
-                      Alert.alert('Lỗi', 'Không thể xóa thành viên');
-                    }
-                  } catch (error) {
-                    console.error('Kick member error:', error);
-                  }
-                }
-              }
-            ]);
-          }}
+          onPress={() => handleKickMember(item)}
         >
           <View style={{ backgroundColor: '#FFEBEE', padding: 8, borderRadius: 20 }}>
             <Icon name="account-remove-outline" size={20} color={Colors.danger} />
@@ -332,6 +386,9 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
           </View>
           <View style={styles.groupNameRow}>
             <Text style={styles.groupName}>{currentGroupName}</Text>
+            {isMuted && (
+              <Icon name="bell-off-outline" size={18} color={Colors.textSecondary} style={{ marginLeft: 4 }} />
+            )}
             {hasPrivilege && (
               <TouchableOpacity onPress={() => setIsEditingName(true)} style={styles.editNameButton}>
                 <Icon name="pencil" size={16} color={Colors.textSecondary} />
@@ -355,11 +412,13 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
             </View>
             <Text style={styles.actionText}>Thêm thành viên</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionItem}>
+          <TouchableOpacity style={styles.actionItem} onPress={() => setIsMuteModalVisible(true)}>
             <View style={styles.actionIconWrapper}>
-              <Icon name="bell-outline" size={24} color={Colors.textPrimary} />
+              <Icon name={isMuted ? "bell-off-outline" : "bell-outline"} size={24} color={isMuted ? Colors.primary : Colors.textPrimary} />
             </View>
-            <Text style={styles.actionText}>Tắt thông báo</Text>
+            <Text style={[styles.actionText, isMuted && { color: Colors.primary }]}>
+              {isMuted ? 'Đang tắt thông báo' : 'Tắt thông báo'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -535,6 +594,82 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
             contentContainerStyle={{ paddingBottom: Spacing.xxl }}
           />
         </SafeAreaView>
+      </Modal>
+
+      {/* Member Action Modal */}
+      <Modal visible={!!selectedMemberAction} transparent animationType="slide">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSelectedMemberAction(null)}>
+          <View style={[styles.editNameModal, { padding: 0, overflow: 'hidden' }]}>
+            <View style={{ padding: Spacing.xl, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.borderLight }}>
+              <Avatar name={selectedMemberAction?.name} size="large" />
+              <Text style={[styles.modalTitle, { marginTop: Spacing.md, marginBottom: 0 }]}>{selectedMemberAction?.name}</Text>
+              <Text style={{ color: Colors.textSecondary, marginTop: 4 }}>
+                {selectedMemberAction?.role === 'ADMIN' ? 'Trưởng nhóm' : selectedMemberAction?.role === 'DEPUTY' ? 'Phó nhóm' : 'Thành viên'}
+              </Text>
+            </View>
+            
+            <View style={{ paddingVertical: Spacing.sm }}>
+              {isLeader && selectedMemberAction?.role !== 'ADMIN' && (
+                <TouchableOpacity style={styles.dangerRow} onPress={() => {
+                  const item = selectedMemberAction;
+                  setSelectedMemberAction(null);
+                  handleChangeRole(item);
+                }}>
+                  <Icon name="account-cog-outline" size={24} color={Colors.primary} />
+                  <Text style={[styles.dangerText, { color: Colors.primary }]}>
+                    {selectedMemberAction?.role === 'DEPUTY' ? 'Giáng chức xuống Thành viên' : 'Phong làm Phó nhóm'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              
+              {(isLeader || (isDeputy && selectedMemberAction?.role === 'MEMBER')) && (
+                <TouchableOpacity style={styles.dangerRow} onPress={() => {
+                  const item = selectedMemberAction;
+                  setSelectedMemberAction(null);
+                  handleKickMember(item);
+                }}>
+                  <Icon name="account-remove-outline" size={24} color={Colors.danger} />
+                  <Text style={styles.dangerText}>Đuổi khỏi nhóm</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Mute Modal */}
+      <Modal visible={isMuteModalVisible} transparent animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsMuteModalVisible(false)}>
+          <View style={[styles.editNameModal, { padding: 0, overflow: 'hidden' }]}>
+            <View style={{ padding: Spacing.xl, borderBottomWidth: 1, borderBottomColor: Colors.borderLight }}>
+              <Text style={[styles.modalTitle, { marginBottom: 0 }]}>Thông báo</Text>
+            </View>
+            
+            <View style={{ paddingVertical: Spacing.sm }}>
+              {isMuted ? (
+                <TouchableOpacity style={styles.dangerRow} onPress={() => handleMuteOption('UNMUTE')}>
+                  <Icon name="bell-ring-outline" size={24} color={Colors.primary} />
+                  <Text style={[styles.dangerText, { color: Colors.primary }]}>Bật lại thông báo</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <TouchableOpacity style={styles.dangerRow} onPress={() => handleMuteOption('1H')}>
+                    <Icon name="clock-outline" size={24} color={Colors.textPrimary} />
+                    <Text style={[styles.dangerText, { color: Colors.textPrimary }]}>Tắt trong 1 giờ</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dangerRow} onPress={() => handleMuteOption('8H')}>
+                    <Icon name="clock-outline" size={24} color={Colors.textPrimary} />
+                    <Text style={[styles.dangerText, { color: Colors.textPrimary }]}>Tắt trong 8 giờ</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dangerRow} onPress={() => handleMuteOption('FOREVER')}>
+                    <Icon name="bell-off-outline" size={24} color={Colors.textPrimary} />
+                    <Text style={[styles.dangerText, { color: Colors.textPrimary }]}>Tắt đến khi tôi mở lại</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );

@@ -330,6 +330,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [isTyping] = useState(false);
   const [isLoadingEarlier, setIsLoadingEarlier] = useState(false);
   const [hasEarlierMessages, setHasEarlierMessages] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [recipientPresence, setRecipientPresence] = useState({ status: 'OFFLINE', lastSeen: 0 });
   const headerAnim = useRef(new Animated.Value(0)).current;
   const attachMenuAnim = useRef(new Animated.Value(0)).current;
@@ -505,11 +506,33 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     }
   }, [conversationId, currentUser, token]);
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await authFetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${conversationId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsMuted(data.isMuted);
+      }
+    } catch (e) {
+      console.log('Failed to fetch settings', e);
+    }
+  }, [currentUser, conversationId, token]);
+
   useEffect(() => {
     fetchHistory();
     fetchPresence();
     markMessagesAsRead();
-  }, [fetchHistory, fetchPresence, markMessagesAsRead]);
+    fetchSettings();
+  }, [fetchHistory, fetchPresence, markMessagesAsRead, fetchSettings]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchSettings();
+    });
+    return unsubscribe;
+  }, [navigation, fetchSettings]);
 
   // Re-sync tin nhắn khi reconnect sau mất mạng
   useEffect(() => {
@@ -1455,9 +1478,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
               showOnlineStatus
             />
             <View style={styles.headerInfo}>
-              <Text numberOfLines={1} style={styles.headerName}>
-                {displayRecipientName}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text numberOfLines={1} style={styles.headerName}>
+                  {displayRecipientName}
+                </Text>
+                {isMuted && (
+                  <Icon name="bell-off-outline" size={14} color="#A0AEC0" style={{ marginLeft: 4, marginTop: 1 }} />
+                )}
+              </View>
               <View style={styles.headerMetaRow}>
                 {lecturerStatus ? (
                   <StatusBadge status={lecturerStatus} compact />

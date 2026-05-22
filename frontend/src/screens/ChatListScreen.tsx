@@ -21,12 +21,14 @@ import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import { API_URL } from '../config/env';
 import { useWebSocket } from '../services/WebSocketProvider';
+import { authFetch } from '../services/authService';
 import { Colors, Shadows, Spacing, Typography } from '../theme/theme';
 import type { Conversation } from '../types/types';
 
 interface ChatListScreenProps {
   navigation: any;
   currentUser: string;
+  token: string | null;
   onLogout: () => void;
 }
 
@@ -98,7 +100,32 @@ const formatCallPreview = (content?: string) => {
   }
 };
 
-const mapConversationPreview = (msg: any, currentUser: string): Conversation | null => {
+const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<string, any>): Conversation | null => {
+  const groupInfo = groupMap[msg.conversationId];
+  if (groupInfo) {
+    let preview = msg.content;
+    if (msg.messageType === 'IMAGE') preview = '📷 Hình ảnh';
+    if (msg.messageType === 'VIDEO') preview = '🎬 Video';
+    if (msg.messageType === 'FILE') preview = `📎 ${msg.fileName || 'Tệp đính kèm'}`;
+    if (msg.messageType === 'STICKER') preview = '😄 Sticker';
+
+    return {
+      id: msg.conversationId,
+      name: groupInfo.name || 'Nhóm',
+      targetUserId: msg.conversationId,
+      avatar: undefined,
+      isGroup: true,
+      participants: groupInfo.members?.map((m: any) => m.userId) || [],
+      lastMessage: {
+        text: preview,
+        timestamp: new Date(msg.timestamp),
+        senderId: msg.senderId,
+      },
+      unreadCount: msg.unreadCount || 0,
+      isOnline: false,
+    };
+  }
+
   const otherUserId = resolveOtherUserId(msg, currentUser);
   if (!otherUserId || otherUserId === currentUser) {
     return null;
@@ -152,6 +179,8 @@ const sanitizeConversations = (items: Conversation[], currentUser: string) => {
 const ChatListScreen: React.FC<ChatListScreenProps> = ({
   navigation,
   currentUser,
+  token,
+  onLogout,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -182,19 +211,38 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
 
   const loadConversations = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/chat/conversations/${currentUser}`);
+      let groupMap: Record<string, any> = {};
+      try {
+        const groupsRes = await authFetch(`${API_URL}/api/v1/chat/conversations/user/${currentUser}`, {
+           headers: { Authorization: `Bearer ${token}` }
+        });
+        if (groupsRes.ok) {
+           const convs = await groupsRes.json();
+           convs.forEach((c: any) => {
+             if (c.type === 'GROUP' || c.type === 'group') {
+               groupMap[c.id] = c;
+             }
+           });
+        }
+      } catch (e) {
+         console.log('Error fetching user groups in ChatList', e);
+      }
+
+      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/${currentUser}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (!res.ok) {
         return;
       }
 
       const data = await res.json();
       const mapped = data
-        .map((msg: any) => mapConversationPreview(msg, currentUser))
+        .map((msg: any) => mapConversationPreview(msg, currentUser, groupMap))
         .filter(Boolean) as Conversation[];
       const sanitized = sanitizeConversations(mapped, currentUser);
 
       const userIds = [
-        ...new Set(sanitized.map(item => item.targetUserId).filter(Boolean)),
+        ...new Set(sanitized.filter(item => !item.isGroup).map(item => item.targetUserId).filter(Boolean)),
       ] as string[];
 
       if (userIds.length > 0 && presenceAvailableRef.current) {

@@ -338,6 +338,7 @@ const MainTabs = ({
         <ChatListScreen
           {...props}
           currentUser={currentUser}
+          token={token}
           onLogout={onLogout}
         />
       )}
@@ -374,6 +375,7 @@ const MainTabs = ({
         <GroupsScreen
           {...props}
           currentUser={currentUser}
+          token={token}
         />
       )}
     </Tab.Screen>
