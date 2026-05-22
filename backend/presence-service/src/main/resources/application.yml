@@ -30,3 +30,21 @@ jwt:
 presence:
   heartbeat-timeout-seconds: 90
   cleanup-interval-seconds: 60
+
+# ---------- Actuator (Health Check) ----------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# ---------- Logging ----------
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+  level:
+    com.iuhconnect: INFO
+    org.springframework.web: WARN

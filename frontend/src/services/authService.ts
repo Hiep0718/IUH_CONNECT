@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import { API_URL } from '../config/env';
+import { apiRateLimiter } from './rateLimiter';
+import { retryWithDelay } from './retryService';
 
 // ── Event Emitter đơn giản cho auto-logout ──
 type LogoutListener = () => void;
@@ -105,15 +107,36 @@ export const isTokenExpired = (token: string): boolean => {
   return payload.exp <= nowInSeconds + 30;
 };
 
-// ── authFetch: wrapper bọc fetch() để tự phát hiện 401 ──
+// ── authFetch: wrapper bọc fetch() với Rate Limiter + Retry 3-5s ──
 export const authFetch = async (
   url: string,
   options: RequestInit = {},
 ): Promise<Response> => {
-  const response = await fetch(url, options);
+  // 1. Rate Limiter — kiểm tra quota trước khi gửi request
+  if (!apiRateLimiter.canProceed()) {
+    console.warn('⚠️ [AuthService] Rate limited — too many requests');
+    throw new Error('Rate limit exceeded. Please try again later.');
+  }
 
+  // 2. Retry with delay 3-5s — tự retry khi network/server error
+  const response = await retryWithDelay(
+    () => fetch(url, options),
+    {
+      maxRetries: 3,
+      minDelay: 3000,  // 3 giây
+      maxDelay: 5000,  // 5 giây
+      shouldRetry: (error: any) => {
+        // Chỉ retry khi network error hoặc server error
+        if (error instanceof TypeError && error.message.includes('Network')) {
+          return true;
+        }
+        return false;
+      },
+    },
+  );
+
+  // 3. Auto-logout khi token hết hạn
   if (response.status === 401 || response.status === 403) {
-    // Token hết hạn hoặc không hợp lệ
     triggerAutoLogout();
   }
 

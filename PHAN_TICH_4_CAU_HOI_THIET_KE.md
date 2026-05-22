@@ -5,179 +5,138 @@
 ### **Câu hỏi 1a: Thư viện bắt sự kiện mạng trở lại?**
 
 **Trả lời:** 
-- ❌ **CHƯA sử dụng @react-native-community/netinfo**
-- ✅ **Hiện tại dùng WebSocket connection state để detect offline**
+- ✅ **ĐÃ sử dụng @react-native-community/netinfo** (package `^12.0.1`)
+- ✅ **Kết hợp cả WebSocket state + NetInfo OS-level để detect offline**
 
-**Cách hiện tại hoạt động:**
+**Cách hoạt động (đã implement):**
 
 ```typescript
 // frontend/src/services/WebSocketProvider.tsx
-const [isConnected, setIsConnected] = useState(false);
+import NetInfo from '@react-native-community/netinfo';
 
-// WebSocket connection events
+// 1. WebSocket connection events (detect qua kết nối WS)
 ws.onopen = () => {
-  setIsConnected(true);  // Network OK
-};
-
-ws.onerror = () => {
-  setIsConnected(false);  // Network down
+  reconnectAttemptsRef.current = 0;
+  setIsConnected(true);
+  setWasReconnected(true);
+  startHeartbeat();
+  // Flush offline queue khi reconnect
+  offlineQueue.flush((payload) => ws.send(JSON.stringify(payload)));
 };
 
 ws.onclose = () => {
-  setIsConnected(false);  // Network down
-  // Auto-reconnect sau 5 giây
-  reconnectTimeoutRef.current = setTimeout(() => {
-    if (shouldReconnectRef.current) {
-      // Reconnect logic
-    }
-  }, 5000);
+  setIsConnected(false);
+  stopHeartbeat();
+  // Exponential backoff reconnect: 2s → 4s → 8s → max 30s
+  const delay = getReconnectDelay();
+  reconnectAttemptsRef.current++;
+  reconnectTimeoutRef.current = setTimeout(() => connect(), delay);
 };
+
+// 2. NetInfo listener (detect mạng ở mức OS - nhanh hơn WS timeout)
+useEffect(() => {
+  const unsubscribe = NetInfo.addEventListener(state => {
+    if (state.isConnected && !isConnected && shouldReconnectRef.current) {
+      // Mạng vừa trở lại → reconnect ngay lập tức
+      reconnectAttemptsRef.current = 0;
+      clearTimeout(reconnectTimeoutRef.current);
+      connect();
+    }
+  });
+  return () => unsubscribe();
+}, [isConnected, connect]);
 ```
 
 **Hiển thị trạng thái:**
 ```typescript
 // frontend/src/components/OfflineBanner.tsx
-// Banner hiển thị "Không có kết nối mạng" khi offline
+// Banner hiển thị "Không có kết nối mạng" với animation (slide + pulse icon)
 <OfflineBanner isOffline={!isConnected} />
-
-// Trong ChatScreen: Tin nhắn đưa vào state với status = 'sending'
-// Nếu mất mạng, display banner và user biết mình offline
 ```
 
-**🔴 Vấn đề hiện tại:** Chỉ detect offline khi WebSocket close, không detect mất mạng real-time từ hệ thống
-
-**💡 Đề xuất cải tiến:**
-```typescript
-// Thêm package: @react-native-community/netinfo
-import NetInfo from "@react-native-community/netinfo";
-
-// Trong WebSocketProvider.tsx
-useEffect(() => {
-  const unsubscribe = NetInfo.addEventListener(state => {
-    if (state.isConnected && !isConnected && shouldReconnectRef.current) {
-      // Network trở lại → reconnect WebSocket
-      connectWebSocket();
-    }
-    setIsConnected(state.isConnected ?? false);
-  });
-  
-  return () => unsubscribe();
-}, [isConnected]);
-```
+**✅ Ưu điểm so với chỉ dùng WebSocket:**
+- NetInfo detect mất mạng **ngay lập tức** (không đợi TCP timeout ~2 phút)
+- Khi mạng trở lại → reconnect **ngay** (không đợi backoff timer)
 
 ---
 
 ### **Câu hỏi 1b: Lưu tin nhắn chờ gửi ở đâu?**
 
 **Trả lời:** 
-- 🟡 **Hiện tại chỉ lưu trong state React (bộ nhớ tạm)**
-- ❌ **Chưa persist vào device storage**
+- ✅ **ĐÃ implement Offline Message Queue với AsyncStorage**
+- ✅ **Tin nhắn persist vào device storage, không mất khi close app**
 
-**Cách hiện tại:**
+**Cách hoạt động (đã implement):**
+
+**Bước 1:** Khi user gửi tin nhắn lúc offline → `sendMessage()` tự động queue vào AsyncStorage:
 ```typescript
-// frontend/src/screens/ChatScreen.tsx
-const onSend = (newMessages: IMessage[] = []) => {
-  const optimisticMessages: ExtendedMessage[] = newMessages.map(msg => ({
-    ...msg,
-    _id: createLocalMessageId(),  // LOCAL_ID format
-    status: isOffline ? 'sending' : 'sent',
-    isOffline,  // Mark as offline message
-  }));
-
-  // Chỉ lưu vào state (bộ nhớ tạm)
-  setMessages(prev => GiftedChat.append(prev, optimisticMessages));
-  
-  // Gửi qua WebSocket
-  sendMessage({...});  // Fail nếu offline
-};
+// frontend/src/services/WebSocketProvider.tsx
+const sendMessage = useCallback((data: object) => {
+  const ws = wsRef.current;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(data));
+    return;
+  }
+  // ✅ Queue tin nhắn để gửi lại khi online
+  offlineQueue.enqueue(data);
+}, []);
 ```
 
-**⚠️ Vấn đề:** 
-- Khi user close app → mất tất cả pending messages
-- Khi offline quá lâu → browser crash → tin nhắn mất
-
-**💡 Đề xuất sử dụng AsyncStorage:**
-
+**Bước 2:** Offline Queue Service lưu vào AsyncStorage:
 ```typescript
-// frontend/src/services/offlineMessageService.ts
+// frontend/src/services/offlineQueue.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const PENDING_MESSAGES_KEY = '@pending_messages';
+const QUEUE_KEY = '@offline_message_queue';
 
-// Lưu tin nhắn chờ gửi
-export const savePendingMessage = async (message: ExtendedMessage) => {
-  try {
-    const existing = await AsyncStorage.getItem(PENDING_MESSAGES_KEY);
-    const messages = existing ? JSON.parse(existing) : [];
-    messages.push({
-      ...message,
-      savedAt: Date.now(),
-    });
-    await AsyncStorage.setItem(PENDING_MESSAGES_KEY, JSON.stringify(messages));
-  } catch (e) {
-    console.error('Failed to save pending message', e);
-  }
-};
+export const offlineQueue = {
+  // Thêm tin nhắn vào queue khi offline
+  async enqueue(payload: object): Promise<string> {
+    const id = `queue_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const queue = await this.getAll();
+    queue.push({ id, payload, createdAt: Date.now(), retryCount: 0 });
+    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    return id;
+  },
 
-// Lấy tất cả tin nhắn chờ
-export const getPendingMessages = async () => {
-  try {
-    const data = await AsyncStorage.getItem(PENDING_MESSAGES_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (e) {
-    return [];
-  }
-};
-
-// Gửi lại khi mạng trở lại
-export const retryPendingMessages = async (sendMessage: (msg: any) => void) => {
-  const pending = await getPendingMessages();
-  for (const msg of pending) {
-    sendMessage(msg);
-  }
-  // Clear sau khi gửi
-  await AsyncStorage.removeItem(PENDING_MESSAGES_KEY);
-};
-```
-
-**Cấu trúc dữ liệu AsyncStorage:**
-```json
-{
-  "@pending_messages": [
-    {
-      "_id": "local-1684235400000-abc123",
-      "senderId": "hiep123",
-      "receiverId": "nam456",
-      "content": "Chào bạn!",
-      "conversationId": "conv_hiep_nam",
-      "messageType": "TEXT",
-      "status": "sending",
-      "savedAt": 1684235400000
-    },
-    {
-      "_id": "local-1684235410000-def456",
-      "senderId": "hiep123",
-      "receiverId": "nam456",
-      "content": "Bạn khỏe không?",
-      "conversationId": "conv_hiep_nam",
-      "messageType": "TEXT",
-      "status": "sending",
-      "savedAt": 1684235410000
+  // Flush: gửi tất cả khi online trở lại
+  async flush(sendFn: (payload: object) => void): Promise<number> {
+    const queue = await this.getAll();
+    let sent = 0;
+    for (const item of queue) {
+      try {
+        sendFn(item.payload);
+        await this.dequeue(item.id);
+        sent++;
+      } catch { break; }
     }
-  ]
-}
+    return sent;
+  },
+
+  // Tự động cleanup tin nhắn quá 24 giờ
+  async cleanup(): Promise<void> { ... },
+};
 ```
 
-**So sánh các tùy chọn lưu trữ:**
+**Bước 3:** Khi reconnect → flush queue tự động:
+```typescript
+// WebSocketProvider.tsx - ws.onopen
+ws.onopen = () => {
+  setIsConnected(true);
+  startHeartbeat();
+  // ✅ Flush offline queue
+  offlineQueue.flush((payload) => ws.send(JSON.stringify(payload)));
+  offlineQueue.cleanup(); // Xóa tin nhắn quá 24h
+};
+```
+
+**Lý do chọn AsyncStorage:**
 
 | Tùy chọn | Dung lượng | Tốc độ | Vĩnh viễn | Khuyên dùng |
 |----------|-----------|-------|----------|-----------|
-| AsyncStorage | ~5MB | Chậm | ✅ Có | ✅ Cho tin nhắn chờ gửi |
+| ✅ AsyncStorage | ~5MB | Chậm | ✅ Có | ✅ Đơn giản, đủ cho tin nhắn chờ |
 | SQLite | Không giới hạn | Nhanh | ✅ Có | ❌ Overkill cho project này |
-| WatermelonDB | Không giới hạn | Cực nhanh | ✅ Có | ❌ Phức tạp, không cần |
 | Memory (state) | RAM | Cực nhanh | ❌ Không | ❌ Mất dữ liệu khi close app |
-
-**✅ Khuyến cáo:** Dùng **AsyncStorage** (đơn giản, đủ dung lượng, dễ implement)
 
 ---
 
@@ -462,320 +421,138 @@ Giảng viên nhận: [Tin nhắn gốc] "Chào giảng viên!"
 ### **Câu hỏi 5: Hệ thống xử lý thế nào khi người dùng mất kết nối WiFi?**
 
 **Trả lời:**
-- 🔴 **CHƯA có cơ chế chịu lỗi toàn diện khi mất WiFi**
-- 🟡 **Chỉ có một số xử lý cơ bản, chưa đủ cho production**
+- ✅ **ĐÃ implement cơ chế chịu lỗi toàn diện khi mất WiFi**
+- ✅ **4 tầng bảo vệ: NetInfo detect → Offline Queue → Chat Cache → Reconnect Sync**
 
 ---
 
-### 📊 Phân Tích Hiện Trạng (Đã Có vs Chưa Có)
+### 📊 Bảng Tổng Hợp Các Khả Năng Chịu Lỗi
 
-| Khả năng | Trạng thái | Mô tả |
-|----------|-----------|-------|
-| Detect mất mạng | 🟡 Một phần | Chỉ qua WebSocket `onclose/onerror`, không dùng OS-level network API |
-| Hiển thị banner offline | ✅ Có | `OfflineBanner.tsx` - hiển thị "Không có kết nối mạng" với animation |
-| Auto-reconnect WebSocket | ✅ Có | Reconnect sau 3 giây khi `ws.onclose` fire |
-| Heartbeat (keep-alive) | ✅ Có | Ping mỗi 30 giây để giữ kết nối |
-| Lưu tin nhắn chờ gửi (persist) | ❌ Chưa | Tin nhắn chỉ nằm trong React state (RAM), close app = mất |
-| Queue & retry tin nhắn offline | ❌ Chưa | `sendMessage()` gọi `ws.send()` trực tiếp, fail silent nếu offline |
-| Sync lại lịch sử khi online | ❌ Chưa | Không fetch lại tin nhắn bị miss trong lúc offline |
-| Cache danh sách chat/contacts | ❌ Chưa | Mất mạng = blank screen (không xem được gì) |
-| Exponential backoff reconnect | ❌ Chưa | Reconnect cố định 3 giây, có thể gây DDoS server |
-| Detect mạng trở lại (OS-level) | ❌ Chưa | Không dùng NetInfo, phải đợi WebSocket timeout mới biết |
+| Khả năng | Trạng thái | File implement |
+|----------|-----------|----------------|
+| Detect mất mạng (OS-level) | ✅ Có | `WebSocketProvider.tsx` — NetInfo listener |
+| Hiển thị banner offline | ✅ Có | `OfflineBanner.tsx` — animation slide + pulse |
+| Auto-reconnect WebSocket | ✅ Có | `WebSocketProvider.tsx` — exponential backoff |
+| Heartbeat (keep-alive) | ✅ Có | `WebSocketProvider.tsx` — ping mỗi 30 giây |
+| Lưu tin nhắn chờ gửi (persist) | ✅ Có | `offlineQueue.ts` — AsyncStorage queue |
+| Queue & retry tin nhắn offline | ✅ Có | `WebSocketProvider.tsx` — enqueue + flush |
+| Sync lại lịch sử khi online | ✅ Có | `ChatScreen.tsx` — wasReconnected → fetchHistory |
+| Cache danh sách chat/contacts | ✅ Có | `chatCache.ts` + `ChatListScreen.tsx` |
+| Exponential backoff reconnect | ✅ Có | `WebSocketProvider.tsx` — 2s→4s→8s→max 30s |
+| Detect mạng trở lại (OS-level) | ✅ Có | `WebSocketProvider.tsx` — NetInfo reconnect ngay |
 
 ---
 
-### 🔴 6 Lỗ Hổng Chính Khi Mất WiFi
+### 🏗️ Kiến Trúc Chịu Lỗi (4 Tầng)
 
-#### **Lỗ hổng 1: Tin nhắn gửi khi offline bị "nuốt" (Silent Failure)**
+#### **Tầng 1: Offline Message Queue** (`offlineQueue.ts`)
+
+Khi user gửi tin nhắn lúc offline → tin nhắn được persist vào AsyncStorage → tự gửi lại khi có mạng.
 
 ```typescript
-// WebSocketProvider.tsx - Line 371-378
+// frontend/src/services/offlineQueue.ts
+export const offlineQueue = {
+  async enqueue(payload: object): Promise<string> { ... },  // Queue vào AsyncStorage
+  async flush(sendFn): Promise<number> { ... },              // Gửi lại tất cả
+  async cleanup(): Promise<void> { ... },                     // Xóa tin > 24h
+};
+
+// frontend/src/services/WebSocketProvider.tsx
 const sendMessage = useCallback((data: object) => {
   const ws = wsRef.current;
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(data));
     return;
   }
-  // ⚠️ Chỉ log warning, KHÔNG queue lại tin nhắn
-  console.warn('[WSProvider] WebSocket is not connected');
+  // ✅ Queue thay vì mất tin nhắn
+  offlineQueue.enqueue(data);
 }, []);
 ```
 
-**Vấn đề:** Khi offline, `sendMessage()` chỉ log warning → tin nhắn biến mất hoàn toàn. User thấy tin nhắn hiện trên UI (optimistic update) nhưng nó không bao giờ được gửi đi.
+#### **Tầng 2: NetInfo + Exponential Backoff** (`WebSocketProvider.tsx`)
 
-#### **Lỗ hổng 2: Không có Message Queue persist**
-
-```typescript
-// ChatScreen.tsx - Line 734-787
-const onSend = useCallback((newMessages: IMessage[] = []) => {
-  const optimisticMessages = newMessages.map(msg => ({
-    ...msg,
-    status: isOffline ? 'sending' : 'sent',
-    isOffline,
-  }));
-
-  // ⚠️ Chỉ lưu vào React state (RAM)
-  setMessages(prev => GiftedChat.append(prev, optimisticMessages));
-
-  // ⚠️ Gọi sendMessage trực tiếp - fail nếu offline
-  optimisticMessages.forEach(message => {
-    sendMessage({...});  // → console.warn nếu offline
-  });
-}, [...]);
-```
-
-**Vấn đề:** Close app khi offline → tất cả tin nhắn "đang gửi" mất vĩnh viễn.
-
-#### **Lỗ hổng 3: Reconnect không có Exponential Backoff**
+Detect mạng ở mức OS (nhanh hơn WebSocket timeout ~2 phút) + reconnect thông minh (tránh DDoS server).
 
 ```typescript
-// WebSocketProvider.tsx - Line 340-344
-ws.onclose = () => {
-  // ⚠️ Luôn retry sau 3 giây cố định
-  reconnectTimeoutRef.current = setTimeout(() => {
-    if (isMountedRef.current && shouldReconnectRef.current) {
-      connect();  // → Thất bại → Lại 3 giây → Lại thất bại → Vòng lặp
-    }
-  }, 3000);
-};
-```
-
-**Vấn đề:** Nếu mất mạng 30 phút → hệ thống retry 600 lần (mỗi 3 giây). Khi có hàng nghìn user cùng mất mạng (sự cố ISP), server bị DDoS bởi reconnect requests.
-
-#### **Lỗ hổng 4: Không sync lại lịch sử khi online trở lại**
-
-```typescript
-// WebSocketProvider.tsx - ws.onopen
-ws.onopen = () => {
-  console.log('✅ [WSProvider] WebSocket connected');
-  setIsConnected(true);
-  startHeartbeat();
-  // ⚠️ KHÔNG có logic nào để:
-  // - Fetch lại tin nhắn bị miss
-  // - Retry pending messages
-  // - Sync conversation list
-};
-```
-
-**Vấn đề:** User offline 10 phút → 5 tin nhắn mới từ bạn bè → User online lại → Không thấy 5 tin nhắn đó cho đến khi mở lại ChatScreen.
-
-#### **Lỗ hổng 5: Không detect mạng ở mức hệ điều hành**
-
-```typescript
-// ⚠️ Hiện tại chỉ dựa vào WebSocket connection state
-const isOffline = !isConnected;  // ChatScreen.tsx - Line 338
-
-// Vấn đề: WebSocket có thể vẫn "open" nhưng mạng đã chết
-// (TCP keepalive timeout có thể lên đến 2 phút)
-// → User tưởng online → Gửi tin nhắn → Mất
-```
-
-#### **Lỗ hổng 6: Blank screen khi mất mạng**
-
-Khi mở app hoặc navigate đến ChatScreen/ConversationsScreen mà không có mạng:
-- `fetchHistory()` fail → `messages = []` → Blank
-- `fetchPresence()` fail → Không biết trạng thái
-- Không có local cache → User không xem được tin nhắn cũ
-
----
-
-### ✅ Giải Pháp Đề Xuất Toàn Diện
-
-#### **Giải pháp 1: Offline Message Queue với AsyncStorage**
-
-```typescript
-// frontend/src/services/offlineQueue.ts
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const QUEUE_KEY = '@offline_message_queue';
-
-interface QueuedMessage {
-  id: string;
-  payload: object;
-  createdAt: number;
-  retryCount: number;
-}
-
-export const offlineQueue = {
-  // Thêm tin nhắn vào queue
-  async enqueue(payload: object): Promise<string> {
-    const id = `queue_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    const queue = await this.getAll();
-    queue.push({ id, payload, createdAt: Date.now(), retryCount: 0 });
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-    return id;
-  },
-
-  // Lấy tất cả tin nhắn chờ
-  async getAll(): Promise<QueuedMessage[]> {
-    const data = await AsyncStorage.getItem(QUEUE_KEY);
-    return data ? JSON.parse(data) : [];
-  },
-
-  // Xóa tin nhắn đã gửi thành công
-  async dequeue(id: string): Promise<void> {
-    const queue = await this.getAll();
-    const filtered = queue.filter(item => item.id !== id);
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(filtered));
-  },
-
-  // Flush: gửi tất cả khi online trở lại
-  async flush(sendFn: (payload: object) => void): Promise<number> {
-    const queue = await this.getAll();
-    let sent = 0;
-    for (const item of queue) {
-      try {
-        sendFn(item.payload);
-        await this.dequeue(item.id);
-        sent++;
-      } catch {
-        // Giữ lại trong queue để retry sau
-        break;
-      }
-    }
-    return sent;
-  },
-
-  // Xóa tin nhắn quá 24 giờ
-  async cleanup(): Promise<void> {
-    const queue = await this.getAll();
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    const valid = queue.filter(item => item.createdAt > cutoff);
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(valid));
-  },
-};
-```
-
-#### **Giải pháp 2: Tích hợp NetInfo + Reconnect thông minh**
-
-```typescript
-// Cập nhật WebSocketProvider.tsx
-import NetInfo from '@react-native-community/netinfo';
-import { offlineQueue } from './offlineQueue';
-
-// Trong WebSocketProvider:
-const reconnectAttemptsRef = useRef(0);
-const MAX_RECONNECT_DELAY = 30000; // Max 30 giây
-
-// Exponential backoff
-const getReconnectDelay = () => {
+// Exponential backoff: 2s → 4s → 8s → 16s → max 30s (có jitter)
+const getReconnectDelay = useCallback(() => {
   const attempt = reconnectAttemptsRef.current;
-  const delay = Math.min(
-    1000 * Math.pow(2, attempt) + Math.random() * 1000,  // Jitter
-    MAX_RECONNECT_DELAY
-  );
-  return delay;
-};
+  return Math.min(1000 * Math.pow(2, attempt) + Math.random() * 1000, 30000);
+}, []);
 
-// NetInfo listener - detect mạng ở mức OS
+// NetInfo listener — detect mạng trở lại → reconnect ngay
 useEffect(() => {
   const unsubscribe = NetInfo.addEventListener(state => {
-    if (state.isConnected && !isConnected) {
-      // Mạng vừa trở lại → reconnect ngay
+    if (state.isConnected && !isConnected && shouldReconnectRef.current) {
       reconnectAttemptsRef.current = 0;
+      clearTimeout(reconnectTimeoutRef.current);
       connect();
     }
   });
   return () => unsubscribe();
 }, [isConnected, connect]);
-
-// Cập nhật ws.onopen - flush queue khi reconnect
-ws.onopen = () => {
-  setIsConnected(true);
-  reconnectAttemptsRef.current = 0;  // Reset backoff
-  startHeartbeat();
-
-  // ✅ Flush offline queue
-  offlineQueue.flush((payload) => {
-    ws.send(JSON.stringify(payload));
-  }).then(count => {
-    if (count > 0) {
-      console.log(`✅ Đã gửi ${count} tin nhắn offline`);
-    }
-  });
-};
-
-// Cập nhật ws.onclose - exponential backoff
-ws.onclose = () => {
-  setIsConnected(false);
-  stopHeartbeat();
-
-  if (shouldReconnectRef.current) {
-    const delay = getReconnectDelay();
-    reconnectAttemptsRef.current++;
-    console.log(`🔄 Reconnect sau ${Math.round(delay/1000)}s (lần ${reconnectAttemptsRef.current})`);
-    
-    reconnectTimeoutRef.current = setTimeout(() => {
-      if (isMountedRef.current && shouldReconnectRef.current) {
-        connect();
-      }
-    }, delay);
-  }
-};
-
-// Cập nhật sendMessage - queue nếu offline
-const sendMessage = useCallback((data: object) => {
-  const ws = wsRef.current;
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(data));
-    return;
-  }
-  // ✅ Queue thay vì chỉ log warning
-  offlineQueue.enqueue(data).then(id => {
-    console.log(`📥 Queued message: ${id}`);
-  });
-}, []);
 ```
 
-#### **Giải pháp 3: Cache lịch sử chat local**
+#### **Tầng 3: Chat Cache Local** (`chatCache.ts`)
+
+Cache tin nhắn + danh sách chat vào AsyncStorage → user vẫn xem được khi mất mạng.
 
 ```typescript
 // frontend/src/services/chatCache.ts
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const CACHE_PREFIX = '@chat_cache_';
-const MAX_CACHED_MESSAGES = 50; // Cache 50 tin nhắn gần nhất mỗi conversation
-
 export const chatCache = {
-  async save(conversationId: string, messages: any[]): Promise<void> {
-    const key = `${CACHE_PREFIX}${conversationId}`;
-    const sliced = messages.slice(0, MAX_CACHED_MESSAGES);
-    await AsyncStorage.setItem(key, JSON.stringify(sliced));
-  },
-
-  async load(conversationId: string): Promise<any[]> {
-    const key = `${CACHE_PREFIX}${conversationId}`;
-    const data = await AsyncStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
-  },
-
-  async clear(conversationId: string): Promise<void> {
-    await AsyncStorage.removeItem(`${CACHE_PREFIX}${conversationId}`);
-  },
+  async saveMessages(conversationId, messages) { ... },   // Cache khi fetch OK
+  async loadMessages(conversationId) { ... },              // Load khi offline
+  async saveConversations(conversations) { ... },          // Cache danh sách
+  async loadConversations() { ... },                       // Load khi offline
 };
 
-// Sử dụng trong ChatScreen.tsx:
-// 1. Khi fetchHistory thành công → cache lại
-const fetchHistory = useCallback(async (beforeTimestamp?: number) => {
+// ChatScreen.tsx — fetchHistory có fallback cache
+const fetchHistory = useCallback(async (beforeTimestamp?) => {
   try {
-    // ... fetch logic ...
-    const historyMessages = data.map(msg => mapServerMessage(msg, currentUser));
-    
-    // ✅ Cache vào local storage
-    if (!beforeTimestamp) {
-      await chatCache.save(conversationId, historyMessages);
-    }
-    
-    setMessages(historyMessages);
+    // ... fetch từ server ...
+    chatCache.saveMessages(conversationId, nextMessages);  // ✅ Cache
   } catch (error) {
-    // ✅ Fallback: load từ cache khi mất mạng
-    console.log('Fetch failed, loading from cache...');
-    const cached = await chatCache.load(conversationId);
-    if (cached.length > 0) {
-      setMessages(cached);
-    }
+    // ✅ Fallback khi mất mạng
+    const cached = await chatCache.loadMessages(conversationId);
+    if (cached.length > 0) setMessages(cached);
   }
-}, [conversationId, currentUser]);
+}, [...]);
+
+// ChatListScreen.tsx — loadConversations có fallback cache
+const loadConversations = useCallback(async () => {
+  try {
+    // ... fetch từ server ...
+    chatCache.saveConversations(sanitized);  // ✅ Cache
+  } catch (error) {
+    // ✅ Fallback khi mất mạng
+    const cached = await chatCache.loadConversations();
+    if (cached.length > 0) setConversations(cached);
+  }
+}, [currentUser]);
+```
+
+#### **Tầng 4: Reconnect Sync** (`WebSocketProvider.tsx` + `ChatScreen.tsx`)
+
+Khi online trở lại → tự fetch lại tin nhắn bị miss + flush pending queue.
+
+```typescript
+// WebSocketProvider.tsx — ws.onopen flush queue + set wasReconnected
+ws.onopen = () => {
+  reconnectAttemptsRef.current = 0;
+  setIsConnected(true);
+  setWasReconnected(true);  // ✅ Flag cho ChatScreen
+  startHeartbeat();
+  offlineQueue.flush((payload) => ws.send(JSON.stringify(payload)));
+  offlineQueue.cleanup();
+};
+
+// ChatScreen.tsx — re-sync khi reconnect
+useEffect(() => {
+  if (wasReconnected && isConnected) {
+    fetchHistory();       // ✅ Lấy tin nhắn miss
+    markMessagesAsRead(); // ✅ Đánh dấu đã đọc
+  }
+}, [wasReconnected, isConnected, fetchHistory, markMessagesAsRead]);
 ```
 
 ---
@@ -811,7 +588,7 @@ WiFi trở lại
     │
     ├─ [6] WebSocket reconnect thành công
     │   ├─ offlineQueue.flush() → Gửi tất cả tin nhắn chờ
-    │   ├─ Update message status: 'sending' → 'sent'
+    │   ├─ wasReconnected = true → ChatScreen re-fetch history
     │   └─ fetchHistory() → Sync tin nhắn bị miss
     │
     └─ [7] OfflineBanner ẩn đi → User tiếp tục bình thường
@@ -819,15 +596,16 @@ WiFi trở lại
 
 ---
 
-### 📦 Packages Cần Thêm
+### 📁 Files Implement Tính Chịu Lỗi
 
-```bash
-# Detect trạng thái mạng ở mức OS
-npm install @react-native-community/netinfo
-
-# AsyncStorage đã có sẵn trong project (dùng cho auth)
-# Không cần cài thêm
-```
+| File | Vai trò |
+|------|---------|
+| `frontend/src/services/offlineQueue.ts` | **Mới** — Queue tin nhắn offline vào AsyncStorage |
+| `frontend/src/services/chatCache.ts` | **Mới** — Cache tin nhắn + conversations local |
+| `frontend/src/services/WebSocketProvider.tsx` | **Sửa** — NetInfo + backoff + queue + wasReconnected |
+| `frontend/src/screens/ChatScreen.tsx` | **Sửa** — Cache fallback + reconnect sync |
+| `frontend/src/screens/ChatListScreen.tsx` | **Sửa** — Cache fallback conversations |
+| `frontend/package.json` | **Sửa** — Thêm `@react-native-community/netinfo ^12.0.1` |
 
 ---
 
@@ -835,38 +613,41 @@ npm install @react-native-community/netinfo
 
 | # | Câu Hỏi | Trả Lời |
 |---|---------|---------|
-| 1a | NetInfo? | ❌ Chưa dùng, chỉ dùng WebSocket state. Đề xuất thêm NetInfo |
-| 1b | Lưu offline message ở đâu? | 🟡 Hiện tại: Memory state. Đề xuất: AsyncStorage |
+| 1a | NetInfo? | ✅ **ĐÃ dùng** `@react-native-community/netinfo ^12.0.1` kết hợp WebSocket state |
+| 1b | Lưu offline message ở đâu? | ✅ **AsyncStorage** — `offlineQueue.ts` enqueue/flush/cleanup |
 | 2 | Jitsi Native hay WebView? | ✅ Dùng WebView (đơn giản, đủ tính năng) |
 | 3 | Auto-reply ở đâu? | 🟡 Chưa implement. Đề xuất: Chat Service + AutoReplyService |
 | 4 | UML: Option A hay B? | ✅ **OPTION B (PlantUML code) - Nhanh & chính xác** |
-| 5 | Chịu lỗi khi mất WiFi? | 🔴 **Chưa có.** Chỉ có banner + auto-reconnect cơ bản. Thiếu: queue persist, backoff, cache, sync |
+| 5 | Chịu lỗi khi mất WiFi? | ✅ **ĐÃ implement.** NetInfo + Offline Queue + Chat Cache + Reconnect Sync |
 
 ---
 
 ## 📝 Bước Tiếp Theo (Nếu bạn muốn)
 
-**Để hoàn thiện features:**
+**Đã hoàn thành:**
 
-1. ✅ **Offline Sync:**
-   - Thêm `@react-native-community/netinfo` vào package.json
-   - Implement `offlineQueue.ts` (queue tin nhắn chờ gửi)
-   - Implement `chatCache.ts` (cache lịch sử chat local)
-   - Update WebSocketProvider: NetInfo listener + exponential backoff + flush queue
+1. ✅ **Offline Sync:** ĐÃ implement
+   - ✅ `@react-native-community/netinfo` đã cài
+   - ✅ `offlineQueue.ts` — queue tin nhắn chờ gửi
+   - ✅ `chatCache.ts` — cache lịch sử chat local
+   - ✅ WebSocketProvider: NetInfo listener + exponential backoff + flush queue
 
-2. ✅ **Auto-Reply:**
+2. ✅ **Fault Tolerance:** ĐÃ implement
+   - ✅ Offline Message Queue (không mất tin nhắn)
+   - ✅ NetInfo detect mạng OS-level
+   - ✅ Exponential backoff reconnect (2s→4s→8s→max 30s)
+   - ✅ Chat cache local (xem tin nhắn cũ khi offline)
+   - ✅ Reconnect sync (fetch lại tin nhắn miss)
+
+**Chưa hoàn thành:**
+
+3. 🟡 **Auto-Reply:**
    - Tạo `AutoReplyService.java` trong chat-service
    - Update `ChatMessageKafkaConsumer` để call `autoReplyService.handleAutoReply()`
    - Test với Postman: Gửi message → Lecturer busy → Kiểm tra auto-reply
 
-3. ✅ **UML Diagrams:**
+4. 🟡 **UML Diagrams:**
    - Nếu bạn muốn mình viết PlantUML code cho các sơ đồ
    - Yêu cầu bạn list nên có diagram nào (UC, Activity, Sequence, Class)
    - Mình sẽ viết code PlantUML + hướng dẫn cách render
-
-4. 🔴 **Fault Tolerance (Ưu tiên cao):**
-   - Implement `offlineQueue.ts` → Không mất tin nhắn khi offline
-   - Thêm NetInfo → Detect mạng nhanh hơn (không đợi WebSocket timeout)
-   - Exponential backoff → Tránh DDoS server khi nhiều user reconnect
-   - Chat cache → User vẫn xem được tin nhắn cũ khi mất mạng
 
