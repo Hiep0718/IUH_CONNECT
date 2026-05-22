@@ -7,6 +7,8 @@ import com.iuhconnect.chatservice.model.GroupMember;
 import com.iuhconnect.chatservice.model.GroupRole;
 import com.iuhconnect.chatservice.repository.ConversationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -57,11 +59,13 @@ public class ConversationService {
         return conversationRepository.findByMembersUserId(userId);
     }
 
+    @Cacheable(value = "conversations", key = "#conversationId")
     public ConversationEntity getConversation(String conversationId) {
         return conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
     }
 
+    @CacheEvict(value = "conversations", key = "#conversationId")
     public ConversationEntity updateGroupName(String conversationId, String requesterId, String newName) {
         ConversationEntity group = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
@@ -82,6 +86,7 @@ public class ConversationService {
         return conversationRepository.save(group);
     }
 
+    @CacheEvict(value = "conversations", key = "#conversationId")
     public ConversationEntity addMembers(String conversationId, String requesterId, List<String> newMemberIds) {
         ConversationEntity group = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
@@ -113,6 +118,7 @@ public class ConversationService {
         return conversationRepository.save(group);
     }
 
+    @CacheEvict(value = "conversations", key = "#conversationId")
     public ConversationEntity removeMember(String conversationId, String requesterId, String targetUserId) {
         ConversationEntity group = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
@@ -184,6 +190,7 @@ public class ConversationService {
         return conversationRepository.save(group);
     }
 
+    @CacheEvict(value = "conversations", key = "#conversationId")
     public ConversationEntity leaveAndTransfer(String conversationId, String requesterId, String successorId) {
         ConversationEntity group = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
@@ -213,6 +220,7 @@ public class ConversationService {
         return conversationRepository.save(group);
     }
 
+    @CacheEvict(value = "conversations", key = "#conversationId")
     public ConversationEntity assignRole(String conversationId, String requesterId, String targetUserId, GroupRole newRole) {
         ConversationEntity group = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));

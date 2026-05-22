@@ -8,9 +8,11 @@ import React, {
 } from 'react';
 import { Alert, View, StyleSheet } from 'react-native';
 import Sound from 'react-native-sound';
+import NetInfo from '@react-native-community/netinfo';
 import { WS_URL } from '../config/env';
 import InAppNotification, { InAppNotificationData } from '../components/InAppNotification';
 import { triggerAutoLogout } from './authService';
+import { offlineQueue } from './offlineQueue';
 
 type MessageHandler = (data: any) => void;
 
@@ -19,6 +21,7 @@ interface WebSocketContextType {
   addListener: (id: string, handler: MessageHandler) => void;
   removeListener: (id: string) => void;
   isConnected: boolean;
+  wasReconnected: boolean;
 }
 
 const WebSocketContext = createContext<WebSocketContextType>({
@@ -26,6 +29,7 @@ const WebSocketContext = createContext<WebSocketContextType>({
   addListener: () => {},
   removeListener: () => {},
   isConnected: false,
+  wasReconnected: false,
 });
 
 export const useWebSocket = () => useContext(WebSocketContext);
@@ -61,7 +65,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const isMountedRef = useRef(false);
   const shouldReconnectRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [wasReconnected, setWasReconnected] = useState(false);
+
+  // ── Exponential backoff with jitter ──
+  const MAX_RECONNECT_DELAY = 30000;
+  const getReconnectDelay = useCallback(() => {
+    const attempt = reconnectAttemptsRef.current;
+    return Math.min(
+      1000 * Math.pow(2, attempt) + Math.random() * 1000,
+      MAX_RECONNECT_DELAY,
+    );
+  }, []);
 
   // ── In-app notification state ──
   const [notification, setNotification] = useState<InAppNotificationData | null>(null);
@@ -234,8 +250,22 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         }
 
         console.log('✅ [WSProvider] WebSocket connected');
+        reconnectAttemptsRef.current = 0;
         setIsConnected(true);
+        setWasReconnected(true);
         startHeartbeat();
+
+        // Flush offline message queue
+        offlineQueue.flush((payload) => {
+          ws.send(JSON.stringify(payload));
+        }).then(count => {
+          if (count > 0) {
+            console.log(`✅ [WSProvider] Flushed ${count} offline messages`);
+          }
+        });
+
+        // Cleanup expired queued messages
+        offlineQueue.cleanup();
       };
 
       ws.onmessage = event => {
@@ -337,17 +367,22 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           return;
         }
 
+        // Exponential backoff reconnect
+        const delay = getReconnectDelay();
+        reconnectAttemptsRef.current++;
+        console.log(`🔄 [WSProvider] Reconnect in ${Math.round(delay / 1000)}s (attempt ${reconnectAttemptsRef.current})`);
+
         reconnectTimeoutRef.current = setTimeout(() => {
           if (isMountedRef.current && shouldReconnectRef.current) {
             connect();
           }
-        }, 3000);
+        }, delay);
       };
     } catch (error) {
       console.error('[WSProvider] Failed to create WebSocket:', error);
       setIsConnected(false);
     }
-  }, [handleGlobalIncomingCall, handleGlobalContactEvent, showNotification, currentUser, token, startHeartbeat, stopHeartbeat]);
+  }, [handleGlobalIncomingCall, handleGlobalContactEvent, showNotification, currentUser, token, startHeartbeat, stopHeartbeat, getReconnectDelay]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -368,6 +403,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     };
   }, [connect]);
 
+  // ── NetInfo: detect network changes at OS level ──
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (state.isConnected && !isConnected && shouldReconnectRef.current && isMountedRef.current) {
+        console.log('📶 [WSProvider] Network restored — reconnecting immediately');
+        reconnectAttemptsRef.current = 0;
+        clearTimeout(reconnectTimeoutRef.current);
+        connect();
+      }
+    });
+    return () => unsubscribe();
+  }, [isConnected, connect]);
+
   const sendMessage = useCallback((data: object) => {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -375,7 +423,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       return;
     }
 
-    console.warn('[WSProvider] WebSocket is not connected');
+    // Queue tin nhắn để gửi lại khi online
+    offlineQueue.enqueue(data);
   }, []);
 
   const addListener = useCallback((id: string, handler: MessageHandler) => {
@@ -388,7 +437,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
   return (
     <WebSocketContext.Provider
-      value={{ sendMessage, addListener, removeListener, isConnected }}
+      value={{ sendMessage, addListener, removeListener, isConnected, wasReconnected }}
     >
       <View style={styles.providerContainer}>
         {children}

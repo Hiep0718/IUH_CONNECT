@@ -42,3 +42,21 @@ spring:
 # ---------- JWT Configuration (shared secret with auth-service) ----------
 jwt:
   secret: IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!
+
+# ---------- Actuator (Health Check) ----------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# ---------- Logging ----------
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+  level:
+    com.iuhconnect: INFO
+    org.springframework.web: WARN

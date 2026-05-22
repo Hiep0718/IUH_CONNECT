@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   FlatList,
+  Modal,
   RefreshControl,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -18,7 +21,7 @@ import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import { API_URL } from '../config/env';
 import { useWebSocket } from '../services/WebSocketProvider';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../theme/theme';
+import { Colors, Shadows, Spacing, Typography } from '../theme/theme';
 import type { Conversation } from '../types/types';
 
 interface ChatListScreenProps {
@@ -102,10 +105,10 @@ const mapConversationPreview = (msg: any, currentUser: string): Conversation | n
   }
 
   let preview = msg.content;
-  if (msg.messageType === 'IMAGE') preview = 'Photo';
-  if (msg.messageType === 'VIDEO') preview = 'Video';
-  if (msg.messageType === 'FILE') preview = `File: ${msg.fileName || 'attachment'}`;
-  if (msg.messageType === 'STICKER') preview = 'Sticker';
+  if (msg.messageType === 'IMAGE') preview = '📷 Photo';
+  if (msg.messageType === 'VIDEO') preview = '🎬 Video';
+  if (msg.messageType === 'FILE') preview = `📎 ${msg.fileName || 'File'}`;
+  if (msg.messageType === 'STICKER') preview = '😄 Sticker';
   if (msg.messageType === 'CALL') preview = formatCallPreview(msg.content);
 
   return {
@@ -155,6 +158,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
   const [refreshing, setRefreshing] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread'>('all');
+  const [longPressItem, setLongPressItem] = useState<Conversation | null>(null);
   const headerAnim = useRef(new Animated.Value(0)).current;
   const listAnim = useRef(new Animated.Value(0)).current;
   const presenceAvailableRef = useRef(true);
@@ -290,6 +294,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
     [navigation],
   );
 
+  // ── Online users horizontal strip (Telegram stories-like) ──
   const renderOnlineStrip = () => {
     const onlineUsers = conversations
       .filter(c => c.isOnline && !c.isGroup)
@@ -301,9 +306,23 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
 
     return (
       <View style={styles.onlineStrip}>
-        <Text style={styles.stripTitle}>Active now</Text>
-        <View style={styles.stripUsers}>
-          {onlineUsers.slice(0, 4).map(user => (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.onlineScrollContent}
+        >
+          {/* New message button */}
+          <TouchableOpacity
+            style={styles.stripUser}
+            onPress={() => navigation.navigate('CreateGroup', { currentUser })}
+          >
+            <View style={styles.addStoryCircle}>
+              <Icon name="plus" size={22} color={Colors.primary} />
+            </View>
+            <Text style={styles.stripUserName} numberOfLines={1}>Mới</Text>
+          </TouchableOpacity>
+
+          {onlineUsers.map(user => (
             <TouchableOpacity
               key={user.id}
               style={styles.stripUser}
@@ -321,17 +340,19 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
                 size="medium"
                 isOnline={user.isOnline}
                 showOnlineStatus
+                showGradientRing
               />
               <Text style={styles.stripUserName} numberOfLines={1}>
                 {user.name.split(' ').slice(-1)[0]}
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       </View>
     );
   };
 
+  // ── Conversation row (Telegram flat style) ──
   const renderConversationItem = ({
     item,
     index,
@@ -339,14 +360,8 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
     item: Conversation;
     index: number;
   }) => {
-    const previewIcon =
-      item.lastMessage?.text?.includes('Photo')
-        ? 'image-outline'
-        : item.lastMessage?.text?.includes('Video')
-          ? 'video-outline'
-          : item.lastMessage?.text?.includes('File:')
-            ? 'file-outline'
-            : undefined;
+    const isMine = item.lastMessage?.senderId === currentUser;
+    const previewPrefix = isMine ? 'You: ' : '';
 
     return (
       <Animated.View
@@ -358,7 +373,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
               {
                 translateY: listAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [20 + index * 2, 0],
+                  outputRange: [12 + index * 1, 0],
                 }),
               },
             ],
@@ -367,8 +382,10 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
       >
         <TouchableOpacity
           style={styles.row}
-          activeOpacity={0.82}
+          activeOpacity={0.6}
           onPress={() => openConversation(item)}
+          onLongPress={() => setLongPressItem(item)}
+          delayLongPress={400}
         >
           <Avatar
             name={item.name}
@@ -405,12 +422,12 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
 
             <View style={styles.rowBottom}>
               <View style={styles.previewWrap}>
-                {previewIcon && (
+                {isMine && (
                   <Icon
-                    name={previewIcon}
-                    size={14}
-                    color="#8192A8"
-                    style={{ marginRight: 4 }}
+                    name="check-all"
+                    size={16}
+                    color={Colors.primary}
+                    style={{ marginRight: 3 }}
                   />
                 )}
                 <Text
@@ -418,9 +435,9 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
                     styles.previewText,
                     item.unreadCount > 0 && styles.previewTextUnread,
                   ]}
-                  numberOfLines={1}
+                  numberOfLines={2}
                 >
-                  {item.lastMessage?.text || 'Start a conversation'}
+                  {previewPrefix}{item.lastMessage?.text || 'Bắt đầu trò chuyện'}
                 </Text>
               </View>
               {item.unreadCount > 0 && (
@@ -437,9 +454,11 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
     );
   };
 
+  const renderSeparator = () => <View style={styles.separator} />;
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1459A2" />
+      <StatusBar barStyle="light-content" backgroundColor="#004A82" />
 
       <Animated.View
         style={[
@@ -450,7 +469,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
               {
                 translateY: headerAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [-16, 0],
+                  outputRange: [-12, 0],
                 }),
               },
             ],
@@ -458,60 +477,60 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         ]}
       >
         <LinearGradient
-          colors={['#1459A2', '#1C74D8']}
+          colors={['#004A82', '#0066B3']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
-          <View style={styles.headerTop}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>Chats</Text>
-              <Text style={styles.headerSubtitle}>
-                {unreadCount > 0 ? `${unreadCount} unread messages` : `Signed in as ${currentUser}`}
-              </Text>
-            </View>
-            <View style={styles.headerActions}>
+          {showSearch ? (
+            <View style={styles.searchRow}>
               <TouchableOpacity
-                style={styles.headerIconButton}
-                onPress={() => setShowSearch(prev => !prev)}
+                style={styles.searchBackBtn}
+                onPress={() => {
+                  setShowSearch(false);
+                  setSearchQuery('');
+                }}
               >
-                <Icon
-                  name={showSearch ? 'close' : 'magnify'}
-                  size={21}
-                  color="#FFFFFF"
-                />
+                <Icon name="arrow-left" size={22} color="#FFFFFF" />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.headerIconButton}
-                onPress={() => navigation.navigate('ProfileSettings')}
-              >
-                <Icon name="cog-outline" size={21} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {showSearch && (
-            <View style={styles.searchWrap}>
               <View style={styles.searchBar}>
-                <Icon name="magnify" size={18} color="#7B8CA2" />
+                <Icon name="magnify" size={18} color="rgba(255,255,255,0.5)" />
                 <TextInput
                   value={searchQuery}
                   onChangeText={setSearchQuery}
-                  placeholder="Search conversations"
-                  placeholderTextColor="#94A3B8"
+                  placeholder="Tìm kiếm..."
+                  placeholderTextColor="rgba(255,255,255,0.45)"
                   style={styles.searchInput}
                   autoFocus
                 />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <Icon name="close-circle" size={16} color="rgba(255,255,255,0.5)" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.headerTop}>
+              <Text style={styles.headerTitle}>Tin nhắn</Text>
+              <View style={styles.headerActions}>
+                <TouchableOpacity
+                  style={styles.headerIconButton}
+                  onPress={() => setShowSearch(true)}
+                >
+                  <Icon name="magnify" size={22} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
             </View>
           )}
         </LinearGradient>
       </Animated.View>
 
+      {/* Filter tabs (Telegram-style minimal) */}
       <View style={styles.filterRow}>
         {[
-          { key: 'all', label: 'All' },
-          { key: 'unread', label: 'Unread' },
+          { key: 'all', label: 'Tất cả' },
+          { key: 'unread', label: `Chưa đọc${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
         ].map(filter => (
           <TouchableOpacity
             key={filter.key}
@@ -539,6 +558,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         data={filteredConversations}
         keyExtractor={item => item.id}
         renderItem={renderConversationItem}
+        ItemSeparatorComponent={renderSeparator}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -552,9 +572,9 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         ListEmptyComponent={
           <EmptyState
             icon="chat-outline"
-            title="No conversations yet"
-            subtitle="Start chatting with your classmates or lecturers."
-            actionLabel="New chat"
+            title="Chưa có cuộc trò chuyện nào"
+            subtitle="Bắt đầu nhắn tin với bạn bè hoặc giảng viên."
+            actionLabel="Tin nhắn mới"
             onAction={() =>
               navigation.navigate('Chat', {
                 conversationId: `demo-chat-${Date.now()}`,
@@ -567,6 +587,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         }
       />
 
+      {/* FAB — New message */}
       <View style={styles.fabWrap}>
         <TouchableOpacity
           activeOpacity={0.86}
@@ -574,13 +595,116 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
           onPress={() => navigation.navigate('CreateGroup', { currentUser })}
         >
           <LinearGradient
-            colors={['#1D6FD7', '#1459A2']}
+            colors={['#0077CC', '#005A9E']}
             style={styles.fab}
           >
-            <Icon name="message-plus" size={24} color="#FFFFFF" />
+            <Icon name="pencil-outline" size={24} color="#FFFFFF" />
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {/* ── Long-press context menu ── */}
+      <Modal
+        visible={!!longPressItem}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLongPressItem(null)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setLongPressItem(null)}
+        >
+          <View style={styles.menuSheet}>
+            {/* Header */}
+            <View style={styles.menuHeader}>
+              <Avatar name={longPressItem?.name} size="medium" />
+              <View style={styles.menuHeaderInfo}>
+                <Text style={styles.menuHeaderName} numberOfLines={1}>
+                  {longPressItem?.name}
+                </Text>
+                <Text style={styles.menuHeaderSub} numberOfLines={1}>
+                  {longPressItem?.lastMessage?.text || 'Cuộc trò chuyện'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.menuDivider} />
+
+            {/* Actions */}
+            {[
+              { icon: 'pin-outline', label: 'Ghim cuộc trò chuyện', color: '#0066B3', action: async () => {
+                const convId = longPressItem?.id;
+                setLongPressItem(null);
+                try {
+                  await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${convId}/pin`, { method: 'PUT' });
+                  Alert.alert('Ghim', `Đã ghim cuộc trò chuyện với ${longPressItem?.name}`);
+                } catch { Alert.alert('Lỗi', 'Không thể ghim cuộc trò chuyện'); }
+              }},
+              { icon: 'volume-off', label: 'Tắt thông báo', color: '#64748B', action: async () => {
+                const convId = longPressItem?.id;
+                setLongPressItem(null);
+                try {
+                  await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${convId}/mute`, { method: 'PUT' });
+                  Alert.alert('Tắt thông báo', `Đã tắt thông báo cho ${longPressItem?.name}`);
+                } catch { Alert.alert('Lỗi', 'Không thể tắt thông báo'); }
+              }},
+              { icon: 'check-all', label: 'Đánh dấu đã đọc', color: '#059669', action: async () => {
+                const convId = longPressItem?.id;
+                setLongPressItem(null);
+                try {
+                  await fetch(`${API_URL}/api/v1/chat/history/${convId}/read?userId=${currentUser}`);
+                  setConversations(prev => prev.map(c => c.id === convId ? { ...c, unreadCount: 0 } : c));
+                } catch { Alert.alert('Lỗi', 'Không thể đánh dấu đã đọc'); }
+              }},
+              { icon: 'archive-outline', label: 'Lưu trữ', color: '#7C3AED', action: async () => {
+                const convId = longPressItem?.id;
+                setLongPressItem(null);
+                try {
+                  await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${convId}/archive`, { method: 'PUT' });
+                  setConversations(prev => prev.filter(c => c.id !== convId));
+                  Alert.alert('Lưu trữ', `Đã lưu trữ cuộc trò chuyện với ${longPressItem?.name}`);
+                } catch { Alert.alert('Lỗi', 'Không thể lưu trữ'); }
+              }},
+              { icon: 'delete-outline', label: 'Xóa cuộc trò chuyện', color: '#DC2626', action: () => {
+                const convId = longPressItem?.id;
+                const convName = longPressItem?.name;
+                setLongPressItem(null);
+                Alert.alert(
+                  'Xóa cuộc trò chuyện',
+                  `Bạn có chắc muốn xóa cuộc trò chuyện với ${convName}?`,
+                  [
+                    { text: 'Hủy', style: 'cancel' },
+                    { text: 'Xóa', style: 'destructive', onPress: async () => {
+                      try {
+                        await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${convId}`, { method: 'DELETE' });
+                        setConversations(prev => prev.filter(c => c.id !== convId));
+                      } catch { Alert.alert('Lỗi', 'Không thể xóa cuộc trò chuyện'); }
+                    }},
+                  ],
+                );
+              }},
+            ].map((menuItem, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={styles.menuItem}
+                activeOpacity={0.6}
+                onPress={menuItem.action}
+              >
+                <View style={[styles.menuIconWrap, { backgroundColor: `${menuItem.color}12` }]}>
+                  <Icon name={menuItem.icon} size={20} color={menuItem.color} />
+                </View>
+                <Text style={[
+                  styles.menuItemText,
+                  menuItem.color === '#DC2626' && { color: '#DC2626' },
+                ]}>
+                  {menuItem.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -588,132 +712,144 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#DCE6F2',
+    backgroundColor: '#FFFFFF',
   },
   headerWrap: {
     zIndex: 5,
   },
   header: {
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    height: 44,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 21,
+    fontWeight: '700',
     color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
-  headerSubtitle: {
-    marginTop: 4,
-    fontSize: Typography.bodySmall,
-    color: 'rgba(255,255,255,0.76)',
+    letterSpacing: 0.15,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   headerIconButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchWrap: {
-    marginTop: 14,
-  },
-  searchBar: {
+  // ── Search ──
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    height: 46,
-    ...Shadows.sm,
+    height: 44,
+  },
+  searchBackBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    height: 38,
   },
   searchInput: {
     flex: 1,
     marginLeft: 8,
-    color: '#182433',
-    fontSize: 14,
+    color: '#FFFFFF',
+    fontSize: 15,
     padding: 0,
   },
+  // ── Filter chips ──
   filterRow: {
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: Spacing.xl,
-    paddingTop: 14,
-    paddingBottom: 10,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: 10,
+    paddingBottom: 6,
+    backgroundColor: '#FFFFFF',
   },
   filterChip: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: '#F1F5F9',
   },
   filterChipActive: {
-    backgroundColor: '#1D6FD7',
+    backgroundColor: Colors.primary,
   },
   filterChipText: {
-    color: '#55657A',
+    color: '#64748B',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   filterChipTextActive: {
     color: '#FFFFFF',
   },
+  // ── Online strip ──
   onlineStrip: {
-    marginHorizontal: Spacing.lg,
-    marginBottom: 10,
-    padding: 14,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.88)',
-    ...Shadows.sm,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E8ECF0',
   },
-  stripTitle: {
-    color: '#223042',
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  stripUsers: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
+  onlineScrollContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 10,
+    gap: 16,
   },
   stripUser: {
-    flex: 1,
     alignItems: 'center',
+    width: 60,
+  },
+  addStoryCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 102, 179, 0.05)',
   },
   stripUserName: {
-    marginTop: 6,
-    color: '#607285',
+    marginTop: 4,
+    color: '#475569',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '500',
+    textAlign: 'center',
   },
+  // ── Conversation list ──
   listContent: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: 110,
+    paddingBottom: 100,
   },
-  rowWrapper: {
-    marginBottom: 8,
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E8ECF0',
+    marginLeft: 82,
   },
+  rowWrapper: {},
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    borderRadius: 22,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    ...Shadows.sm,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 10,
   },
   rowContent: {
     flex: 1,
@@ -723,7 +859,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 3,
   },
   rowNameWrap: {
     flexDirection: 'row',
@@ -733,21 +869,23 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   rowName: {
-    color: '#1A2535',
-    fontSize: 15,
-    fontWeight: '700',
+    color: '#0F172A',
+    fontSize: 16,
+    fontWeight: '600',
     flexShrink: 1,
   },
   rowNameUnread: {
-    color: '#0F172A',
+    fontWeight: '700',
+    color: '#000000',
   },
   rowTime: {
-    color: '#7F90A7',
-    fontSize: 11,
-    fontWeight: '600',
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '400',
   },
   rowTimeUnread: {
-    color: '#1D6FD7',
+    color: Colors.primary,
+    fontWeight: '500',
   },
   rowBottom: {
     flexDirection: 'row',
@@ -761,19 +899,20 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   previewText: {
-    color: '#6E8094',
-    fontSize: 13,
+    color: '#94A3B8',
+    fontSize: 14,
     flex: 1,
+    lineHeight: 20,
   },
   previewTextUnread: {
-    color: '#314155',
-    fontWeight: '600',
+    color: '#475569',
+    fontWeight: '500',
   },
   unreadBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#1D6FD7',
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
@@ -781,24 +920,89 @@ const styles = StyleSheet.create({
   unreadBadgeText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
   },
+  // ── FAB ──
   fabWrap: {
     position: 'absolute',
     right: Spacing.xl,
     bottom: Spacing.xxl,
-    ...Shadows.lg,
+    ...Shadows.md,
   },
   fabTouch: {
     borderRadius: 28,
     overflow: 'hidden',
   },
   fab: {
-    width: 58,
-    height: 58,
+    width: 56,
+    height: 56,
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // ── Context menu ──
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  menuSheet: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  menuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  menuHeaderInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  menuHeaderName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  menuHeaderSub: {
+    fontSize: 13,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  menuDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 16,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  menuIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  menuItemText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1E293B',
   },
 });
 
