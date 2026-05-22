@@ -97,4 +97,10 @@ public class UserConversationSettingsService {
     public List<UserConversationSettings> getPinned(String userId) {
         return repository.findByUserIdAndPinnedTrue(userId);
     }
+
+    // ── Get archived conversations ──
+
+    public List<UserConversationSettings> getArchived(String userId) {
+        return repository.findByUserIdAndArchivedTrue(userId);
+    }
 }

@@ -104,4 +104,13 @@ public class ConversationSettingsController {
     public ResponseEntity<List<UserConversationSettings>> getPinned(@PathVariable String userId) {
         return ResponseEntity.ok(settingsService.getPinned(userId));
     }
+
+    /**
+     * GET /api/v1/chat/settings/{userId}/archived
+     * Get all archived conversations for a user
+     */
+    @GetMapping("/{userId}/archived")
+    public ResponseEntity<List<UserConversationSettings>> getArchived(@PathVariable String userId) {
+        return ResponseEntity.ok(settingsService.getArchived(userId));
+    }
 }

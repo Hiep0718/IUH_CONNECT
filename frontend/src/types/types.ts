@@ -87,6 +87,8 @@ export interface Conversation {
   isOnline?: boolean;
   lecturerStatus?: LecturerStatus;
   isPinned?: boolean;
+  isMuted?: boolean;
+  isArchived?: boolean;
 }
 
 // ============================================================

@@ -101,8 +101,10 @@ const formatCallPreview = (content?: string) => {
   }
 };
 
-const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<string, any>, settingsMap: Record<string, boolean>): Conversation | null => {
+const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<string, any>, settingsMap: Record<string, any>): Conversation | null => {
   const groupInfo = groupMap[msg.conversationId];
+  const settings = settingsMap[msg.conversationId] || {};
+
   if (groupInfo) {
     let preview = msg.content;
     if (msg.messageType === 'IMAGE') preview = '📷 Hình ảnh';
@@ -124,7 +126,9 @@ const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<
       },
       unreadCount: msg.unreadCount || 0,
       isOnline: false,
-      isMuted: settingsMap[msg.conversationId] || false,
+      isPinned: settings.pinned || false,
+      isMuted: settings.muted || false,
+      isArchived: settings.archived || false,
     };
   }
 
@@ -154,7 +158,9 @@ const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<
     },
     unreadCount: msg.unreadCount || 0,
     isOnline: false,
-    isMuted: settingsMap[msg.conversationId] || false,
+    isPinned: settings.pinned || false,
+    isMuted: settings.muted || false,
+    isArchived: settings.archived || false,
   };
 };
 
@@ -179,6 +185,75 @@ const sanitizeConversations = (items: Conversation[], currentUser: string) => {
   });
 };
 
+// ── Mock data cho 5 users để test ──
+const MOCK_CONVERSATIONS: Conversation[] = [
+  {
+    id: 'mock-conv-1',
+    name: 'Nguyễn Văn An',
+    targetUserId: 'nguyen-van-an',
+    isGroup: false,
+    participants: [],
+    lastMessage: { text: 'Anh ơi, bài tập tuần này nộp khi nào vậy?', timestamp: new Date(Date.now() - 120000), senderId: 'nguyen-van-an' },
+    unreadCount: 3,
+    isOnline: true,
+    isPinned: true,
+    isMuted: false,
+    isArchived: false,
+  },
+  {
+    id: 'mock-conv-2',
+    name: 'Trần Thị Bình',
+    targetUserId: 'tran-thi-binh',
+    isGroup: false,
+    participants: [],
+    lastMessage: { text: 'Em đã gửi file báo cáo rồi ạ 📎', timestamp: new Date(Date.now() - 3600000), senderId: 'tran-thi-binh' },
+    unreadCount: 1,
+    isOnline: true,
+    isPinned: false,
+    isMuted: true,
+    isArchived: false,
+  },
+  {
+    id: 'mock-conv-3',
+    name: 'Nhóm Đồ án KTPM',
+    targetUserId: 'nhom-do-an-ktpm',
+    isGroup: true,
+    participants: [],
+    lastMessage: { text: 'Cuối tuần họp nhóm nhé mọi người!', timestamp: new Date(Date.now() - 7200000), senderId: 'le-van-cuong' },
+    unreadCount: 5,
+    isOnline: false,
+    isPinned: true,
+    isMuted: false,
+    isArchived: false,
+  },
+  {
+    id: 'mock-conv-4',
+    name: 'Lê Văn Cường',
+    targetUserId: 'le-van-cuong',
+    isGroup: false,
+    participants: [],
+    lastMessage: { text: 'Ok bạn, mình sẽ làm phần backend', timestamp: new Date(Date.now() - 86400000), senderId: 'le-van-cuong' },
+    unreadCount: 0,
+    isOnline: false,
+    isPinned: false,
+    isMuted: false,
+    isArchived: false,
+  },
+  {
+    id: 'mock-conv-5',
+    name: 'Phạm Thị Dung',
+    targetUserId: 'pham-thi-dung',
+    isGroup: false,
+    participants: [],
+    lastMessage: { text: 'Cảm ơn bạn đã giúp đỡ! 🙏', timestamp: new Date(Date.now() - 172800000), senderId: 'pham-thi-dung' },
+    unreadCount: 0,
+    isOnline: false,
+    isPinned: false,
+    isMuted: false,
+    isArchived: true,
+  },
+];
+
 const ChatListScreen: React.FC<ChatListScreenProps> = ({
   navigation,
   currentUser,
@@ -189,6 +264,8 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
   const [showSearch, setShowSearch] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [archivedConversations, setArchivedConversations] = useState<Conversation[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread'>('all');
   const [longPressItem, setLongPressItem] = useState<Conversation | null>(null);
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -238,7 +315,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         return;
       }
 
-      let settingsMap: Record<string, boolean> = {};
+      let settingsMap: Record<string, any> = {};
       try {
         const settingsRes = await authFetch(`${API_URL}/api/v1/chat/settings/${currentUser}`, {
            headers: { Authorization: `Bearer ${token}` }
@@ -246,7 +323,11 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         if (settingsRes.ok) {
            const settings = await settingsRes.json();
            settings.forEach((s: any) => {
-             settingsMap[s.conversationId] = s.muted;
+             settingsMap[s.conversationId] = {
+               pinned: s.pinned || false,
+               muted: s.muted || false,
+               archived: s.archived || false,
+             };
            });
         }
       } catch (e) {
@@ -287,9 +368,37 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         }
       }
 
-      setConversations(sanitized);
+      // Tách archived conversations ra riêng
+      const archived = sanitized.filter(c => c.isArchived);
+      const active = sanitized.filter(c => !c.isArchived);
+
+      // Sort: pinned lên đầu, còn lại theo thời gian
+      active.sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        const timeA = a.lastMessage?.timestamp?.getTime() || 0;
+        const timeB = b.lastMessage?.timestamp?.getTime() || 0;
+        return timeB - timeA;
+      });
+
+      setArchivedConversations(archived);
+
+      // Nếu không có data thực, dùng mock data để test
+      if (active.length === 0) {
+        const mockActive = MOCK_CONVERSATIONS.filter(c => !c.isArchived);
+        const mockArchived = MOCK_CONVERSATIONS.filter(c => c.isArchived);
+        setConversations(mockActive);
+        setArchivedConversations(mockArchived);
+      } else {
+        setConversations(active);
+      }
     } catch (error) {
       console.log('Error loading conversations', error);
+      // Fallback to mock data on error
+      const mockActive = MOCK_CONVERSATIONS.filter(c => !c.isArchived);
+      const mockArchived = MOCK_CONVERSATIONS.filter(c => c.isArchived);
+      setConversations(mockActive);
+      setArchivedConversations(mockArchived);
     }
   }, [currentUser]);
 
@@ -474,6 +583,9 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
                 >
                   {item.name}
                 </Text>
+                {item.isPinned && (
+                  <Icon name="pin" size={14} color={Colors.primary} style={{ marginLeft: 4 }} />
+                )}
                 {item.isMuted && (
                   <Icon name="bell-off-outline" size={14} color={Colors.textMuted} style={{ marginLeft: 4 }} />
                 )}
@@ -625,6 +737,25 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
 
       {renderOnlineStrip()}
 
+      {/* Archived conversations banner */}
+      {archivedConversations.length > 0 && (
+        <TouchableOpacity
+          style={styles.archivedBanner}
+          activeOpacity={0.7}
+          onPress={() => setShowArchived(true)}
+        >
+          <View style={styles.archivedBannerLeft}>
+            <View style={styles.archivedIconWrap}>
+              <Icon name="archive-outline" size={20} color="#7C3AED" />
+            </View>
+            <Text style={styles.archivedBannerText}>Tin nhắn đã lưu trữ</Text>
+          </View>
+          <View style={styles.archivedBadge}>
+            <Text style={styles.archivedBadgeText}>{archivedConversations.length}</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
       <FlatList
         data={filteredConversations}
         keyExtractor={item => item.id}
@@ -704,21 +835,36 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
 
             {/* Actions */}
             {[
-              { icon: 'pin-outline', label: 'Ghim cuộc trò chuyện', color: '#0066B3', action: async () => {
+              { icon: longPressItem?.isPinned ? 'pin-off-outline' : 'pin-outline',
+                label: longPressItem?.isPinned ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện',
+                color: '#0066B3', action: async () => {
                 const convId = longPressItem?.id;
+                const wasPinned = longPressItem?.isPinned;
                 setLongPressItem(null);
                 try {
                   await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${convId}/pin`, { method: 'PUT' });
-                  Alert.alert('Ghim', `Đã ghim cuộc trò chuyện với ${longPressItem?.name}`);
-                } catch { Alert.alert('Lỗi', 'Không thể ghim cuộc trò chuyện'); }
+                  setConversations(prev => {
+                    const updated = prev.map(c => c.id === convId ? { ...c, isPinned: !wasPinned } : c);
+                    return updated.sort((a, b) => {
+                      if (a.isPinned && !b.isPinned) return -1;
+                      if (!a.isPinned && b.isPinned) return 1;
+                      return 0;
+                    });
+                  });
+                  Alert.alert(wasPinned ? 'Bỏ ghim' : 'Ghim', wasPinned ? `Đã bỏ ghim cuộc trò chuyện` : `Đã ghim cuộc trò chuyện`);
+                } catch { Alert.alert('Lỗi', 'Không thể thay đổi trạng thái ghim'); }
               }},
-              { icon: 'volume-off', label: 'Tắt thông báo', color: '#64748B', action: async () => {
+              { icon: longPressItem?.isMuted ? 'volume-high' : 'volume-off',
+                label: longPressItem?.isMuted ? 'Bật thông báo' : 'Tắt thông báo',
+                color: '#64748B', action: async () => {
                 const convId = longPressItem?.id;
+                const wasMuted = longPressItem?.isMuted;
                 setLongPressItem(null);
                 try {
                   await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${convId}/mute`, { method: 'PUT' });
-                  Alert.alert('Tắt thông báo', `Đã tắt thông báo cho ${longPressItem?.name}`);
-                } catch { Alert.alert('Lỗi', 'Không thể tắt thông báo'); }
+                  setConversations(prev => prev.map(c => c.id === convId ? { ...c, isMuted: !wasMuted } : c));
+                  Alert.alert(wasMuted ? 'Bật thông báo' : 'Tắt thông báo', wasMuted ? `Đã bật thông báo` : `Đã tắt thông báo`);
+                } catch { Alert.alert('Lỗi', 'Không thể thay đổi thông báo'); }
               }},
               { icon: 'check-all', label: 'Đánh dấu đã đọc', color: '#059669', action: async () => {
                 const convId = longPressItem?.id;
@@ -730,11 +876,15 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
               }},
               { icon: 'archive-outline', label: 'Lưu trữ', color: '#7C3AED', action: async () => {
                 const convId = longPressItem?.id;
+                const convItem = longPressItem;
                 setLongPressItem(null);
                 try {
                   await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${convId}/archive`, { method: 'PUT' });
                   setConversations(prev => prev.filter(c => c.id !== convId));
-                  Alert.alert('Lưu trữ', `Đã lưu trữ cuộc trò chuyện với ${longPressItem?.name}`);
+                  if (convItem) {
+                    setArchivedConversations(prev => [...prev, { ...convItem, isArchived: true }]);
+                  }
+                  Alert.alert('Lưu trữ', `Đã lưu trữ cuộc trò chuyện`);
                 } catch { Alert.alert('Lỗi', 'Không thể lưu trữ'); }
               }},
               { icon: 'delete-outline', label: 'Xóa cuộc trò chuyện', color: '#DC2626', action: () => {
@@ -775,6 +925,74 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
             ))}
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* ── Archived conversations modal ── */}
+      <Modal
+        visible={showArchived}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowArchived(false)}
+      >
+        <SafeAreaView style={styles.archivedModal}>
+          <View style={styles.archivedModalHeader}>
+            <TouchableOpacity onPress={() => setShowArchived(false)} style={styles.archivedBackBtn}>
+              <Icon name="arrow-left" size={24} color="#0F172A" />
+            </TouchableOpacity>
+            <Text style={styles.archivedModalTitle}>Tin nhắn đã lưu trữ</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <FlatList
+            data={archivedConversations}
+            keyExtractor={item => item.id}
+            ItemSeparatorComponent={renderSeparator}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <EmptyState
+                icon="archive-outline"
+                title="Không có tin nhắn lưu trữ"
+                subtitle="Các cuộc trò chuyện đã lưu trữ sẽ hiển thị ở đây."
+              />
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.row}
+                activeOpacity={0.6}
+                onPress={() => {
+                  setShowArchived(false);
+                  openConversation(item);
+                }}
+              >
+                <Avatar name={item.name} size="large" isOnline={item.isOnline} showOnlineStatus={!item.isGroup} />
+                <View style={styles.rowContent}>
+                  <View style={styles.rowTop}>
+                    <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.rowTime}>
+                      {item.lastMessage ? formatTimeAgo(item.lastMessage.timestamp) : ''}
+                    </Text>
+                  </View>
+                  <View style={styles.rowBottom}>
+                    <Text style={styles.previewText} numberOfLines={1}>
+                      {item.lastMessage?.text || 'Cuộc trò chuyện'}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.unarchiveBtn}
+                      onPress={async () => {
+                        try {
+                          await fetch(`${API_URL}/api/v1/chat/settings/${currentUser}/${item.id}/archive`, { method: 'PUT' });
+                          setArchivedConversations(prev => prev.filter(c => c.id !== item.id));
+                          setConversations(prev => [...prev, { ...item, isArchived: false }]);
+                        } catch { Alert.alert('Lỗi', 'Không thể bỏ lưu trữ'); }
+                      }}
+                    >
+                      <Icon name="archive-arrow-up-outline" size={20} color="#7C3AED" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -1074,6 +1292,83 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: '#1E293B',
+  },
+  // ── Archived banner ──
+  archivedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 12,
+    backgroundColor: '#F5F3FF',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E8ECF0',
+  },
+  archivedBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  archivedIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#EDE9FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  archivedBannerText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#5B21B6',
+  },
+  archivedBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  archivedBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  // ── Archived modal ──
+  archivedModal: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  archivedModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E8ECF0',
+    backgroundColor: '#F8FAFC',
+  },
+  archivedBackBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  archivedModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  unarchiveBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F3FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
