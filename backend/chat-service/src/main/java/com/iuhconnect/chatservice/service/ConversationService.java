@@ -15,15 +15,23 @@ import org.springframework.context.annotation.Lazy;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.kafka.core.KafkaTemplate;
+import com.iuhconnect.chatservice.dto.ChatMessageDto;
+import java.util.UUID;
+
 @Service
 public class ConversationService {
 
     private final ConversationRepository conversationRepository;
     private final RealtimeEventService realtimeEventService;
+    private final KafkaTemplate<String, ChatMessageDto> kafkaTemplate;
 
-    public ConversationService(ConversationRepository conversationRepository, @Lazy RealtimeEventService realtimeEventService) {
+    public ConversationService(ConversationRepository conversationRepository, 
+                               @Lazy RealtimeEventService realtimeEventService,
+                               KafkaTemplate<String, ChatMessageDto> kafkaTemplate) {
         this.conversationRepository = conversationRepository;
         this.realtimeEventService = realtimeEventService;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     private void broadcastGroupUpdate(ConversationEntity group) {
@@ -67,7 +75,20 @@ public class ConversationService {
                 .updatedAt(now)
                 .build();
 
-        return conversationRepository.save(group);
+        ConversationEntity saved = conversationRepository.save(group);
+
+        // Send a SYSTEM message so the conversation appears in the list
+        ChatMessageDto sysMessage = ChatMessageDto.builder()
+                .id(UUID.randomUUID().toString())
+                .senderId(creatorId)
+                .content(creatorId + " đã tạo nhóm")
+                .conversationId(saved.getId())
+                .timestamp(now)
+                .messageType("SYSTEM")
+                .build();
+        kafkaTemplate.send("chat-messages", saved.getId(), sysMessage);
+
+        return saved;
     }
 
     public List<ConversationEntity> getUserConversations(String userId) {

@@ -113,7 +113,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'PING' }));
       }
-    }, 30000); // Every 30 seconds
+    }, 10000); // Every 10 seconds
   }, []);
 
   const stopHeartbeat = useCallback(() => {
@@ -407,7 +407,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   // ── NetInfo: detect network changes at OS level ──
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
-      if (state.isConnected && !isConnected && shouldReconnectRef.current && isMountedRef.current) {
+      const currentSocket = wsRef.current;
+      const isActuallyConnected = currentSocket?.readyState === WebSocket.OPEN;
+      
+      if (state.isConnected && !isActuallyConnected && shouldReconnectRef.current && isMountedRef.current) {
         console.log('📶 [WSProvider] Network restored — reconnecting immediately');
         reconnectAttemptsRef.current = 0;
         clearTimeout(reconnectTimeoutRef.current);
@@ -415,7 +418,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       }
     });
     return () => unsubscribe();
-  }, [isConnected, connect]);
+  }, [connect]);
 
   const sendMessage = useCallback((data: object) => {
     const ws = wsRef.current;

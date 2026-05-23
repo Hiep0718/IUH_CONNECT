@@ -400,6 +400,19 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
 
         {/* Actions Grid */}
         <View style={styles.actionsGrid}>
+          <TouchableOpacity style={styles.actionItem} onPress={() => {
+            navigation.navigate('Chat', {
+              conversationId: conversationId,
+              recipientName: currentGroupName,
+              recipientId: conversationId,
+              isGroup: true
+            });
+          }}>
+            <View style={styles.actionIconWrapper}>
+              <Icon name="chat" size={24} color={Colors.textPrimary} />
+            </View>
+            <Text style={styles.actionText}>Nhắn tin</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.actionItem}>
             <View style={styles.actionIconWrapper}>
               <Icon name="magnify" size={24} color={Colors.textPrimary} />

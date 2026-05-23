@@ -133,6 +133,11 @@ export type RootStackParamList = {
     conversationId: string;
     groupName: string;
   };
+  ChatSettings: {
+    conversationId: string;
+    recipientId: string;
+    recipientName: string;
+  };
   Meeting: {
     callerId: string;
     callerName: string;

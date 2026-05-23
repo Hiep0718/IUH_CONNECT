@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StatusBar, LogBox, View, Text, Animated, StyleSheet, Image } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -17,13 +17,14 @@ import ContactsScreen from './src/screens/ContactsScreen';
 import GroupsScreen from './src/screens/GroupsScreen';
 import CreateGroupScreen from './src/screens/CreateGroupScreen';
 import GroupSettingsScreen from './src/screens/GroupSettingsScreen';
+import ChatSettingsScreen from './src/screens/ChatSettingsScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import MeetingScreen from './src/screens/MeetingScreen';
 import ProfileSettingsScreen from './src/screens/ProfileSettingsScreen';
 
 // Services
 import { WebSocketProvider, useWebSocket } from './src/services/WebSocketProvider';
-import { isTokenExpired, onAuthExpired } from './src/services/authService';
+import { isTokenExpired, onAuthExpired, authFetch } from './src/services/authService';
 import { API_URL } from './src/config/env';
 import {
   requestUserPermission,
@@ -251,13 +252,15 @@ const MainTabs = ({
   const fetchUnreadCounts = useCallback(async () => {
     if (!currentUser) return;
     try {
-      const res = await fetch(`${API_URL}/api/v1/chat/conversations/${currentUser}`);
+      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/${currentUser}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         let chatUnread = 0;
         let groupUnread = 0;
         data.forEach((msg: any) => {
-          const count = msg.unreadCount || 0;
+          const count = msg.unreadCount !== undefined ? msg.unreadCount : (msg.unread_count || 0);
           if (msg.type === 'GROUP' || (msg.conversationId && msg.conversationId.startsWith('GROUP_'))) {
             groupUnread += count;
           } else {
@@ -270,9 +273,11 @@ const MainTabs = ({
     } catch (e) {}
   }, [currentUser]);
 
-  useEffect(() => {
-    fetchUnreadCounts();
-  }, [fetchUnreadCounts]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCounts();
+    }, [fetchUnreadCounts])
+  );
 
   useEffect(() => {
     const listenerId = 'main-tabs-ws';
@@ -551,6 +556,15 @@ export default function App() {
             >
               {(props) => (
                 <GroupSettingsScreen {...props} currentUser={currentUser} token={token} />
+              )}
+            </Stack.Screen>
+
+            <Stack.Screen
+              name="ChatSettings"
+              options={{ animation: 'slide_from_right' }}
+            >
+              {(props) => (
+                <ChatSettingsScreen {...props} currentUser={currentUser} token={token} />
               )}
             </Stack.Screen>
 

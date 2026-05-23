@@ -41,6 +41,5 @@ public class ConversationSummaryDto {
     @Field("is_read")
     private boolean isRead;
 
-    @Field("unread_count")
     private Integer unreadCount;
 }

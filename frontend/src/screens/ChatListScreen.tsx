@@ -101,7 +101,13 @@ const formatCallPreview = (content?: string) => {
   }
 };
 
-const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<string, any>, settingsMap: Record<string, any>): Conversation | null => {
+const mapConversationPreview = (
+  msg: any,
+  currentUser: string,
+  groupMap: Record<string, any>,
+  settingsMap: Record<string, any>,
+  contactMap: Record<string, string>
+): Conversation | null => {
   const groupInfo = groupMap[msg.conversationId];
   const settings = settingsMap[msg.conversationId] || {};
 
@@ -133,6 +139,7 @@ const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<
   }
 
   const otherUserId = resolveOtherUserId(msg, currentUser);
+  console.log('MSG UNREAD CHECK:', otherUserId, msg.unreadCount, msg.unread_count, Object.keys(msg));
   if (!otherUserId || otherUserId === currentUser) {
     return null;
   }
@@ -146,7 +153,7 @@ const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<
 
   return {
     id: msg.conversationId,
-    name: otherUserId,
+    name: contactMap[otherUserId] || otherUserId,
     targetUserId: otherUserId,
     avatar: undefined,
     isGroup: false,
@@ -156,7 +163,7 @@ const mapConversationPreview = (msg: any, currentUser: string, groupMap: Record<
       timestamp: new Date(msg.timestamp),
       senderId: msg.senderId,
     },
-    unreadCount: msg.unreadCount || 0,
+    unreadCount: msg.unreadCount !== undefined ? msg.unreadCount : (msg.unread_count || 0),
     isOnline: false,
     isPinned: settings.pinned || false,
     isMuted: settings.muted || false,
@@ -334,9 +341,24 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
          console.log('Error fetching user settings in ChatList', e);
       }
 
+      let contactMap: Record<string, string> = {};
+      try {
+        const contactsRes = await authFetch(`${API_URL}/api/v1/contacts/list`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (contactsRes.ok) {
+          const contacts = await contactsRes.json();
+          contacts.forEach((c: any) => {
+            contactMap[c.username] = c.fullName || c.username;
+          });
+        }
+      } catch (e) {
+        console.log('Error fetching contacts in ChatList', e);
+      }
+
       const data = await res.json();
       const mapped = data
-        .map((msg: any) => mapConversationPreview(msg, currentUser, groupMap, settingsMap))
+        .map((msg: any) => mapConversationPreview(msg, currentUser, groupMap, settingsMap, contactMap))
         .filter(Boolean) as Conversation[];
       const sanitized = sanitizeConversations(mapped, currentUser);
 
@@ -346,9 +368,12 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
 
       if (userIds.length > 0 && presenceAvailableRef.current) {
         try {
-          const presenceRes = await fetch(`${API_URL}/api/v1/presence/bulk`, {
+          const presenceRes = await authFetch(`${API_URL}/api/v1/presence/bulk`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}` 
+            },
             body: JSON.stringify(userIds),
           });
 
@@ -475,7 +500,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
   const renderOnlineStrip = () => {
     const onlineUsers = conversations
       .filter(c => c.isOnline && !c.isGroup)
-      .map(c => ({ id: c.targetUserId!, name: c.name, isOnline: true }));
+      .map(c => ({ id: c.targetUserId!, name: c.name, isOnline: true, conversationId: c.id }));
 
     if (onlineUsers.length === 0) {
       return null;
@@ -505,7 +530,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
               style={styles.stripUser}
               onPress={() =>
                 navigation.navigate('Chat', {
-                  conversationId: buildDirectConversationKey(currentUser, user.id),
+                  conversationId: user.conversationId,
                   recipientName: user.name,
                   recipientId: user.id,
                   isOnline: user.isOnline,

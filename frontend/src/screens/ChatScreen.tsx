@@ -13,6 +13,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Linking,
+  Image,
 } from 'react-native';
 import DocumentPicker from 'react-native-document-picker';
 import {
@@ -159,7 +161,9 @@ const mapServerMessage = (
     text:
       msg.messageType === 'CALL'
         ? msg.content
-        : normalizeMessageText(msg.messageType, isStickerImage ? '' : msg.content, msg.fileName),
+        : (msg.messageType === 'IMAGE' || msg.messageType === 'VIDEO' || msg.messageType === 'FILE' || isStickerImage)
+          ? ''
+          : normalizeMessageText(msg.messageType, msg.content, msg.fileName),
     createdAt: new Date(msg.timestamp),
     user: {
       _id: msg.senderId === currentUser ? 'me' : msg.senderId,
@@ -419,7 +423,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const fetchPresence = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/presence/${recipientId}`);
+      const res = await authFetch(`${API_URL}/api/v1/presence/${recipientId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (!res.ok) {
         return;
       }
@@ -870,7 +876,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
         const optimisticMessage: ExtendedMessage = {
           _id: optimisticId,
-          text: normalizeMessageText(messageType, '', upload.fileName),
+          text: (messageType === 'IMAGE' || messageType === 'VIDEO' || messageType === 'FILE') ? '' : normalizeMessageText(messageType, '', upload.fileName),
           rawContent: normalizeMessageText(messageType, '', upload.fileName),
           createdAt: new Date(),
           user: { _id: 'me', name: currentUser },
@@ -1009,18 +1015,18 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const openLibrary = useCallback(async () => {
     try {
-      const result = await launchImageLibrary({ mediaType: 'mixed', quality: 0.8 });
-      const asset = result.assets?.[0];
-      if (!asset?.uri) {
-        return;
-      }
+      const result = await launchImageLibrary({ mediaType: 'mixed', quality: 0.8, selectionLimit: 0 });
+      if (!result.assets || result.assets.length === 0) return;
 
-      await handleMediaSend({
-        uri: asset.uri,
-        fileName: asset.fileName || 'media',
-        type: asset.type || 'application/octet-stream',
-        fileSize: asset.fileSize,
-      });
+      for (const asset of result.assets) {
+        if (!asset.uri) continue;
+        await handleMediaSend({
+          uri: asset.uri,
+          fileName: asset.fileName || 'media',
+          type: asset.type || 'application/octet-stream',
+          fileSize: asset.fileSize,
+        });
+      }
     } catch {
       Alert.alert('Gallery', 'Cannot open gallery.');
     }
@@ -1326,13 +1332,49 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     [],
   );
 
+  const renderCustomView = useCallback((props: any) => {
+    const msg = props.currentMessage as ExtendedMessage;
+    if (msg.messageType === 'FILE' && msg.mediaUrl) {
+      return (
+        <TouchableOpacity style={styles.fileCard} onPress={() => Linking.openURL(msg.mediaUrl!)} activeOpacity={0.8}>
+          <View style={styles.fileIconWrap}>
+            <Icon name="file-document-outline" size={32} color="#FFF" />
+          </View>
+          <View style={styles.fileInfo}>
+            <Text style={styles.fileName} numberOfLines={1}>{msg.fileName || 'Document'}</Text>
+            <Text style={styles.fileSize}>
+              {msg.fileSize
+                ? (msg.fileSize / 1024 > 1024
+                    ? (msg.fileSize / 1024 / 1024).toFixed(2) + ' MB'
+                    : (msg.fileSize / 1024).toFixed(0) + ' KB')
+                : 'Unknown size'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+    return null;
+  }, []);
+
+  const renderMessageImage = useCallback((props: any) => {
+    const msg = props.currentMessage as ExtendedMessage;
+    if (msg.image) {
+      return (
+        <TouchableOpacity onPress={() => Linking.openURL(msg.image!)} activeOpacity={0.9}>
+          <Image source={{ uri: msg.image }} style={styles.customImage} resizeMode="cover" />
+        </TouchableOpacity>
+      );
+    }
+    return null;
+  }, []);
+
   const renderChatFooter = useCallback(() => <TypingIndicator isVisible={isTyping} />, [isTyping]);
 
   const renderInputToolbar = useCallback(
     (props: any) => (
       <InputToolbar
         {...props}
-        containerStyle={styles.inputToolbar}
+        containerStyle={[styles.inputToolbar, replyTo ? { flexDirection: 'column-reverse' } : undefined]}
         primaryStyle={styles.inputToolbarPrimary}
         renderAccessory={replyTo ? () => (
           <View style={styles.replyBar}>
@@ -1557,11 +1599,19 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             <TouchableOpacity
               style={styles.headerIcon}
               onPress={() => {
-                if (!isOffline && isGroup) {
-                  navigation.navigate('GroupSettings', {
-                    conversationId,
-                    groupName: displayRecipientName,
-                  });
+                if (!isOffline) {
+                  if (isGroup) {
+                    navigation.navigate('GroupSettings', {
+                      conversationId,
+                      groupName: displayRecipientName,
+                    });
+                  } else {
+                    navigation.navigate('ChatSettings', {
+                      conversationId,
+                      recipientId,
+                      recipientName: displayRecipientName,
+                    });
+                  }
                 }
               }}
             >
@@ -1597,6 +1647,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         renderComposer={renderComposer}
         renderSend={renderSend}
         renderChatFooter={renderChatFooter}
+        renderCustomView={renderCustomView}
+        renderMessageImage={renderMessageImage}
         renderAvatar={renderAvatar}
         onInputTextChanged={setInputText}
         extraData={replyTo}
@@ -1723,6 +1775,44 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#E8ECF1',
+  },
+  fileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#004A82',
+    borderRadius: 12,
+    padding: 12,
+    margin: 4,
+    maxWidth: 240,
+  },
+  fileIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  fileInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  fileName: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  fileSize: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+  },
+  customImage: {
+    width: 220,
+    height: 220,
+    borderRadius: 12,
+    margin: 4,
   },
   wallpaperLayer: {
     ...StyleSheet.absoluteFillObject,
