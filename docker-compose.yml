@@ -123,6 +123,15 @@ services:
       timeout: 20s
       retries: 3
 
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: iuh-zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - iuh-connect-network
+    restart: always
+
   # =============================================
   # BACKEND SERVICES
   # =============================================
@@ -143,6 +152,7 @@ services:
       SPRING_DATASOURCE_USERNAME: iuh_user
       SPRING_DATASOURCE_PASSWORD: iuh_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     networks:
       - iuh-connect-network
     restart: always
@@ -180,6 +190,7 @@ services:
       SPRING_DATA_REDIS_PASSWORD: iuh_redis_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_MINIO_URL: http://minio:9000
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     networks:
       - iuh-connect-network
     restart: always
@@ -217,6 +228,7 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: iuh_redis_pass
       JWT_SECRET: IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     networks:
       - iuh-connect-network
     restart: always
@@ -251,6 +263,7 @@ services:
       SPRING_DATA_REDIS_PASSWORD: iuh_redis_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       JWT_SECRET: IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     networks:
       - iuh-connect-network
     restart: always
@@ -277,6 +290,7 @@ services:
         condition: service_started
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     networks:
       - iuh-connect-network
     restart: always

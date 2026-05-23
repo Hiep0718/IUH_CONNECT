@@ -31,6 +31,10 @@ spring:
                 redis-rate-limiter.replenishRate: 10
                 redis-rate-limiter.burstCapacity: 20
                 key-resolver: "#{@userKeyResolver}"
+            - name: CircuitBreaker
+              args:
+                name: authServiceCircuitBreaker
+                fallbackUri: forward:/fallback/auth
 
         # -------- Chat Service (HTTP) --------
         - id: chat-service-http
@@ -43,6 +47,10 @@ spring:
                 redis-rate-limiter.replenishRate: 10
                 redis-rate-limiter.burstCapacity: 20
                 key-resolver: "#{@userKeyResolver}"
+            - name: CircuitBreaker
+              args:
+                name: chatServiceCircuitBreaker
+                fallbackUri: forward:/fallback/chat
 
         # -------- Chat Service (WebSocket) --------
         - id: chat-service-ws
@@ -98,16 +106,39 @@ spring:
           predicates:
             - Path=/ws/presence/**
 
+# ---------- Resilience4j Global Config ----------
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+    instances:
+      authServiceCircuitBreaker:
+        baseConfig: default
+      chatServiceCircuitBreaker:
+        baseConfig: default
+
 # ---------- JWT Configuration (shared secret with auth-service) ----------
 jwt:
   secret: ${JWT_SECRET:IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!}
 
 # ---------- Actuator ----------
 management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: "http://localhost:9411/api/v2/spans"
   endpoints:
     web:
       exposure:
-        include: health,info,gateway
+        include: health,info,gateway,metrics,prometheus
   endpoint:
     gateway:
       enabled: true
@@ -117,7 +148,8 @@ management:
 # ---------- Logging ----------
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] [traceId=%X{traceId},spanId=%X{spanId}] - %msg%n"
   level:
     org.springframework.cloud.gateway: INFO
     com.iuhconnect.gateway: DEBUG
+    io.github.resilience4j: DEBUG

@@ -33,10 +33,16 @@ presence:
 
 # ---------- Actuator (Health Check) ----------
 management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: "http://localhost:9411/api/v2/spans"
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
@@ -44,7 +50,7 @@ management:
 # ---------- Logging ----------
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] [traceId=%X{traceId},spanId=%X{spanId}] - %msg%n"
   level:
     com.iuhconnect: INFO
     org.springframework.web: WARN
