@@ -10,6 +10,7 @@ import {
 } from '@react-native-firebase/messaging';
 import { API_URL } from '../config/env';
 import { authFetch } from './authService';
+import notifee, { AndroidImportance, AndroidCategory, EventType } from '@notifee/react-native';
 
 const messagingInstance = getMessaging(getApp());
 
@@ -63,6 +64,23 @@ export const sendFCMTokenToBackend = async (token: string, userJwt: string) => {
 };
 
 export const setupNotificationListeners = () => {
+  // Tạo sẵn channel cho cuộc gọi đến để hệ thống Android tự xử lý Push Notification (bật pop-up Heads-up)
+  if (Platform.OS === 'android') {
+    (async () => {
+      await notifee.createChannel({
+        id: 'call_channel',
+        name: 'Cuộc gọi đến',
+        importance: AndroidImportance.HIGH,
+        vibration: true,
+      });
+      await notifee.createChannel({
+        id: 'default_channel',
+        name: 'Thông báo chung',
+        importance: AndroidImportance.DEFAULT,
+      });
+    })();
+  }
+
   return onMessage(messagingInstance, async remoteMessage => {
     console.log('A new FCM message arrived!', JSON.stringify(remoteMessage));
 
@@ -81,8 +99,9 @@ export const setupNotificationListeners = () => {
 export const registerBackgroundMessageHandler = () => {
   setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
     console.log('Message handled in the background!', remoteMessage);
-    // Background messages automatically show system notifications
-    // No additional handling needed — Android/iOS will display them
+    // Khi Backend gửi { notification, android: { channel_id } }, hệ thống Android sẽ tự động vẽ Notification
+    // dựa trên cái channel_id mà ta đã tạo ở setupNotificationListeners.
+    // Không cần dùng JS Notifee để vẽ lại nữa (tránh trùng lặp và tránh lỗi do App bị kill).
   });
 };
 

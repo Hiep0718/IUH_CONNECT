@@ -12,21 +12,27 @@ import java.util.Map;
 @RequestMapping("/fallback")
 public class FallbackController {
 
-    @GetMapping("/auth")
+    @RequestMapping("/auth")
     public Mono<ResponseEntity<Map<String, String>>> authServiceFallback() {
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(Map.of("message", "Auth Service is currently unavailable. Please try again later.")));
     }
 
-    @GetMapping("/chat")
+    @RequestMapping("/chat")
     public Mono<ResponseEntity<Map<String, String>>> chatServiceFallback() {
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(Map.of("message", "Chat Service is currently unavailable. Please try again later.")));
     }
 
-    @GetMapping("/presence")
+    @RequestMapping("/presence")
     public Mono<ResponseEntity<Map<String, String>>> presenceServiceFallback() {
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(Map.of("message", "Presence Service is currently unavailable. Please try again later.")));
+    }
+
+    @RequestMapping("/ai")
+    public Mono<ResponseEntity<Map<String, String>>> aiServiceFallback() {
+        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("message", "AI Service is currently unavailable or initializing. Please try again later.")));
     }
 }

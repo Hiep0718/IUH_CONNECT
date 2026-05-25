@@ -407,23 +407,10 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
       });
 
       setArchivedConversations(archived);
-
-      // Nếu không có data thực, dùng mock data để test
-      if (active.length === 0) {
-        const mockActive = MOCK_CONVERSATIONS.filter(c => !c.isArchived);
-        const mockArchived = MOCK_CONVERSATIONS.filter(c => c.isArchived);
-        setConversations(mockActive);
-        setArchivedConversations(mockArchived);
-      } else {
-        setConversations(active);
-      }
+      setConversations(active);
     } catch (error) {
       console.log('Error loading conversations', error);
-      // Fallback to mock data on error
-      const mockActive = MOCK_CONVERSATIONS.filter(c => !c.isArchived);
-      const mockArchived = MOCK_CONVERSATIONS.filter(c => c.isArchived);
-      setConversations(mockActive);
-      setArchivedConversations(mockArchived);
+      // Fallback: clear or show error, but do NOT show mock data
     }
   }, [currentUser]);
 

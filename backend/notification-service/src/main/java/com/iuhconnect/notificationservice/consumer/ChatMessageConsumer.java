@@ -28,8 +28,9 @@ public class ChatMessageConsumer {
 
         String receiverId = message.getReceiverId();
         
-        // 1. Kiểm tra trạng thái Online
-        if (localCacheService.isOnline(receiverId)) {
+        // 1. Kiểm tra trạng thái Online (Bypass cho CALL_INVITE để đảm bảo luôn gửi thông báo)
+        boolean isCallInvite = "CALL_INVITE".equals(message.getMessageType());
+        if (!isCallInvite && localCacheService.isOnline(receiverId)) {
             log.info("⏩ User {} is ONLINE, skipping push notification.", receiverId);
             return;
         }
@@ -46,7 +47,10 @@ public class ChatMessageConsumer {
         String body = "Tin nhắn từ " + message.getSenderId(); // Lý tưởng là query tên user, nhưng trong microservices ta tạm dùng ID hoặc senderName nếu gửi kèm
 
         // Xử lý content hiển thị
-        if ("IMAGE".equals(message.getMessageType())) {
+        if ("CALL_INVITE".equals(message.getMessageType())) {
+            title = "Cuộc gọi đến";
+            body = message.getSenderId() + " đang gọi video cho bạn.";
+        } else if ("IMAGE".equals(message.getMessageType())) {
             body = message.getSenderId() + " đã gửi 1 hình ảnh.";
         } else if (message.getContent() != null && !message.getContent().isEmpty()) {
             body = message.getSenderId() + ": " + message.getContent();
@@ -54,7 +58,12 @@ public class ChatMessageConsumer {
 
         Map<String, String> data = new HashMap<>();
         data.put("conversationId", message.getConversationId());
-        data.put("type", "CHAT_MESSAGE");
+        
+        if ("CALL_INVITE".equals(message.getMessageType())) {
+            data.put("type", "CALL_INVITE");
+        } else {
+            data.put("type", "CHAT_MESSAGE");
+        }
         
         log.info("📲 Preparing to send Push to {} (OFFLINE)", receiverId);
         fcmPushService.sendPushNotification(receiverId, title, body, data);

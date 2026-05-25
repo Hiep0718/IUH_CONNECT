@@ -34,17 +34,20 @@ public class CallSignalService {
     private final PresenceService presenceService;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.chatservice.dto.ChatMessageDto> kafkaTemplate;
 
     public CallSignalService(WebSocketSessionManager sessionManager,
                              MeetingSessionService meetingSessionService,
                              PresenceService presenceService,
                              StringRedisTemplate redisTemplate,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper,
+                             org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.chatservice.dto.ChatMessageDto> kafkaTemplate) {
         this.sessionManager = sessionManager;
         this.meetingSessionService = meetingSessionService;
         this.presenceService = presenceService;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     /**
@@ -165,12 +168,30 @@ public class CallSignalService {
         try {
             String payload = objectMapper.writeValueAsString(signal);
 
+            // LUÔN LUÔN gửi Push Notification cho CALL_INVITE để đề phòng "Ghost Socket" (app bị kill nhưng chưa timeout)
+            if ("CALL_INVITE".equals(signal.getSignalType())) {
+                com.iuhconnect.chatservice.dto.ChatMessageDto fakeMsg = new com.iuhconnect.chatservice.dto.ChatMessageDto();
+                fakeMsg.setSenderId(signal.getSenderId());
+                fakeMsg.setReceiverId(receiverId);
+                fakeMsg.setConversationId(receiverId); // Use receiverId as a fallback
+                fakeMsg.setMessageType("CALL_INVITE");
+                fakeMsg.setContent("Đang gọi video cho bạn");
+                kafkaTemplate.send("chat-messages", receiverId, fakeMsg);
+                log.info("🔔 Sent fallback CALL_INVITE push notification to Kafka for receiver: {}", receiverId);
+            }
+
             // Ưu tiên 1: Gửi trực tiếp nếu receiver có session local
             WebSocketSession receiverSession = sessionManager.getSession(receiverId);
             if (receiverSession != null && receiverSession.isOpen()) {
-                receiverSession.sendMessage(new TextMessage(payload));
-                log.info("✅ Call Signal delivered directly [to={}]", receiverId);
-                return;
+                try {
+                    receiverSession.sendMessage(new TextMessage(payload));
+                    log.info("✅ Call Signal delivered directly [to={}]", receiverId);
+                    return;
+                } catch (Exception ex) {
+                    log.warn("⚠️ Failed to deliver signal directly, connection might be dead: {}", ex.getMessage());
+                    try { receiverSession.close(); } catch (Exception ignore) {}
+                    // fall through to fallback
+                }
             }
 
             // Ưu tiên 2: Route qua Redis Pub/Sub tới instance khác

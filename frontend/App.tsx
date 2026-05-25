@@ -259,12 +259,34 @@ const MainTabs = ({
         const data = await res.json();
         let chatUnread = 0;
         let groupUnread = 0;
+        const seenConvs = new Set<string>();
+
         data.forEach((msg: any) => {
-          const count = msg.unreadCount !== undefined ? msg.unreadCount : (msg.unread_count || 0);
-          if (msg.type === 'GROUP' || (msg.conversationId && msg.conversationId.startsWith('GROUP_'))) {
-            groupUnread += count;
-          } else {
-            chatUnread += count;
+          const isGroup = msg.type === 'GROUP' || (msg.conversationId && msg.conversationId.startsWith('GROUP_'));
+          
+          let dedupeKey = msg.conversationId;
+          if (!isGroup) {
+            const otherUserId = msg.senderId === currentUser ? msg.receiverId : (msg.receiverId === currentUser ? msg.senderId : null);
+            if (otherUserId && otherUserId !== currentUser) {
+               dedupeKey = [currentUser, otherUserId].sort().join('::');
+            } else if (!otherUserId) {
+               dedupeKey = msg.conversationId;
+            } else {
+               return; // Ignore if otherUserId === currentUser
+            }
+          }
+
+          if (dedupeKey && !seenConvs.has(dedupeKey)) {
+             seenConvs.add(dedupeKey);
+             const count = msg.unreadCount !== undefined ? msg.unreadCount : (msg.unread_count || 0);
+             if (isGroup) {
+               groupUnread += count;
+             } else {
+               chatUnread += count;
+             }
+          } else if (dedupeKey && seenConvs.has(dedupeKey)) {
+             // If we already saw this conversation, add its unread count to the total just in case
+             // Wait, if ChatListScreen ignores it, we should ignore it too to keep UI consistent!
           }
         });
         setUnreadChatCount(chatUnread);

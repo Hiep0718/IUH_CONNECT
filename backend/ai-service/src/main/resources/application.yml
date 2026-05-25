@@ -1,0 +1,59 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: ai-service
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ai-triage-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+app:
+  ai:
+    chat-service:
+      url: ${CHAT_SERVICE_URL:http://localhost:8082}
+    auth-service:
+      url: ${AUTH_SERVICE_URL:http://localhost:8081}
+    ollama:
+      url: ${OLLAMA_HOST:http://host.docker.internal:11434}
+      model: ${OLLAMA_MODEL:qwen2:7b}
+    chromadb:
+      url: ${CHROMADB_HOST:http://host.docker.internal:8000}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+    instances:
+      ollamaCircuitBreaker:
+        baseConfig: default
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers
+  health:
+    circuitbreakers:
+      enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411/api/v2/spans}
+
+logging:
+  level:
+    com.iuhconnect.aiservice: DEBUG
+    io.github.resilience4j: DEBUG

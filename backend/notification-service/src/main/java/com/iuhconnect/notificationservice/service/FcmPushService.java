@@ -33,17 +33,22 @@ public class FcmPushService {
 
         try {
             Message.Builder messageBuilder = Message.builder()
-                    .setToken(token)
-                    .setNotification(Notification.builder()
+                    .setToken(token);
+
+            boolean isCall = "CALL_INVITE".equals(data.get("type"));
+            String channelId = isCall ? "call_channel" : "default_channel";
+
+            messageBuilder.setNotification(Notification.builder()
                             .setTitle(title)
                             .setBody(body)
                             .build())
                     .setAndroidConfig(AndroidConfig.builder()
                             .setPriority(AndroidConfig.Priority.HIGH)
                             .setNotification(AndroidNotification.builder()
-                                    .setColor("#0056D2") // IUH Blue
+                                    .setColor("#0056D2")
                                     .setSound("default")
-                                    .setIcon("ic_notification") // Sử dụng icon trắng trong drawable
+                                    .setIcon("ic_notification")
+                                    .setChannelId(channelId) // Sử dụng custom channel
                                     .build())
                             .build())
                     .setApnsConfig(ApnsConfig.builder()

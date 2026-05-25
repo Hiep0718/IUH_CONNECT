@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Alert, View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Modal, Text, TouchableOpacity } from 'react-native';
 import Sound from 'react-native-sound';
 import NetInfo from '@react-native-community/netinfo';
 import { WS_URL } from '../config/env';
@@ -68,6 +68,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const reconnectAttemptsRef = useRef(0);
   const [isConnected, setIsConnected] = useState(false);
   const [wasReconnected, setWasReconnected] = useState(false);
+  const [incomingCallData, setIncomingCallData] = useState<any>(null);
 
   // ── Exponential backoff with jitter ──
   const MAX_RECONNECT_DELAY = 30000;
@@ -130,66 +131,56 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         globalRingtone.play();
       }
 
-      Alert.alert(
-        'Cuoc goi den',
-        `${callerName} dang goi video cho ban`,
-        [
-          {
-            text: 'Tu choi',
-            style: 'cancel',
-            onPress: () => {
-              if (globalRingtone && globalRingtone.isLoaded()) {
-                try {
-                  globalRingtone.stop();
-                } catch {}
-              }
-
-              const ws = wsRef.current;
-              if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(
-                  JSON.stringify({
-                    type: 'CALL_SIGNAL',
-                    signalType: 'CALL_REJECT',
-                    receiverId: data.senderId,
-                    meetingId: data.meetingId,
-                  }),
-                );
-              }
-            },
-          },
-          {
-            text: 'Nghe may',
-            onPress: () => {
-              if (globalRingtone && globalRingtone.isLoaded()) {
-                try {
-                  globalRingtone.stop();
-                } catch {}
-              }
-
-              navigationRef?.current?.navigate('Meeting', {
-                callerId: data.senderId,
-                callerName,
-                isIncoming: true,
-                roomName: data.roomName,
-                meetingId: data.meetingId,
-                conversationId: data.conversationId || `${data.senderId}-${currentUser}`,
-              });
-            },
-          },
-        ],
-        {
-          onDismiss: () => {
-            if (globalRingtone && globalRingtone.isLoaded()) {
-              try {
-                globalRingtone.stop();
-              } catch {}
-            }
-          },
-        },
-      );
+      setIncomingCallData(data);
     },
     [navigationRef],
   );
+
+  const handleRejectCall = useCallback(() => {
+    if (globalRingtone && globalRingtone.isLoaded()) {
+      try {
+        globalRingtone.pause();
+        globalRingtone.setCurrentTime(0);
+      } catch {}
+    }
+
+    if (incomingCallData) {
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            type: 'CALL_SIGNAL',
+            signalType: 'CALL_REJECT',
+            receiverId: incomingCallData.senderId,
+            meetingId: incomingCallData.meetingId,
+          }),
+        );
+      }
+    }
+    setIncomingCallData(null);
+  }, [incomingCallData]);
+
+  const handleAcceptCall = useCallback(() => {
+    if (globalRingtone && globalRingtone.isLoaded()) {
+      try {
+        globalRingtone.pause();
+        globalRingtone.setCurrentTime(0);
+      } catch {}
+    }
+
+    if (incomingCallData) {
+      const callerName = incomingCallData.senderName || incomingCallData.senderId || 'Nguoi dung';
+      navigationRef?.current?.navigate('Meeting', {
+        callerId: incomingCallData.senderId,
+        callerName,
+        isIncoming: true,
+        roomName: incomingCallData.roomName,
+        meetingId: incomingCallData.meetingId,
+        conversationId: incomingCallData.conversationId || `${incomingCallData.senderId}-${currentUser}`,
+      });
+    }
+    setIncomingCallData(null);
+  }, [incomingCallData, navigationRef, currentUser]);
 
   // ── Global handler for contact events (friend requests/acceptances) ──
   const handleGlobalContactEvent = useCallback(
@@ -290,9 +281,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
             } else if (data.signalType === 'CALL_END' || data.signalType === 'CALL_REJECT') {
               if (globalRingtone && globalRingtone.isLoaded()) {
                 try {
-                  globalRingtone.stop();
+                  globalRingtone.pause();
+                  globalRingtone.setCurrentTime(0);
                 } catch {}
               }
+              setIncomingCallData(null);
             }
           }
 
@@ -449,6 +442,26 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           notification={notification}
           onDismiss={handleNotificationDismiss}
         />
+        
+        {/* Modal thông báo cuộc gọi đến */}
+        <Modal visible={!!incomingCallData} transparent animationType="slide">
+          <View style={styles.callModalContainer}>
+            <View style={styles.callModalContent}>
+              <Text style={styles.callModalTitle}>Cuộc gọi đến</Text>
+              <Text style={styles.callModalSubtitle}>
+                {(incomingCallData?.senderName || incomingCallData?.senderId || 'Người dùng')} đang gọi video cho bạn
+              </Text>
+              <View style={styles.callModalActions}>
+                <TouchableOpacity style={[styles.callBtn, styles.rejectBtn]} onPress={handleRejectCall}>
+                  <Text style={styles.callBtnText}>Từ chối</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.callBtn, styles.acceptBtn]} onPress={handleAcceptCall}>
+                  <Text style={styles.callBtnText}>Nghe máy</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </WebSocketContext.Provider>
   );
@@ -457,5 +470,54 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 const styles = StyleSheet.create({
   providerContainer: {
     flex: 1,
+  },
+  callModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  callModalContent: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    elevation: 5,
+  },
+  callModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#333',
+  },
+  callModalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  callModalActions: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-around',
+  },
+  callBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  rejectBtn: {
+    backgroundColor: '#FF3B30',
+  },
+  acceptBtn: {
+    backgroundColor: '#34C759',
+  },
+  callBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

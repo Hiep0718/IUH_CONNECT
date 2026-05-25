@@ -27,6 +27,11 @@ public class UserController {
         return ResponseEntity.ok(userDto);
     }
 
+    @PostMapping("/bulk-names")
+    public ResponseEntity<java.util.Map<String, String>> getBulkNames(@RequestBody java.util.List<String> usernames) {
+        return ResponseEntity.ok(userService.getBulkNames(usernames));
+    }
+
     @PutMapping("/me")
     public ResponseEntity<UserDto> updateUserProfile(Principal principal, @RequestBody UpdateUserRequest request) {
         if (principal == null) {

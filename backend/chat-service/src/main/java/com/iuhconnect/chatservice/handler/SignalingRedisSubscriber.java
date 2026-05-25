@@ -26,10 +26,14 @@ public class SignalingRedisSubscriber implements MessageListener {
 
     private final WebSocketSessionManager sessionManager;
     private final ObjectMapper objectMapper;
+    private final org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.chatservice.dto.ChatMessageDto> kafkaTemplate;
 
-    public SignalingRedisSubscriber(WebSocketSessionManager sessionManager, ObjectMapper objectMapper) {
+    public SignalingRedisSubscriber(WebSocketSessionManager sessionManager, 
+                                    ObjectMapper objectMapper,
+                                    org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.chatservice.dto.ChatMessageDto> kafkaTemplate) {
         this.sessionManager = sessionManager;
         this.objectMapper = objectMapper;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     @Override
@@ -63,10 +67,16 @@ public class SignalingRedisSubscriber implements MessageListener {
             if (receiverId != null) {
                 WebSocketSession session = sessionManager.getSession(receiverId);
                 if (session != null && session.isOpen()) {
-                    session.sendMessage(new TextMessage(payload));
-                } else {
-                    log.warn("⚠️ WebSocket session not found or closed for receiver: {}", receiverId);
+                    try {
+                        session.sendMessage(new TextMessage(payload));
+                        return; // Successfully sent
+                    } catch (Exception ex) {
+                        log.warn("⚠️ Failed to deliver signal via Redis subscriber, connection dead: {}", ex.getMessage());
+                        try { session.close(); } catch (Exception ignore) {}
+                        // Fallback below
+                    }
                 }
+                log.warn("⚠️ WebSocket session not found or closed for receiver: {}", receiverId);
             }
         } catch (IOException e) {
             log.error("❌ Failed to process signaling message from Redis: {}", e.getMessage(), e);

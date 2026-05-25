@@ -127,7 +127,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
   const renderItem = ({ item }: { item: any }) => {
     return (
       <View style={styles.contactItem}>
-        <Avatar name={item.fullName || item.username} size="large" isOnline={true} showOnlineStatus />
+        <Avatar name={item.fullName || item.username} uri={item.isBot ? 'https://cdn-icons-png.flaticon.com/512/4712/4712109.png' : undefined} size="large" isOnline={true} showOnlineStatus />
         <View style={styles.contactInfo}>
           <Text style={styles.contactName}>{item.fullName || item.username}</Text>
           <Text style={styles.contactRole}>{item.role}</Text>
@@ -146,6 +146,8 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
   };
 
   const data = [
+    { isHeader: true, title: 'Trợ lý ảo AI', color: '#8B5CF6' },
+    { username: 'ai-assistant', fullName: 'IUH Assistant (Bot)', role: 'AI Support', isBot: true },
     ...(pendings.length > 0 ? [{ isHeader: true, title: `Lời mời kết bạn (${pendings.length})`, color: Colors.warning }] : []),
     ...pendings,
     ...(friends.length > 0 ? [{ isHeader: true, title: `Danh bạ (${friends.length})`, color: Colors.primary }] : []),

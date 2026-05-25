@@ -1,0 +1,223 @@
+diff --git a/node_modules/react-native-audio-recorder-player/android/build.gradle b/node_modules/react-native-audio-recorder-player/android/build.gradle
+index 88d1a85..bab9ba6 100644
+--- a/node_modules/react-native-audio-recorder-player/android/build.gradle
++++ b/node_modules/react-native-audio-recorder-player/android/build.gradle
+@@ -33,7 +33,7 @@ android {
+   }
+ 
+   kotlinOptions {
+-      jvmTarget = "1.8"
++      jvmTarget = "17"
+   }
+ 
+   lintOptions {
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/generated/source/buildConfig/release/com/dooboolab/audiorecorderplayer/BuildConfig.java b/node_modules/react-native-audio-recorder-player/android/build/generated/source/buildConfig/release/com/dooboolab/audiorecorderplayer/BuildConfig.java
+new file mode 100644
+index 0000000..7aec512
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/generated/source/buildConfig/release/com/dooboolab/audiorecorderplayer/BuildConfig.java
+@@ -0,0 +1,10 @@
++/**
++ * Automatically generated file. DO NOT MODIFY
++ */
++package com.dooboolab.audiorecorderplayer;
++
++public final class BuildConfig {
++  public static final boolean DEBUG = false;
++  public static final String LIBRARY_PACKAGE_NAME = "com.dooboolab.audiorecorderplayer";
++  public static final String BUILD_TYPE = "release";
++}
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/aapt_friendly_merged_manifests/release/aapt/AndroidManifest.xml b/node_modules/react-native-audio-recorder-player/android/build/intermediates/aapt_friendly_merged_manifests/release/aapt/AndroidManifest.xml
+new file mode 100644
+index 0000000..f813cba
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/aapt_friendly_merged_manifests/release/aapt/AndroidManifest.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.dooboolab.audiorecorderplayer" >
++
++    <uses-sdk android:minSdkVersion="24" />
++    <!-- dooboolab -->
++    <uses-permission android:name="android.permission.RECORD_AUDIO" />
++    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
++
++</manifest>
+\ No newline at end of file
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/aapt_friendly_merged_manifests/release/aapt/output-metadata.json b/node_modules/react-native-audio-recorder-player/android/build/intermediates/aapt_friendly_merged_manifests/release/aapt/output-metadata.json
+new file mode 100644
+index 0000000..94db8bd
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/aapt_friendly_merged_manifests/release/aapt/output-metadata.json
+@@ -0,0 +1,18 @@
++{
++  "version": 3,
++  "artifactType": {
++    "type": "AAPT_FRIENDLY_MERGED_MANIFESTS",
++    "kind": "Directory"
++  },
++  "applicationId": "com.dooboolab.audiorecorderplayer",
++  "variantName": "release",
++  "elements": [
++    {
++      "type": "SINGLE",
++      "filters": [],
++      "attributes": [],
++      "outputFile": "AndroidManifest.xml"
++    }
++  ],
++  "elementType": "File"
++}
+\ No newline at end of file
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/aar_metadata/release/aar-metadata.properties b/node_modules/react-native-audio-recorder-player/android/build/intermediates/aar_metadata/release/aar-metadata.properties
+new file mode 100644
+index 0000000..776557e
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/aar_metadata/release/aar-metadata.properties
+@@ -0,0 +1,5 @@
++aarFormatVersion=1.0
++aarMetadataVersion=1.0
++minCompileSdk=1
++minCompileSdkExtension=0
++minAndroidGradlePluginVersion=1.0.0
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/annotation_processor_list/release/annotationProcessors.json b/node_modules/react-native-audio-recorder-player/android/build/intermediates/annotation_processor_list/release/annotationProcessors.json
+new file mode 100644
+index 0000000..9e26dfe
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/annotation_processor_list/release/annotationProcessors.json
+@@ -0,0 +1 @@
++{}
+\ No newline at end of file
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/compile_r_class_jar/release/R.jar b/node_modules/react-native-audio-recorder-player/android/build/intermediates/compile_r_class_jar/release/R.jar
+new file mode 100644
+index 0000000..e920285
+Binary files /dev/null and b/node_modules/react-native-audio-recorder-player/android/build/intermediates/compile_r_class_jar/release/R.jar differ
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/compile_symbol_list/release/R.txt b/node_modules/react-native-audio-recorder-player/android/build/intermediates/compile_symbol_list/release/R.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml b/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml
+new file mode 100644
+index 0000000..e5888ad
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\jniLibs"/></dataSet><dataSet config="release" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\release\jniLibs"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/mergeReleaseShaders/merger.xml b/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/mergeReleaseShaders/merger.xml
+new file mode 100644
+index 0000000..c35bb88
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/mergeReleaseShaders/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\shaders"/></dataSet><dataSet config="release" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\release\shaders"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/packageReleaseAssets/merger.xml b/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/packageReleaseAssets/merger.xml
+new file mode 100644
+index 0000000..fe0579d
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/packageReleaseAssets/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\assets"/></dataSet><dataSet config="release" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\release\assets"/></dataSet><dataSet config="generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\build\intermediates\shader_assets\release\out"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties b/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties
+new file mode 100644
+index 0000000..6e92508
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties
+@@ -0,0 +1 @@
++#Mon May 25 21:12:27 ICT 2026
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml b/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml
+new file mode 100644
+index 0000000..0faf34d
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main" generated-set="main$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="release$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\release\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="release" generated-set="release$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\release\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\build\generated\res\resValues\release"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated" generated-set="generated$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\build\generated\res\resValues\release"/></dataSet><mergedItems/></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/local_only_symbol_list/release/R-def.txt b/node_modules/react-native-audio-recorder-player/android/build/intermediates/local_only_symbol_list/release/R-def.txt
+new file mode 100644
+index 0000000..78ac5b8
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/local_only_symbol_list/release/R-def.txt
+@@ -0,0 +1,2 @@
++R_DEF: Internal format may change without notice
++local
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/manifest_merge_blame_file/release/manifest-merger-blame-release-report.txt b/node_modules/react-native-audio-recorder-player/android/build/intermediates/manifest_merge_blame_file/release/manifest-merger-blame-release-report.txt
+new file mode 100644
+index 0000000..fdacd30
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/manifest_merge_blame_file/release/manifest-merger-blame-release-report.txt
+@@ -0,0 +1,14 @@
++1<?xml version="1.0" encoding="utf-8"?>
++2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++3    package="com.dooboolab.audiorecorderplayer" >
++4
++5    <uses-sdk android:minSdkVersion="24" />
++6    <!-- dooboolab -->
++7    <uses-permission android:name="android.permission.RECORD_AUDIO" />
++7-->D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:5:5-71
++7-->D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:5:22-68
++8    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
++8-->D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:6:5-81
++8-->D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:6:22-78
++9
++10</manifest>
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/merged_manifest/release/AndroidManifest.xml b/node_modules/react-native-audio-recorder-player/android/build/intermediates/merged_manifest/release/AndroidManifest.xml
+new file mode 100644
+index 0000000..f813cba
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/merged_manifest/release/AndroidManifest.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.dooboolab.audiorecorderplayer" >
++
++    <uses-sdk android:minSdkVersion="24" />
++    <!-- dooboolab -->
++    <uses-permission android:name="android.permission.RECORD_AUDIO" />
++    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
++
++</manifest>
+\ No newline at end of file
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/intermediates/symbol_list_with_package_name/release/package-aware-r.txt b/node_modules/react-native-audio-recorder-player/android/build/intermediates/symbol_list_with_package_name/release/package-aware-r.txt
+new file mode 100644
+index 0000000..dfbcb96
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/intermediates/symbol_list_with_package_name/release/package-aware-r.txt
+@@ -0,0 +1 @@
++com.dooboolab.audiorecorderplayer
+diff --git a/node_modules/react-native-audio-recorder-player/android/build/outputs/logs/manifest-merger-release-report.txt b/node_modules/react-native-audio-recorder-player/android/build/outputs/logs/manifest-merger-release-report.txt
+new file mode 100644
+index 0000000..01ab890
+--- /dev/null
++++ b/node_modules/react-native-audio-recorder-player/android/build/outputs/logs/manifest-merger-release-report.txt
+@@ -0,0 +1,25 @@
++-- Merging decision tree log ---
++manifest
++ADDED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:2:1-7:12
++INJECTED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:2:1-7:12
++	package
++		ADDED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:3:11-54
++		INJECTED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml
++	xmlns:android
++		ADDED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:2:11-69
++uses-permission#android.permission.RECORD_AUDIO
++ADDED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:5:5-71
++	android:name
++		ADDED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:5:22-68
++uses-permission#android.permission.WRITE_EXTERNAL_STORAGE
++ADDED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:6:5-81
++	android:name
++		ADDED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml:6:22-78
++uses-sdk
++INJECTED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml reason: use-sdk injection requested
++INJECTED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml
++INJECTED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml
++	android:targetSdkVersion
++		INJECTED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml
++	android:minSdkVersion
++		INJECTED from D:\Study\KienTruc\BaiTapLon\frontend\node_modules\react-native-audio-recorder-player\android\src\main\AndroidManifest.xml

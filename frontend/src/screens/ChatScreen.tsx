@@ -45,6 +45,7 @@ import { useWebSocket } from '../services/WebSocketProvider';
 import { chatCache } from '../services/chatCache';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../theme/theme';
 import type { LecturerStatus, MessageStatus } from '../types/types';
+import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 
 type ReactionMap = Record<string, string[]>;
 
@@ -176,6 +177,7 @@ const mapServerMessage = (
         : isStickerImage
           ? msg.content
           : undefined,
+    audio: msg.messageType === 'AUDIO' ? msg.mediaUrl : undefined,
     messageType: msg.messageType || 'TEXT',
     isAutoReply: msg.messageType === 'AUTO_REPLY',
     mediaUrl: msg.mediaUrl,
@@ -345,7 +347,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [isLoadingEarlier, setIsLoadingEarlier] = useState(false);
   const [hasEarlierMessages, setHasEarlierMessages] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [summaryText, setSummaryText] = useState('');
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const [recipientPresence, setRecipientPresence] = useState({ status: 'OFFLINE', lastSeen: 0 });
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordTime, setRecordTime] = useState('00:00');
+  const audioRecorderPlayerRef = useRef(new AudioRecorderPlayer());
   const headerAnim = useRef(new Animated.Value(0)).current;
   const attachMenuAnim = useRef(new Animated.Value(0)).current;
 
@@ -443,6 +452,26 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const fetchHistory = useCallback(
     async (beforeTimestamp?: number) => {
       try {
+        if (recipientId === 'ai-assistant') {
+          // AI Chat is local-only
+          if (!beforeTimestamp) {
+            const cached = await chatCache.loadMessages(conversationId);
+            if (cached && cached.length > 0) {
+              setMessages(cached);
+            } else {
+              setMessages([{
+                _id: 'ai-welcome',
+                text: 'Chào bạn! Mình là trợ lý ảo IUH Assistant. Bạn cần mình giúp gì?',
+                createdAt: new Date(),
+                user: { _id: 'ai-assistant', name: 'IUH Assistant' },
+                system: false,
+              }]);
+            }
+          }
+          setHasEarlierMessages(false);
+          return;
+        }
+
         const url = beforeTimestamp
           ? `${API_URL}/api/v1/chat/history/${conversationId}?before=${beforeTimestamp}&limit=${LIMIT}`
           : `${API_URL}/api/v1/chat/history/${conversationId}?limit=${LIMIT}`;
@@ -460,7 +489,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         const data: ServerMessage[] = await res.json();
         const historyMessages = data
           .map(msg => mapServerMessage(msg, currentUser))
-          .filter(msg => msg.text || msg.image || msg.messageType === 'CALL');
+          .filter(msg => msg.text || msg.image || msg.audio || msg.messageType === 'CALL');
 
         setHasEarlierMessages(data.length === LIMIT);
 
@@ -535,6 +564,26 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       console.log('Failed to fetch settings', e);
     }
   }, [currentUser, conversationId, token]);
+
+  const handleAISummarize = useCallback(async () => {
+    setShowSummaryModal(true);
+    setIsSummarizing(true);
+    setSummaryText('');
+    try {
+      const res = await authFetch(`${API_URL}/api/v1/ai/summarize/${conversationId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        throw new Error('Failed to summarize');
+      }
+      const data = await res.json();
+      setSummaryText(data.summary || 'Không thể tóm tắt cuộc trò chuyện lúc này.');
+    } catch (error) {
+      setSummaryText('Đã xảy ra lỗi khi AI tóm tắt tin nhắn.');
+    } finally {
+      setIsSummarizing(false);
+    }
+  }, [conversationId, token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -822,25 +871,66 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
           : {}),
       }));
 
-      setMessages(prev => GiftedChat.append(prev, optimisticMessages));
       setReplyTo(null);
       setInputText('');
 
-      optimisticMessages.forEach(message => {
-        sendMessage({
-          senderId: currentUser,
-          receiverId: recipientId,
-          content: message.text,
-          conversationId,
-          ...(replyTo
-            ? {
-                replyToId: String(replyTo._id),
-                replyToText: replyTo.text,
-                replyToSender: String(replyTo.user._id),
-              }
-            : {}),
+      const isBot = recipientId === 'ai-assistant';
+
+      if (isBot) {
+        setMessages(prev => {
+           const updated = GiftedChat.append(prev, optimisticMessages);
+           chatCache.saveMessages(conversationId, updated);
+           return updated;
         });
-      });
+        
+        optimisticMessages.forEach(async message => {
+          try {
+            const res = await authFetch(`${API_URL}/api/v1/ai/ask`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ question: message.text }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              const botMessage: ExtendedMessage = {
+                _id: createLocalMessageId(),
+                text: data.answer || 'Xin lỗi, tôi không có câu trả lời.',
+                createdAt: new Date(),
+                user: { _id: 'ai-assistant', name: 'IUH Assistant' },
+                status: 'sent',
+              };
+              setMessages(prev => {
+                const updated = GiftedChat.append(prev, [botMessage]);
+                chatCache.saveMessages(conversationId, updated);
+                return updated;
+              });
+            }
+          } catch (e) {
+            console.log('AI Ask Error:', e);
+          }
+        });
+      } else {
+        setMessages(prev => GiftedChat.append(prev, optimisticMessages));
+
+        optimisticMessages.forEach(message => {
+          sendMessage({
+            senderId: currentUser,
+            receiverId: recipientId,
+            content: message.text,
+            conversationId,
+            ...(replyTo
+              ? {
+                  replyToId: String(replyTo._id),
+                  replyToText: replyTo.text,
+                  replyToSender: String(replyTo.user._id),
+                }
+              : {}),
+          });
+        });
+      }
 
       if (!isOffline) {
         setTimeout(() => {
@@ -1356,11 +1446,41 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     return null;
   }, []);
 
+  const renderMessageAudio = useCallback((props: any) => {
+    const msg = props.currentMessage as ExtendedMessage;
+    if (msg.audio) {
+      return (
+        <TouchableOpacity 
+          style={styles.audioCard} 
+          onPress={async () => {
+            try {
+              await audioRecorderPlayerRef.current.stopPlayer();
+              await audioRecorderPlayerRef.current.startPlayer(msg.audio!);
+              audioRecorderPlayerRef.current.addPlayBackListener((e) => {
+                if (e.currentPosition === e.duration) {
+                  audioRecorderPlayerRef.current.stopPlayer();
+                  audioRecorderPlayerRef.current.removePlayBackListener();
+                }
+              });
+            } catch (error) {
+              console.error('Error playing audio', error);
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          <Icon name="play-circle" size={36} color="#1D6FD7" />
+          <Text style={styles.audioText}>Tin nhắn thoại</Text>
+        </TouchableOpacity>
+      );
+    }
+    return null;
+  }, []);
+
   const renderMessageImage = useCallback((props: any) => {
     const msg = props.currentMessage as ExtendedMessage;
     if (msg.image) {
       return (
-        <TouchableOpacity onPress={() => Linking.openURL(msg.image!)} activeOpacity={0.9}>
+        <TouchableOpacity onPress={() => setViewerImage(msg.image!)} activeOpacity={0.9}>
           <Image source={{ uri: msg.image }} style={styles.customImage} resizeMode="cover" />
         </TouchableOpacity>
       );
@@ -1419,46 +1539,136 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     [currentUser, recipientName, replyTo],
   );
 
+  const onStartRecord = useCallback(async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const grants = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        ]);
+
+        if (grants['android.permission.RECORD_AUDIO'] !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert('Lỗi', 'Cần cấp quyền ghi âm để sử dụng tính năng này.');
+          return;
+        }
+      } catch (err) {
+        console.warn(err);
+        return;
+      }
+    }
+
+    try {
+      setIsRecording(true);
+      const uri = await audioRecorderPlayerRef.current.startRecorder();
+      audioRecorderPlayerRef.current.addRecordBackListener((e) => {
+        setRecordTime(audioRecorderPlayerRef.current.mmssss(Math.floor(e.currentPosition)));
+      });
+      console.log('Recording at:', uri);
+    } catch (error) {
+      console.error('Error starting record:', error);
+      setIsRecording(false);
+    }
+  }, []);
+
+  const onStopRecord = useCallback(async () => {
+    if (!isRecording) return;
+    try {
+      const resultUri = await audioRecorderPlayerRef.current.stopRecorder();
+      audioRecorderPlayerRef.current.removeRecordBackListener();
+      setIsRecording(false);
+      setRecordTime('00:00');
+      console.log('Recording stopped:', resultUri);
+      
+      setIsUploading(true);
+      const fakeAsset = {
+        uri: resultUri,
+        type: 'audio/mp4',
+        fileName: `voice_${Date.now()}.mp4`,
+      };
+      
+      const uploadResult = await uploadMedia(token, fakeAsset);
+      
+      if (uploadResult) {
+        const newMessage = {
+          _id: Math.random().toString(36).substring(7),
+          text: '',
+          createdAt: new Date(),
+          user: { _id: 'me', name: currentUser },
+          audio: uploadResult.url,
+        };
+        onSend([newMessage as IMessage]);
+      }
+    } catch (error) {
+      console.error('Error stopping record:', error);
+      setIsRecording(false);
+      setRecordTime('00:00');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [isRecording, token, currentUser, onSend]);
+
   const renderComposer = useCallback(
     (props: any) => (
       <View style={styles.composerRow}>
-        <TouchableOpacity
-          onPress={toggleAttachMenu}
-          style={styles.attachBtn}
-          activeOpacity={0.6}
-        >
-          <Icon name="paperclip" size={24} color="#8E99A4" />
-        </TouchableOpacity>
-        <View style={styles.composerShell}>
-          <Composer
-            {...props}
-            placeholder="Nhập tin nhắn..."
-            placeholderTextColor="#A0AEC0"
-            textInputStyle={styles.composerInput}
-            onTextChanged={(text: string) => {
-              setInputText(text);
-              props.onTextChanged?.(text);
-            }}
-          />
+        {!isRecording && (
           <TouchableOpacity
-            onPress={() => setShowStickerPicker(true)}
-            style={styles.emojiBtn}
+            onPress={toggleAttachMenu}
+            style={styles.attachBtn}
             activeOpacity={0.6}
           >
-            <Icon name="emoticon-outline" size={24} color="#8E99A4" />
+            <Icon name="paperclip" size={24} color="#8E99A4" />
           </TouchableOpacity>
+        )}
+        <View style={styles.composerShell}>
+          {isRecording ? (
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }}>
+              <View style={[styles.recordingDot]} />
+              <Text style={styles.recordingText}>Đang ghi âm... {recordTime}</Text>
+            </View>
+          ) : (
+            <Composer
+              {...props}
+              placeholder="Nhập tin nhắn..."
+              placeholderTextColor="#A0AEC0"
+              textInputStyle={styles.composerInput}
+              onTextChanged={(text: string) => {
+                setInputText(text);
+                props.onTextChanged?.(text);
+              }}
+            />
+          )}
+          {!isRecording && (
+            <TouchableOpacity
+              onPress={() => setShowStickerPicker(true)}
+              style={styles.emojiBtn}
+              activeOpacity={0.6}
+            >
+              <Icon name="emoticon-outline" size={24} color="#8E99A4" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     ),
-    [inputText, toggleAttachMenu],
+    [inputText, toggleAttachMenu, isRecording, recordTime],
   );
 
   const renderSend = useCallback(
     (props: any) => {
+      if (isRecording) {
+        return (
+          <View style={styles.sendContainer}>
+            <TouchableOpacity style={[styles.actionFab, { backgroundColor: '#FF3B30' }]} activeOpacity={0.7} onPress={onStopRecord}>
+              <Icon name="stop" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
       if (!inputText.trim()) {
         return (
           <View style={styles.sendContainer}>
-            <TouchableOpacity style={styles.actionFab} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.actionFab} activeOpacity={0.7} onPress={onStartRecord}>
               <Icon name="microphone" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
@@ -1473,7 +1683,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         </Send>
       );
     },
-    [inputText],
+    [inputText, isRecording, onStartRecord, onStopRecord],
   );
 
   const attachmentItems = useMemo(
@@ -1596,6 +1806,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             >
               <Icon name="video-outline" size={22} color="#FFFFFF" />
             </TouchableOpacity>
+            {isGroup && (
+              <TouchableOpacity
+                style={styles.headerIcon}
+                onPress={handleAISummarize}
+              >
+                <Icon name="robot-outline" size={22} color="#FACC15" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.headerIcon}
               onPress={() => {
@@ -1648,6 +1866,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         renderSend={renderSend}
         renderChatFooter={renderChatFooter}
         renderCustomView={renderCustomView}
+        renderMessageAudio={renderMessageAudio}
         renderMessageImage={renderMessageImage}
         renderAvatar={renderAvatar}
         onInputTextChanged={setInputText}
@@ -1759,6 +1978,50 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         onSelectSticker={(sticker, type) => handleStickerSend(sticker, type)}
       />
 
+      <Modal
+        visible={showSummaryModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSummaryModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.actionModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSummaryModal(false)}
+        >
+          <View style={[styles.actionModal, { padding: 20 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <Icon name="robot-outline" size={24} color="#1D6FD7" style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#172233' }}>AI Tóm Tắt Nhóm</Text>
+            </View>
+            {isSummarizing ? (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#1D6FD7" />
+                <Text style={{ marginTop: 12, color: '#475569', fontSize: 14 }}>AI đang đọc tin nhắn...</Text>
+              </View>
+            ) : (
+              <View>
+                <Text style={{ color: '#334155', fontSize: 14, lineHeight: 22, minHeight: 60 }}>
+                  {summaryText}
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    marginTop: 20,
+                    backgroundColor: '#1D6FD7',
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                  }}
+                  onPress={() => setShowSummaryModal(false)}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 15 }}>Đóng</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {isUploading && (
         <View style={styles.uploadOverlay}>
           <View style={styles.uploadCard}>
@@ -1767,6 +2030,25 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
           </View>
         </View>
       )}
+
+      {/* Image Viewer Modal */}
+      <Modal visible={!!viewerImage} transparent animationType="fade" onRequestClose={() => setViewerImage(null)}>
+        <View style={styles.viewerContainer}>
+          <TouchableOpacity 
+            style={styles.viewerCloseBtn} 
+            onPress={() => setViewerImage(null)}
+          >
+            <Icon name="close" size={32} color="#fff" />
+          </TouchableOpacity>
+          {viewerImage && (
+            <Image 
+              source={{ uri: viewerImage }} 
+              style={styles.viewerImage} 
+              resizeMode="contain" 
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1775,6 +2057,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#E8ECF1',
+  },
+  recordingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FF3B30',
+    marginRight: 8,
+  },
+  recordingText: {
+    fontSize: 15,
+    color: '#FF3B30',
+    fontWeight: '500',
+  },
+  viewerContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewerCloseBtn: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 10,
+    padding: 10,
+  },
+  viewerImage: {
+    width: '100%',
+    height: '100%',
   },
   fileCard: {
     flexDirection: 'row',
@@ -1805,8 +2116,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   fileSize: {
-    color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
+    color: '#E0E7FF',
+    marginTop: 2,
+  },
+  audioCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    padding: 8,
+    borderRadius: 16,
+    margin: 4,
+    minWidth: 150,
+  },
+  audioText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
   },
   customImage: {
     width: 220,

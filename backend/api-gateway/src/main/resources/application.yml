@@ -106,6 +106,22 @@ spring:
           predicates:
             - Path=/ws/presence/**
 
+        # -------- AI Service (HTTP) --------
+        - id: ai-service-http
+          uri: ${AI_SERVICE_URL:http://ai-service:8084}
+          predicates:
+            - Path=/api/v1/ai/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                key-resolver: "#{@userKeyResolver}"
+            - name: CircuitBreaker
+              args:
+                name: aiServiceCircuitBreaker
+                fallbackUri: forward:/fallback/ai
+
 # ---------- Resilience4j Global Config ----------
 resilience4j:
   circuitbreaker:
@@ -122,6 +138,12 @@ resilience4j:
         baseConfig: default
       chatServiceCircuitBreaker:
         baseConfig: default
+      aiServiceCircuitBreaker:
+        baseConfig: default
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 120s
 
 # ---------- JWT Configuration (shared secret with auth-service) ----------
 jwt:

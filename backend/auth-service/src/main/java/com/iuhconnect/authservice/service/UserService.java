@@ -23,6 +23,15 @@ public class UserService {
         return mapToDto(user);
     }
 
+    public java.util.Map<String, String> getBulkNames(java.util.List<String> usernames) {
+        java.util.Map<String, String> map = new java.util.HashMap<>();
+        userRepository.findByUsernameIn(usernames).forEach(u -> {
+            String name = (u.getFullName() != null && !u.getFullName().trim().isEmpty()) ? u.getFullName() : u.getUsername();
+            map.put(u.getUsername(), name);
+        });
+        return map;
+    }
+
     public UserDto updateUserProfile(String username, UpdateUserRequest request) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
