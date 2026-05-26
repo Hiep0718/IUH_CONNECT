@@ -22,6 +22,7 @@ export interface InAppNotificationData {
   title: string;
   body: string;
   senderName?: string;
+  senderAvatar?: string;
   icon?: string;           // MaterialCommunityIcons name
   iconColor?: string;
   type: 'chat' | 'contact' | 'system';
@@ -146,7 +147,7 @@ const InAppNotification: React.FC<InAppNotificationProps> = ({
           {/* Avatar / Icon */}
           <View style={styles.iconSection}>
             {notification.senderName ? (
-              <Avatar name={notification.senderName} size="small" />
+              <Avatar name={notification.senderName} uri={notification.senderAvatar} size="small" />
             ) : (
               <LinearGradient
                 colors={getGradientForType()}

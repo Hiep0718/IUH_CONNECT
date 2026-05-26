@@ -21,17 +21,20 @@ public class ChatMessageKafkaConsumer {
 
     private final MessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
+    private final com.iuhconnect.chatservice.repository.ChatUserRepository chatUserRepository;
     private final RealtimeEventService realtimeEventService;
     private final AutoReplyService autoReplyService;
 
     public ChatMessageKafkaConsumer(
             MessageRepository messageRepository,
             ConversationRepository conversationRepository,
+            com.iuhconnect.chatservice.repository.ChatUserRepository chatUserRepository,
             RealtimeEventService realtimeEventService,
             AutoReplyService autoReplyService
     ) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
+        this.chatUserRepository = chatUserRepository;
         this.realtimeEventService = realtimeEventService;
         this.autoReplyService = autoReplyService;
     }
@@ -78,6 +81,11 @@ public class ChatMessageKafkaConsumer {
 
             Optional<com.iuhconnect.chatservice.model.ConversationEntity> convOpt = 
                     conversationRepository.findById(message.getConversationId());
+
+            chatUserRepository.findByUsername(message.getSenderId()).ifPresent(user -> {
+                message.setSenderName(user.getUsername());
+                message.setSenderAvatar(user.getAvatarUrl());
+            });
 
             if (convOpt.isPresent() && convOpt.get().getType() == com.iuhconnect.chatservice.model.ConversationType.GROUP) {
                 for (com.iuhconnect.chatservice.model.GroupMember member : convOpt.get().getMembers()) {

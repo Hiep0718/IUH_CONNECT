@@ -310,7 +310,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
               title: senderLabel,
               body: msgPreview,
               senderName: senderLabel,
+              senderAvatar: data.senderAvatar,
               type: 'chat',
+              icon: data.senderAvatar ? undefined : 'chat',
               onPress: () => {
                 navigationRef?.current?.navigate('Chat', {
                   conversationId: data.conversationId,

@@ -112,7 +112,7 @@ const mapConversationPreview = (
   currentUser: string,
   groupMap: Record<string, any>,
   settingsMap: Record<string, any>,
-  contactMap: Record<string, string>
+  contactMap: Record<string, {name: string, avatar?: string}>
 ): Conversation | null => {
   const groupInfo = groupMap[msg.conversationId];
   const settings = settingsMap[msg.conversationId] || {};
@@ -160,11 +160,13 @@ const mapConversationPreview = (
   if (msg.messageType === 'AUDIO') preview = '🎤 Tin nhắn thoại';
   if (msg.messageType === 'CALL') preview = formatCallPreview(msg.content);
 
+  const contactInfo = contactMap[otherUserId] || { name: otherUserId };
+
   return {
     id: msg.conversationId,
-    name: contactMap[otherUserId] || otherUserId,
+    name: contactInfo.name,
     targetUserId: otherUserId,
-    avatar: undefined,
+    avatar: contactInfo.avatar,
     isGroup: false,
     participants: [],
     lastMessage: {
@@ -350,7 +352,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
          console.log('Error fetching user settings in ChatList', e);
       }
 
-      let contactMap: Record<string, string> = {};
+      let contactMap: Record<string, {name: string, avatar?: string}> = {};
       try {
         const contactsRes = await authFetch(`${API_URL}/api/v1/contacts/list`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -358,7 +360,10 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         if (contactsRes.ok) {
           const contacts = await contactsRes.json();
           contacts.forEach((c: any) => {
-            contactMap[c.username] = c.fullName || c.username;
+            contactMap[c.username] = {
+              name: c.fullName || c.username,
+              avatar: c.avatarUrl
+            };
           });
         }
       } catch (e) {
@@ -484,9 +489,11 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         conversationId: conversation.id,
         recipientName: conversation.name,
         recipientId: conversation.targetUserId || conversation.name,
+        recipientAvatar: conversation.avatar,
         isOnline: conversation.isOnline,
         lecturerStatus: conversation.lecturerStatus,
         isGroup: conversation.isGroup,
+        participants: conversation.participants,
       });
     },
     [navigation],
@@ -496,7 +503,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
   const renderOnlineStrip = () => {
     const onlineUsers = conversations
       .filter(c => c.isOnline && !c.isGroup)
-      .map(c => ({ id: c.targetUserId!, name: c.name, isOnline: true, conversationId: c.id }));
+      .map(c => ({ id: c.targetUserId!, name: c.name, isOnline: true, conversationId: c.id, avatar: c.avatar }));
 
     if (onlineUsers.length === 0) {
       return null;
@@ -529,12 +536,14 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
                   conversationId: user.conversationId,
                   recipientName: user.name,
                   recipientId: user.id,
+                  recipientAvatar: user.avatar,
                   isOnline: user.isOnline,
                 })
               }
             >
               <Avatar
                 name={user.name}
+                uri={user.avatar}
                 size="medium"
                 isOnline={user.isOnline}
                 showOnlineStatus
@@ -587,6 +596,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
         >
           <Avatar
             name={item.name}
+            uri={item.avatar}
             size="large"
             isOnline={item.isOnline}
             showOnlineStatus={!item.isGroup}

@@ -332,6 +332,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     recipientId,
     lecturerStatus,
     isGroup = false,
+    participants = [],
   } = route.params;
   const [displayRecipientName, setDisplayRecipientName] = useState(recipientName || recipientId || 'Người dùng');
 
@@ -351,6 +352,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [summaryText, setSummaryText] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [recipientPresence, setRecipientPresence] = useState({ status: 'OFFLINE', lastSeen: 0 });
+  const [groupMemberNames, setGroupMemberNames] = useState<Record<string, string>>({});
+  const [groupMemberAvatars, setGroupMemberAvatars] = useState<Record<string, string>>({});
   const [viewerImage, setViewerImage] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime, setRecordTime] = useState('00:00');
@@ -396,6 +399,34 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     };
     checkActiveMeeting();
   }, [conversationId, isGroup, token]);
+
+  useEffect(() => {
+    if (isGroup && participants && participants.length > 0) {
+      const fetchGroupMemberProfiles = async () => {
+        try {
+          const res = await authFetch(`${API_URL}/api/v1/users/bulk-profiles`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify(participants),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const names: Record<string, string> = {};
+            const avatars: Record<string, string> = {};
+            Object.keys(data).forEach(key => {
+              names[key] = data[key].fullName || data[key].username || key;
+              avatars[key] = data[key].avatarUrl;
+            });
+            setGroupMemberNames(names);
+            setGroupMemberAvatars(avatars);
+          }
+        } catch (error) {
+          console.log('Error fetching member profiles', error);
+        }
+      };
+      fetchGroupMemberProfiles();
+    }
+  }, [isGroup, participants, token]);
 
   const mergeMessageIntoState = useCallback((nextMessage: ExtendedMessage) => {
     setMessages(prev => {
@@ -1264,13 +1295,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
       return (
         <Avatar
-          name={displayRecipientName}
-          uri={recipientAvatar}
+          name={isGroup ? (groupMemberNames[props.currentMessage.senderId] || props.currentMessage.senderId) : displayRecipientName}
+          uri={isGroup ? groupMemberAvatars[props.currentMessage.senderId] : recipientAvatar}
           size="small"
         />
       );
     },
-    [currentUser, displayRecipientName, recipientAvatar],
+    [currentUser, displayRecipientName, recipientAvatar, groupMemberNames, groupMemberAvatars, isGroup],
   );
 
   const renderBubble = useCallback(
