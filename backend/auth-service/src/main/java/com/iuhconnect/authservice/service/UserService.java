@@ -56,6 +56,7 @@ public class UserService {
         if (request.getLecturerId() != null && user.getRole() == com.iuhconnect.authservice.model.Role.LECTURER) {
             user.setLecturerId(request.getLecturerId());
         }
+        if (request.getAvatarUrl() != null) user.setAvatarUrl(request.getAvatarUrl());
 
         User updatedUser = userRepository.save(user);
         return mapToDto(updatedUser);

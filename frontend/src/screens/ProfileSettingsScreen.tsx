@@ -25,6 +25,7 @@ import type { LecturerStatus, UserRole } from '../types/types';
 import { API_URL } from '../config/env';
 import { authFetch } from '../services/authService';
 import { setWorkStatus, clearWorkStatus, getWorkStatus, AUTO_REPLY_TEMPLATES, WorkStatusInfo } from '../services/presenceApi';
+import { launchImageLibrary } from 'react-native-image-picker';
 
 interface ProfileSettingsScreenProps {
   navigation: any;
@@ -113,9 +114,11 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
     dateOfBirth: new Date(),
     studentId: '',
     lecturerId: '',
+    avatarUrl: '',
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [lecturerStatus, setLecturerStatus] = useState<LecturerStatus>('available');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -256,8 +259,53 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
       dateOfBirth: parsedDate,
       studentId: profile.studentId || '',
       lecturerId: profile.lecturerId || '',
+      avatarUrl: profile.avatarUrl || '',
     });
     setShowEditModal(true);
+  };
+
+  const handleUploadAvatar = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 0.8,
+        selectionLimit: 1,
+      });
+
+      if (result.didCancel || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      setUploadingAvatar(true);
+
+      const fileName = asset.fileName || `avatar_${Date.now()}.jpg`;
+      const mimeType = asset.type || 'image/jpeg';
+      
+      const presignRes = await authFetch(`${API_URL}/api/v1/files/presigned-url?fileName=${fileName}&contentType=${mimeType}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!presignRes.ok) throw new Error('Failed to get presigned URL');
+      const presignData = await presignRes.json();
+      const { presignedUrl, downloadUrl } = presignData;
+
+      const fileData = await fetch(asset.uri!);
+      const blob = await fileData.blob();
+      
+      const uploadRes = await fetch(presignedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': mimeType },
+        body: blob,
+      });
+
+      if (!uploadRes.ok) throw new Error('Failed to upload to S3');
+
+      setEditForm(prev => ({...prev, avatarUrl: downloadUrl}));
+    } catch (err) {
+      console.log('Error uploading avatar:', err);
+      Alert.alert('Lỗi', 'Không thể tải ảnh lên. Vui lòng thử lại.');
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -282,7 +330,8 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
           gender: editForm.gender,
           dateOfBirth: isoDateString,
           studentId: editForm.studentId,
-          lecturerId: editForm.lecturerId
+          lecturerId: editForm.lecturerId,
+          avatarUrl: editForm.avatarUrl
         })
       });
 
@@ -299,7 +348,8 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
           gender: data.gender,
           dateOfBirth: data.dateOfBirth,
           studentId: data.studentId,
-          lecturerId: data.lecturerId
+          lecturerId: data.lecturerId,
+          avatarUrl: data.avatarUrl
         }));
         setShowEditModal(false);
       } else {
@@ -367,8 +417,8 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
           <LinearGradient colors={['#004A82', '#0066B3', '#0077CC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.profileGradient}>
             <View style={styles.profileDecor1} />
             <View style={styles.profileDecor2} />
-            <TouchableOpacity style={styles.avatarContainer} activeOpacity={0.8}>
-              <Avatar name={profile.fullName} size="xxlarge" showGradientRing />
+            <TouchableOpacity style={styles.avatarContainer} activeOpacity={0.8} onPress={openEditModal}>
+              <Avatar name={profile.fullName} uri={profile.avatarUrl} size="xxlarge" showGradientRing />
               <View style={styles.editAvatarBadge}><Icon name="camera" size={14} color={Colors.white} /></View>
             </TouchableOpacity>
             <Text style={styles.profileName}>{profile.fullName}</Text>
@@ -601,9 +651,13 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
               
               {/* Photo Area */}
               <View style={styles.modalPhotoArea}>
-                 <Avatar name={editForm.fullName} size="xlarge" />
-                 <TouchableOpacity style={styles.changePhotoBtn}>
-                    <Text style={styles.changePhotoText}>Thay đổi ảnh đại diện</Text>
+                 <Avatar name={editForm.fullName} uri={editForm.avatarUrl} size="xlarge" />
+                 <TouchableOpacity style={styles.changePhotoBtn} onPress={handleUploadAvatar} disabled={uploadingAvatar}>
+                    {uploadingAvatar ? (
+                      <ActivityIndicator size="small" color={Colors.primary} />
+                    ) : (
+                      <Text style={styles.changePhotoText}>Thay đổi ảnh đại diện</Text>
+                    )}
                  </TouchableOpacity>
               </View>
 

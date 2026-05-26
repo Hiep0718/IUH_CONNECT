@@ -22,4 +22,5 @@ public class UpdateUserRequest {
     private LocalDate dateOfBirth;
     private String studentId;
     private String lecturerId;
+    private String avatarUrl;
 }
