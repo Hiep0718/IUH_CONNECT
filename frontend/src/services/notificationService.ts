@@ -11,8 +11,12 @@ import {
 import { API_URL } from '../config/env';
 import { authFetch } from './authService';
 import notifee, { AndroidImportance, AndroidCategory, EventType } from '@notifee/react-native';
+import { DeviceEventEmitter } from 'react-native';
 
 const messagingInstance = getMessaging(getApp());
+
+// ── Event name để giao tiếp giữa FCM handler và WebSocketProvider ──
+export const CALL_INVITE_EVENT = 'FCM_CALL_INVITE';
 
 export const requestUserPermission = async () => {
   if (Platform.OS === 'ios') {
@@ -63,8 +67,54 @@ export const sendFCMTokenToBackend = async (token: string, userJwt: string) => {
   }
 };
 
+/**
+ * Hiển thị Notifee notification cho cuộc gọi đến.
+ * Dùng cho cả background lẫn killed state.
+ */
+async function displayCallNotification(data: Record<string, string>) {
+  try {
+    // Tạo/đảm bảo channel tồn tại
+    const channelId = await notifee.createChannel({
+      id: 'call_channel',
+      name: 'Cuộc gọi đến',
+      importance: AndroidImportance.HIGH,
+      vibration: true,
+      sound: 'default',
+    });
+
+    const callerName = data.senderId || 'Người dùng';
+
+    await notifee.displayNotification({
+      title: '📞 Cuộc gọi đến',
+      body: `${callerName} đang gọi video cho bạn`,
+      android: {
+        channelId,
+        importance: AndroidImportance.HIGH,
+        category: AndroidCategory.CALL,
+        sound: 'default',
+        vibrationPattern: [300, 500, 300, 500],
+        // Full-screen intent: hiện notification dạng heads-up / full-screen trên lock screen
+        fullScreenAction: {
+          id: 'default',
+        },
+        pressAction: {
+          id: 'default',
+        },
+        // Giữ notification cho đến khi user tương tác
+        autoCancel: true,
+        ongoing: false,
+      },
+      data: data,
+    });
+
+    console.log('📞 [Notifee] Displayed incoming call notification for:', callerName);
+  } catch (error) {
+    console.error('❌ [Notifee] Failed to display call notification:', error);
+  }
+}
+
 export const setupNotificationListeners = () => {
-  // Tạo sẵn channel cho cuộc gọi đến để hệ thống Android tự xử lý Push Notification (bật pop-up Heads-up)
+  // Tạo sẵn channel
   if (Platform.OS === 'android') {
     (async () => {
       await notifee.createChannel({
@@ -72,6 +122,7 @@ export const setupNotificationListeners = () => {
         name: 'Cuộc gọi đến',
         importance: AndroidImportance.HIGH,
         vibration: true,
+        sound: 'default',
       });
       await notifee.createChannel({
         id: 'default_channel',
@@ -82,12 +133,19 @@ export const setupNotificationListeners = () => {
   }
 
   return onMessage(messagingInstance, async remoteMessage => {
-    console.log('A new FCM message arrived!', JSON.stringify(remoteMessage));
+    console.log('📬 [FCM] Foreground message arrived:', JSON.stringify(remoteMessage));
 
-    // Khi app đang foreground, WebSocket đã xử lý in-app notification banner.
-    // FCM foreground message chỉ cần log, KHÔNG hiện Alert chặn màn hình.
-    // Push notification chỉ hiện khi app ở background/killed (do hệ thống xử lý).
-    const data = remoteMessage.data;
+    const data = remoteMessage.data as Record<string, string> | undefined;
+
+    if (data?.type === 'CALL_INVITE') {
+      // ★ Cuộc gọi đến khi app đang foreground.
+      // WebSocket thường xử lý nhưng FCM là fallback đảm bảo.
+      // Emit event để WebSocketProvider hiện Modal nếu chưa có.
+      console.log('📞 [FCM] CALL_INVITE received in foreground, emitting event');
+      DeviceEventEmitter.emit(CALL_INVITE_EVENT, data);
+      return;
+    }
+
     if (data?.type === 'CONTACT_EVENT') {
       console.log('📬 [FCM] Contact event in foreground (handled by WebSocket):', data.eventType);
     } else {
@@ -98,10 +156,19 @@ export const setupNotificationListeners = () => {
 
 export const registerBackgroundMessageHandler = () => {
   setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
-    console.log('Message handled in the background!', remoteMessage);
-    // Khi Backend gửi { notification, android: { channel_id } }, hệ thống Android sẽ tự động vẽ Notification
-    // dựa trên cái channel_id mà ta đã tạo ở setupNotificationListeners.
-    // Không cần dùng JS Notifee để vẽ lại nữa (tránh trùng lặp và tránh lỗi do App bị kill).
+    console.log('📬 [FCM] Background/Killed message received:', JSON.stringify(remoteMessage));
+
+    const data = remoteMessage.data as Record<string, string> | undefined;
+
+    if (data?.type === 'CALL_INVITE') {
+      // ★ Cuộc gọi đến khi app bị background hoặc killed.
+      // Dùng Notifee để hiển thị full-screen incoming call notification.
+      console.log('📞 [FCM] CALL_INVITE in background/killed, displaying Notifee notification');
+      await displayCallNotification(data);
+      return;
+    }
+
+    // Tin nhắn thường: Android OS đã tự hiện notification từ FCM notification payload.
+    // Không cần xử lý thêm.
   });
 };
-

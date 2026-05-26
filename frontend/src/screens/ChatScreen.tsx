@@ -1590,14 +1590,36 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       const uploadResult = await uploadMedia(token, fakeAsset);
       
       if (uploadResult) {
-        const newMessage = {
-          _id: Math.random().toString(36).substring(7),
+        const optimisticId = createLocalMessageId();
+        const optimisticMessage: ExtendedMessage = {
+          _id: optimisticId,
           text: '',
+          rawContent: '[Tin nhắn thoại]',
           createdAt: new Date(),
           user: { _id: 'me', name: currentUser },
-          audio: uploadResult.url,
+          audio: uploadResult.mediaUrl,
+          messageType: 'AUDIO',
+          mediaUrl: uploadResult.mediaUrl,
+          fileName: uploadResult.fileName,
+          status: 'sent',
+          ...(replyTo ? { replyTo: { _id: replyTo._id, text: replyTo.text || '', user: replyTo.user } } : {}),
         };
-        onSend([newMessage as IMessage]);
+
+        setMessages(prev => GiftedChat.append(prev, [optimisticMessage]));
+        setReplyTo(null);
+
+        sendMessage({
+          senderId: currentUser,
+          receiverId: recipientId,
+          content: '[Tin nhắn thoại]',
+          conversationId,
+          messageType: 'AUDIO',
+          mediaUrl: uploadResult.mediaUrl,
+          fileName: uploadResult.fileName,
+          fileSize: uploadResult.fileSize,
+          mimeType: uploadResult.mimeType,
+          ...(replyTo ? { replyToId: replyTo._id, replyToText: replyTo.text || '', replyToSender: replyTo.user.name } : {}),
+        });
       }
     } catch (error) {
       console.error('Error stopping record:', error);
@@ -1606,7 +1628,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     } finally {
       setIsUploading(false);
     }
-  }, [isRecording, token, currentUser, onSend]);
+  }, [isRecording, token, currentUser, recipientId, conversationId, replyTo, sendMessage]);
 
   const renderComposer = useCallback(
     (props: any) => (

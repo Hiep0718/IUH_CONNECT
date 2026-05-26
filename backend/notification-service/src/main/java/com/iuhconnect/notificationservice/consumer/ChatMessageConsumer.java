@@ -61,11 +61,12 @@ public class ChatMessageConsumer {
         
         if ("CALL_INVITE".equals(message.getMessageType())) {
             data.put("type", "CALL_INVITE");
+            data.put("senderId", message.getSenderId());
         } else {
             data.put("type", "CHAT_MESSAGE");
         }
         
-        log.info("📲 Preparing to send Push to {} (OFFLINE)", receiverId);
+        log.info("📲 Preparing to send Push to {} (type={})", receiverId, data.get("type"));
         fcmPushService.sendPushNotification(receiverId, title, body, data);
     }
 }

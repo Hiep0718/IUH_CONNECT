@@ -6,13 +6,14 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { View, StyleSheet, Modal, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Modal, Text, TouchableOpacity, DeviceEventEmitter } from 'react-native';
 import Sound from 'react-native-sound';
 import NetInfo from '@react-native-community/netinfo';
 import { WS_URL } from '../config/env';
 import InAppNotification, { InAppNotificationData } from '../components/InAppNotification';
 import { triggerAutoLogout } from './authService';
 import { offlineQueue } from './offlineQueue';
+import { CALL_INVITE_EVENT } from './notificationService';
 
 type MessageHandler = (data: any) => void;
 
@@ -412,6 +413,26 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     });
     return () => unsubscribe();
   }, [connect]);
+
+  // ── FCM CALL_INVITE fallback: lắng nghe event từ FCM khi app foreground ──
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(CALL_INVITE_EVENT, (data: any) => {
+      console.log('📞 [WSProvider] Received CALL_INVITE from FCM fallback:', data);
+      // Chỉ hiện nếu chưa có cuộc gọi đang hiển thị
+      if (!incomingCallData) {
+        handleGlobalIncomingCall({
+          type: 'CALL_SIGNAL',
+          signalType: 'CALL_INVITE',
+          senderId: data.senderId,
+          senderName: data.senderId,
+          roomName: data.roomName,
+          meetingId: data.meetingId,
+          conversationId: data.conversationId,
+        });
+      }
+    });
+    return () => subscription.remove();
+  }, [handleGlobalIncomingCall, incomingCallData]);
 
   const sendMessage = useCallback((data: object) => {
     const ws = wsRef.current;
