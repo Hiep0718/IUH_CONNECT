@@ -1,0 +1,382 @@
+version: '3.8'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    ports:
+    - 2181:2181
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+    - zookeeper-data:/var/lib/zookeeper/data
+    - zookeeper-logs:/var/lib/zookeeper/log
+    networks:
+    - iuh-connect-network
+    restart: always
+    deploy:
+      placement:
+        constraints:
+        - node.role == manager
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    ports:
+    - 9092:9092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    volumes:
+    - kafka-data:/var/lib/kafka/data
+    networks:
+    - iuh-connect-network
+    restart: always
+    deploy:
+      placement:
+        constraints:
+        - node.role == manager
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+  mariadb:
+    image: mariadb:11
+    ports:
+    - 3307:3306
+    environment:
+      MARIADB_ROOT_PASSWORD: root123
+      MARIADB_DATABASE: auth_db
+      MARIADB_USER: iuh_user
+      MARIADB_PASSWORD: iuh_pass
+    volumes:
+    - mariadb-data:/var/lib/mysql
+    networks:
+    - iuh-connect-network
+    restart: always
+    healthcheck:
+      test:
+      - CMD
+      - healthcheck.sh
+      - --connect
+      - --innodb_initialized
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      placement:
+        constraints:
+        - node.role == manager
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+  mongodb:
+    image: mongo:7.0
+    ports:
+    - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: iuh_admin
+      MONGO_INITDB_ROOT_PASSWORD: iuh_mongo_pass
+      MONGO_INITDB_DATABASE: iuh_connect_db
+    volumes:
+    - mongodb-data:/data/db
+    networks:
+    - iuh-connect-network
+    restart: always
+    healthcheck:
+      test:
+      - CMD
+      - mongosh
+      - --eval
+      - db.adminCommand('ping')
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      placement:
+        constraints:
+        - node.role == manager
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+  redis:
+    image: redis:7.2-alpine
+    ports:
+    - 6379:6379
+    command: redis-server --appendonly yes --requirepass iuh_redis_pass
+    volumes:
+    - redis-data:/data
+    networks:
+    - iuh-connect-network
+    restart: always
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - -a
+      - iuh_redis_pass
+      - ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      placement:
+        constraints:
+        - node.role == manager
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+  minio:
+    image: minio/minio:RELEASE.2023-11-20T22-40-07Z
+    ports:
+    - 9000:9000
+    - 9001:9001
+    environment:
+      MINIO_ROOT_USER: iuh_minio_admin
+      MINIO_ROOT_PASSWORD: iuh_minio_password
+    volumes:
+    - minio-data:/data
+    command: server /data --console-address ":9001"
+    networks:
+    - iuh-connect-network
+    restart: always
+    healthcheck:
+      test:
+      - CMD
+      - mc
+      - ready
+      - local
+      interval: 30s
+      timeout: 20s
+      retries: 5
+    deploy:
+      placement:
+        constraints:
+        - node.role == manager
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+  zipkin:
+    image: openzipkin/zipkin:latest
+    ports:
+    - 9411:9411
+    networks:
+    - iuh-connect-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    ports:
+    - 8085:8085
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mariadb://mariadb:3306/auth_db
+      SPRING_DATASOURCE_USERNAME: iuh_user
+      SPRING_DATASOURCE_PASSWORD: iuh_pass
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    networks:
+    - iuh-connect-network
+    restart: always
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8085/actuator/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    image: 127.0.0.1:5000/auth-service:latest
+  chat-service:
+    build:
+      context: ./backend/chat-service
+      dockerfile: Dockerfile
+    ports:
+    - 8082:8082
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://iuh_admin:iuh_mongo_pass@mongodb:27017/iuh_connect_db?authSource=admin
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: iuh_redis_pass
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      AWS_REGION: ${AWS_REGION:-ap-southeast-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-iuh-connect-chat-media}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    networks:
+    - iuh-connect-network
+    restart: always
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8082/actuator/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    image: 127.0.0.1:5000/chat-service:latest
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    ports:
+    - 8081:8080
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8085
+      CHAT_SERVICE_HTTP_URL: http://chat-service:8082
+      CHAT_SERVICE_WS_URL: ws://chat-service:8082
+      PRESENCE_SERVICE_URL: http://presence-service:8083
+      PRESENCE_SERVICE_WS_URL: ws://presence-service:8083
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: iuh_redis_pass
+      JWT_SECRET: IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    networks:
+    - iuh-connect-network
+    restart: always
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8080/actuator/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    image: 127.0.0.1:5000/api-gateway:latest
+  presence-service:
+    build:
+      context: ./backend/presence-service
+      dockerfile: Dockerfile
+    ports:
+    - 8083:8083
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: iuh_redis_pass
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JWT_SECRET: IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    networks:
+    - iuh-connect-network
+    restart: always
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8083/actuator/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    image: 127.0.0.1:5000/presence-service:latest
+  notification-service:
+    build:
+      context: ./backend/notification-service
+      dockerfile: Dockerfile
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    networks:
+    - iuh-connect-network
+    restart: always
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    image: 127.0.0.1:5000/notification-service:latest
+  ai-service:
+    build:
+      context: ./backend/ai-service
+      dockerfile: Dockerfile
+    ports:
+    - 8084:8084
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OLLAMA_HOST: http://host.docker.internal:11434
+      OLLAMA_MODEL: qwen2:1.5b
+      CHROMADB_HOST: http://host.docker.internal:8000
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    extra_hosts:
+    - host.docker.internal:host-gateway
+    networks:
+    - iuh-connect-network
+    restart: always
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8084/actuator/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    image: 127.0.0.1:5000/ai-service:latest
+volumes:
+  zookeeper-data: null
+  zookeeper-logs: null
+  kafka-data: null
+  mariadb-data: null
+  mongodb-data: null
+  redis-data: null
+  minio-data: null
+networks:
+  iuh-connect-network:
+    driver: overlay
