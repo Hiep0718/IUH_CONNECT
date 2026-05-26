@@ -81,23 +81,29 @@ const resolveOtherUserId = (msg: any, currentUser: string) => {
 
 const formatCallPreview = (content?: string) => {
   if (!content) {
-    return 'Call';
+    return '📞 Cuộc gọi';
   }
 
   try {
     const callInfo = JSON.parse(content);
     switch (callInfo.callStatus) {
       case 'missed':
-        return 'Missed call';
+        return '📞 Cuộc gọi nhỡ';
       case 'rejected':
-        return 'Call rejected';
+        return '📞 Cuộc gọi bị từ chối';
       case 'cancelled':
-        return 'Call cancelled';
+        return '📞 Cuộc gọi bị huỷ';
       default:
-        return callInfo.duration > 0 ? 'Completed call' : 'Video call';
+        if (callInfo.duration > 0) {
+          const mins = Math.floor(callInfo.duration / 60);
+          const secs = callInfo.duration % 60;
+          const durationStr = mins > 0 ? `${mins}p ${secs}s` : `${secs}s`;
+          return `📞 Cuộc gọi kết thúc (${durationStr})`;
+        }
+        return '📞 Cuộc gọi video';
     }
   } catch {
-    return 'Video call';
+    return '📞 Cuộc gọi video';
   }
 };
 
@@ -117,6 +123,8 @@ const mapConversationPreview = (
     if (msg.messageType === 'VIDEO') preview = '🎬 Video';
     if (msg.messageType === 'FILE') preview = `📎 ${msg.fileName || 'Tệp đính kèm'}`;
     if (msg.messageType === 'STICKER') preview = '😄 Sticker';
+    if (msg.messageType === 'AUDIO') preview = '🎤 Tin nhắn thoại';
+    if (msg.messageType === 'CALL') preview = formatCallPreview(msg.content);
 
     return {
       id: msg.conversationId,
@@ -145,10 +153,11 @@ const mapConversationPreview = (
   }
 
   let preview = msg.content;
-  if (msg.messageType === 'IMAGE') preview = '📷 Photo';
+  if (msg.messageType === 'IMAGE') preview = '📷 Hình ảnh';
   if (msg.messageType === 'VIDEO') preview = '🎬 Video';
-  if (msg.messageType === 'FILE') preview = `📎 ${msg.fileName || 'File'}`;
+  if (msg.messageType === 'FILE') preview = `📎 ${msg.fileName || 'Tệp đính kèm'}`;
   if (msg.messageType === 'STICKER') preview = '😄 Sticker';
+  if (msg.messageType === 'AUDIO') preview = '🎤 Tin nhắn thoại';
   if (msg.messageType === 'CALL') preview = formatCallPreview(msg.content);
 
   return {
