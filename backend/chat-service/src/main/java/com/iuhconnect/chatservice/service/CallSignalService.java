@@ -96,7 +96,7 @@ public class CallSignalService {
 
         // Tạo meeting session trong Redis
         MeetingSession meeting = meetingSessionService.createMeeting(
-                signal.getSenderId(), roomName);
+                signal.getSenderId(), roomName, signal.getConversationId());
 
         // Inject meetingId vào signal để callee biết
         signal.setMeetingId(meeting.getMeetingId());

@@ -354,6 +354,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [viewerImage, setViewerImage] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime, setRecordTime] = useState('00:00');
+  const [activeMeeting, setActiveMeeting] = useState<{ meetingId: string; roomName: string } | null>(null);
   const audioRecorderPlayerRef = useRef(new AudioRecorderPlayer());
   const headerAnim = useRef(new Animated.Value(0)).current;
   const attachMenuAnim = useRef(new Animated.Value(0)).current;
@@ -373,6 +374,28 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       useNativeDriver: true,
     }).start();
   }, [headerAnim]);
+
+  useEffect(() => {
+    // Kiểm tra xem có cuộc gọi nhóm nào đang diễn ra không
+    if (!isGroup || !conversationId) return;
+
+    const checkActiveMeeting = async () => {
+      try {
+        const res = await authFetch(`${API_URL}/api/v1/meetings/conversation/${conversationId}/active`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setActiveMeeting(data);
+        } else {
+          setActiveMeeting(null);
+        }
+      } catch (error) {
+        console.log('Error checking active meeting:', error);
+      }
+    };
+    checkActiveMeeting();
+  }, [conversationId, isGroup, token]);
 
   const mergeMessageIntoState = useCallback((nextMessage: ExtendedMessage) => {
     setMessages(prev => {
@@ -1863,6 +1886,27 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
       <OfflineBanner isOffline={isOffline} />
 
+      {activeMeeting && (
+        <TouchableOpacity
+          style={styles.activeMeetingBanner}
+          onPress={() => {
+            navigation.navigate('Meeting', {
+              callerId: recipientId,
+              callerName: displayRecipientName,
+              callerAvatar: recipientAvatar,
+              roomName: activeMeeting.roomName,
+              meetingId: activeMeeting.meetingId,
+              isIncoming: false,
+              isLateJoin: true,
+              conversationId,
+            });
+          }}
+        >
+          <Icon name="video" size={20} color="#FFF" style={{ marginRight: 8 }} />
+          <Text style={styles.activeMeetingBannerText}>Cuộc gọi nhóm đang diễn ra. Tham gia ngay!</Text>
+        </TouchableOpacity>
+      )}
+
       {(lecturerStatus === 'busy' || recipientPresence.status === 'BUSY') && (
         <View style={styles.busyBanner}>
           <Icon name="clock-alert-outline" size={16} color="#B45309" />
@@ -2236,6 +2280,19 @@ const styles = StyleSheet.create({
     color: '#9A5B08',
     fontSize: 12,
     fontWeight: '500',
+  },
+  activeMeetingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  activeMeetingBannerText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   listContentContainer: {
     paddingTop: 8,

@@ -28,6 +28,7 @@ public class MeetingSessionService {
 
     private static final String SESSION_KEY_PREFIX = "meeting:session:";
     private static final String HANDOFF_KEY_PREFIX = "meeting:handoff:";
+    private static final String CONVERSATION_KEY_PREFIX = "meeting:conversation:";
     private static final long SESSION_TTL_HOURS = 24;
     private static final long HANDOFF_TTL_SECONDS = 300; // 5 phút
 
@@ -44,7 +45,7 @@ public class MeetingSessionService {
     /**
      * Tạo meeting session mới khi caller gửi CALL_INVITE.
      */
-    public MeetingSession createMeeting(String hostUserId, String roomName) {
+    public MeetingSession createMeeting(String hostUserId, String roomName, String conversationId) {
         String meetingId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
 
@@ -53,6 +54,7 @@ public class MeetingSessionService {
 
         MeetingSession session = MeetingSession.builder()
                 .meetingId(meetingId)
+                .conversationId(conversationId)
                 .roomName(roomName)
                 .hostUserId(hostUserId)
                 .participantUserIds(participants)
@@ -62,7 +64,13 @@ public class MeetingSessionService {
                 .build();
 
         saveMeeting(session);
-        log.info("📋 Meeting created [meetingId={}, room={}, host={}]", meetingId, roomName, hostUserId);
+        if (conversationId != null) {
+            String convKey = CONVERSATION_KEY_PREFIX + conversationId;
+            redisTemplate.opsForValue().set(convKey, meetingId, SESSION_TTL_HOURS, TimeUnit.HOURS);
+        }
+        
+        log.info("📋 Meeting created [meetingId={}, room={}, conv={}, host={}]", 
+                meetingId, roomName, conversationId, hostUserId);
         return session;
     }
 
@@ -108,8 +116,34 @@ public class MeetingSessionService {
         session.setStatus(MeetingStatus.ENDED);
         session.setUpdatedAt(System.currentTimeMillis());
         saveMeeting(session);
+        
+        if (session.getConversationId() != null) {
+            String convKey = CONVERSATION_KEY_PREFIX + session.getConversationId();
+            redisTemplate.delete(convKey);
+        }
+        
         log.info("🔴 Meeting ended [meetingId={}]", meetingId);
         return session;
+    }
+
+    /**
+     * Lấy meeting đang active cho một conversation.
+     */
+    public MeetingSession getActiveMeetingForConversation(String conversationId) {
+        String convKey = CONVERSATION_KEY_PREFIX + conversationId;
+        String meetingId = redisTemplate.opsForValue().get(convKey);
+        if (meetingId == null) {
+            return null;
+        }
+        
+        MeetingSession session = getMeeting(meetingId);
+        if (session != null && session.getStatus() != MeetingStatus.ENDED) {
+            return session;
+        }
+        
+        // Cleanup stale data
+        redisTemplate.delete(convKey);
+        return null;
     }
 
     // ==================== Handoff Token ====================

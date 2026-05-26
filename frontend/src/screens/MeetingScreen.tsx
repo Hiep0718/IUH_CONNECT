@@ -49,6 +49,7 @@ interface MeetingScreenProps {
       roomName?: string;
       meetingId?: string;
       conversationId?: string;
+      isLateJoin?: boolean;
     };
   };
   token: string | null;
@@ -64,6 +65,7 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token,
     roomName: initialRoomName,
     meetingId: initialMeetingId,
     conversationId,
+    isLateJoin = false,
   } = route.params;
 
   const { sendMessage, addListener, removeListener } = useWebSocket();
@@ -219,7 +221,14 @@ const MeetingScreen: React.FC<MeetingScreenProps> = ({ navigation, route, token,
       useNativeDriver: true,
     }).start();
 
-    if (!isIncoming) {
+    if (isLateJoin) {
+      // === LATE JOIN (JOINING ACTIVE MEETING) ===
+      console.log('✅ Late joining active meeting:', roomNameRef.current);
+      setCallStatus('Đang tham gia cuộc gọi...');
+      setTimeout(() => {
+        if (isMounted) openJitsiMeeting(roomNameRef.current);
+      }, 500);
+    } else if (!isIncoming) {
       // === CALLER ===
       if (!roomNameRef.current) {
         roomNameRef.current = `IUHConnect_${callerId}_${Date.now()}`;

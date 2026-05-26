@@ -194,6 +194,27 @@ public class MeetingController {
     }
 
     /**
+     * GET /api/v1/meetings/conversation/{conversationId}/active
+     *
+     * Frontend gọi khi mở màn hình chat (đặc biệt là group) để kiểm tra có meeting nào đang diễn ra không.
+     * Nếu có, trả về meeting info để hiển thị nút "Join Call".
+     */
+    @GetMapping("/conversation/{conversationId}/active")
+    public ResponseEntity<MeetingJoinInfoResponse> getActiveMeeting(@PathVariable String conversationId) {
+        MeetingSession session = meetingSessionService.getActiveMeetingForConversation(conversationId);
+        if (session == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String jitsiUrl = JITSI_SERVER + "/" + session.getRoomName();
+        return ResponseEntity.ok(MeetingJoinInfoResponse.builder()
+                .meetingId(session.getMeetingId())
+                .roomName(session.getRoomName())
+                .jitsiUrl(jitsiUrl)
+                .build());
+    }
+
+    /**
      * Trích xuất userId từ request.
      */
     private String extractUserId(HttpServletRequest request) {

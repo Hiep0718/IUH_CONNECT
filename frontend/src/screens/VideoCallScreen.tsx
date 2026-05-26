@@ -32,12 +32,13 @@ interface VideoCallScreenProps {
       isIncoming?: boolean;
       token?: string;
       roomName?: string;
+      conversationId?: string;
     };
   };
 }
 
 const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ navigation, route }) => {
-  const { callerId, callerName, callerAvatar, isIncoming = false, token, roomName: initialRoomName } = route.params;
+  const { callerId, callerName, callerAvatar, isIncoming = false, token, roomName: initialRoomName, conversationId } = route.params;
 
   const [callDuration, setCallDuration] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
@@ -107,6 +108,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ navigation, route }) 
               signalType: 'CALL_INVITE',
               senderId: '',
               receiverId: callerId,
+              conversationId: conversationId,
               roomName: roomNameRef.current,
             }));
             console.log('📞 CALL_INVITE sent to', callerId, 'room:', roomNameRef.current);

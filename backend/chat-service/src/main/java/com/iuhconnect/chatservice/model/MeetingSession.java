@@ -11,6 +11,7 @@ import java.util.Set;
 @Builder
 public class MeetingSession {
     private String meetingId;
+    private String conversationId;
     private String roomName;
     private String hostUserId;
     private Set<String> participantUserIds;
