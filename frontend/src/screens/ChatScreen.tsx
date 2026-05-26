@@ -1316,7 +1316,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         message.messageType === 'VIDEO' ||
         message.messageType === 'STICKER' ||
         message.messageType === 'FILE' ||
-        !!message.image;
+        message.messageType === 'AUDIO' ||
+        !!message.image ||
+        !!message.audio;
 
       const timeText = new Date(message.createdAt).toLocaleTimeString('vi-VN', {
         hour: '2-digit',
