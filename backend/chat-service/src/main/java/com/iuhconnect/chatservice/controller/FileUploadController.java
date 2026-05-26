@@ -1,17 +1,21 @@
 package com.iuhconnect.chatservice.controller;
 
-import io.minio.*;
-import io.minio.http.Method;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/v1/files")
@@ -19,64 +23,20 @@ public class FileUploadController {
 
     private static final Logger log = LoggerFactory.getLogger(FileUploadController.class);
 
-    private final MinioClient minioClient;
+    private final S3Presigner s3Presigner;
 
-    @Value("${spring.minio.bucket-name:chat-media}")
+    @Value("${aws.s3.bucket-name:iuh-connect-chat-media}")
     private String bucketName;
+    
+    @Value("${aws.s3.region:ap-southeast-1}")
+    private String region;
 
-    @Value("${spring.minio.url:http://localhost:9000}")
-    private String minioUrl;
-
-    @Value("${spring.minio.access-key:iuh_minio_admin}")
-    private String accessKey;
-
-    @Value("${spring.minio.secret-key:iuh_minio_password}")
-    private String secretKey;
-
-    public FileUploadController(MinioClient minioClient) {
-        this.minioClient = minioClient;
+    public FileUploadController(S3Presigner s3Presigner) {
+        this.s3Presigner = s3Presigner;
     }
 
     /**
-     * Auto-create the bucket on startup if it doesn't exist.
-     */
-    @PostConstruct
-    public void initBucket() {
-        try {
-            boolean exists = minioClient.bucketExists(
-                    BucketExistsArgs.builder().bucket(bucketName).build());
-            if (!exists) {
-                minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
-                log.info("✅ Created MinIO bucket: {}", bucketName);
-
-                // Set bucket policy to allow public read (for download URLs)
-                String policy = """
-                    {
-                      "Version": "2012-10-17",
-                      "Statement": [
-                        {
-                          "Effect": "Allow",
-                          "Principal": {"AWS": ["*"]},
-                          "Action": ["s3:GetObject"],
-                          "Resource": ["arn:aws:s3:::%s/*"]
-                        }
-                      ]
-                    }
-                    """.formatted(bucketName);
-                minioClient.setBucketPolicy(
-                        SetBucketPolicyArgs.builder()
-                                .bucket(bucketName)
-                                .config(policy)
-                                .build());
-                log.info("✅ Set public read policy for bucket: {}", bucketName);
-            }
-        } catch (Exception e) {
-            log.error("❌ Failed to initialize MinIO bucket: {}", e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Generate a presigned PUT URL for the client to upload a file directly to MinIO.
+     * Generate a presigned PUT URL for the client to upload a file directly to AWS S3.
      * Returns JSON with presignedUrl, objectKey, and downloadUrl.
      */
     @GetMapping("/presigned-url")
@@ -85,28 +45,24 @@ public class FileUploadController {
             @RequestParam String contentType,
             @RequestParam(required = false) String clientHost) {
         try {
-            String objectKey = System.currentTimeMillis() + "_" + fileName;
+            String objectKey = System.currentTimeMillis() + "_" + fileName.replaceAll("[^a-zA-Z0-9.-]", "_");
 
-            MinioClient signClient = minioClient;
-            if (clientHost != null && !clientHost.trim().isEmpty()) {
-                signClient = MinioClient.builder()
-                        .endpoint("http://" + clientHost + ":9000")
-                        .credentials(accessKey, secretKey)
-                        .region("us-east-1")
-                        .build();
-            }
+            PutObjectRequest objectRequest = PutObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(objectKey)
+                    .contentType(contentType)
+                    .build();
 
-            // Presigned PUT URL (client uploads here)
-            String presignedUrl = signClient.getPresignedObjectUrl(
-                    GetPresignedObjectUrlArgs.builder()
-                            .method(Method.PUT)
-                            .bucket(bucketName)
-                            .object(objectKey)
-                            .expiry(10, TimeUnit.MINUTES)
-                            .build());
+            PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                    .signatureDuration(Duration.ofMinutes(10))
+                    .putObjectRequest(objectRequest)
+                    .build();
 
-            // Public download URL (used in chat message)
-            String downloadUrl = "http://" + (clientHost != null && !clientHost.trim().isEmpty() ? clientHost : "localhost") + ":9000/" + bucketName + "/" + objectKey;
+            PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(presignRequest);
+            String presignedUrl = presignedRequest.url().toString();
+
+            // S3 standard public URL format: https://bucket-name.s3.region.amazonaws.com/objectKey
+            String downloadUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, objectKey);
 
             Map<String, String> response = new HashMap<>();
             response.put("presignedUrl", presignedUrl);
@@ -115,7 +71,7 @@ public class FileUploadController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("❌ Failed to generate presigned URL: {}", e.getMessage(), e);
+            log.error("❌ Failed to generate S3 presigned PUT URL: {}", e.getMessage(), e);
             Map<String, String> error = new HashMap<>();
             error.put("error", "Failed to generate upload URL");
             return ResponseEntity.internalServerError().body(error);
@@ -123,20 +79,24 @@ public class FileUploadController {
     }
 
     /**
-     * Generate a presigned GET URL for downloading/viewing a file.
-     * Useful for private buckets or temporary access.
+     * Generate a presigned GET URL for downloading/viewing a file securely.
      */
     @GetMapping("/download-url")
     public ResponseEntity<Map<String, String>> getDownloadUrl(
             @RequestParam String objectKey) {
         try {
-            String presignedUrl = minioClient.getPresignedObjectUrl(
-                    GetPresignedObjectUrlArgs.builder()
-                            .method(Method.GET)
-                            .bucket(bucketName)
-                            .object(objectKey)
-                            .expiry(60, TimeUnit.MINUTES)
-                            .build());
+            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(objectKey)
+                    .build();
+
+            GetObjectPresignRequest getObjectPresignRequest = GetObjectPresignRequest.builder()
+                    .signatureDuration(Duration.ofMinutes(60))
+                    .getObjectRequest(getObjectRequest)
+                    .build();
+
+            PresignedGetObjectRequest presignedGetObjectRequest = s3Presigner.presignGetObject(getObjectPresignRequest);
+            String presignedUrl = presignedGetObjectRequest.url().toString();
 
             Map<String, String> response = new HashMap<>();
             response.put("downloadUrl", presignedUrl);
@@ -144,7 +104,7 @@ public class FileUploadController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("❌ Failed to generate download URL: {}", e.getMessage(), e);
+            log.error("❌ Failed to generate S3 presigned GET URL: {}", e.getMessage(), e);
             Map<String, String> error = new HashMap<>();
             error.put("error", "Failed to generate download URL");
             return ResponseEntity.internalServerError().body(error);
