@@ -120,6 +120,8 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
           conversationId: `${currentUser}-${contact.username}`,
           recipientName: contact.fullName || contact.username,
           recipientId: contact.username,
+          recipientAvatar: contact.avatarUrl,
+          isBot: contact.isBot,
           isOnline: true,
       });
   };
@@ -127,7 +129,14 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
   const renderItem = ({ item }: { item: any }) => {
     return (
       <View style={styles.contactItem}>
-        <Avatar name={item.fullName || item.username} uri={item.isBot ? 'https://cdn-icons-png.flaticon.com/512/4712/4712109.png' : undefined} size="large" isOnline={true} showOnlineStatus />
+        <Avatar 
+          name={item.fullName || item.username} 
+          uri={!item.isBot ? item.avatarUrl : undefined} 
+          localSource={item.isBot ? require('../botai.png') : undefined}
+          size="large" 
+          isOnline={true} 
+          showOnlineStatus 
+        />
         <View style={styles.contactInfo}>
           <Text style={styles.contactName}>{item.fullName || item.username}</Text>
           <Text style={styles.contactRole}>{item.role}</Text>

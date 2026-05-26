@@ -35,7 +35,7 @@ const MOCK_USERS_TO_ADD = [
 ];
 
 const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, route, currentUser, token }) => {
-  const { conversationId, groupName } = route.params;
+  const { conversationId, groupName, groupMemberAvatars = {}, groupMemberNames = {} } = route.params as any;
   const [currentGroupName, setCurrentGroupName] = useState(groupName);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameInput, setEditNameInput] = useState(groupName);
@@ -67,7 +67,8 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
         // Cập nhật danh sách thành viên với tên (tạm thời lấy userId làm tên, nếu có user-service thì gọi thêm)
         const mappedMembers = data.members.map((m: any) => ({
           id: m.userId,
-          name: m.userId === currentUser ? 'Bạn' : m.userId,
+          name: m.userId === currentUser ? 'Bạn' : (groupMemberNames[m.userId] || m.userId),
+          avatar: groupMemberAvatars[m.userId],
           role: m.role
         }));
         setMembers(mappedMembers);
@@ -327,7 +328,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
         }
       }}
     >
-      <Avatar name={item.name} size="medium" />
+      <Avatar name={item.name} uri={item.avatar} size="medium" />
       <View style={styles.memberInfo}>
         <Text style={styles.memberName}>{item.name}</Text>
         <Text style={styles.memberRole}>{item.role === 'ADMIN' ? 'Trưởng nhóm' : item.role === 'DEPUTY' ? 'Phó nhóm' : 'Thành viên'}</Text>
@@ -355,7 +356,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
         onPress={() => toggleUserSelection(item.id)}
         activeOpacity={0.7}
       >
-        <Avatar name={item.name} size="medium" />
+        <Avatar name={item.name} uri={item.avatar} size="medium" />
         <Text style={styles.userAddName}>{item.name}</Text>
         <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
           {isSelected && <Icon name="check" size={16} color={Colors.white} />}
@@ -590,7 +591,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
                   onPress={() => setSelectedSuccessor(item.id)}
                   activeOpacity={0.7}
                 >
-                  <Avatar name={item.name} size="medium" />
+                  <Avatar name={item.name} uri={item.avatar} size="medium" />
                   <View style={{ flex: 1, marginLeft: Spacing.md }}>
                     <Text style={styles.userAddName}>{item.name}</Text>
                     <Text style={{ fontSize: Typography.caption, color: Colors.textSecondary, marginTop: 2 }}>
@@ -614,7 +615,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSelectedMemberAction(null)}>
           <View style={[styles.editNameModal, { padding: 0, overflow: 'hidden' }]}>
             <View style={{ padding: Spacing.xl, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.borderLight }}>
-              <Avatar name={selectedMemberAction?.name} size="large" />
+              <Avatar name={selectedMemberAction?.name} uri={selectedMemberAction?.avatar} size="large" />
               <Text style={[styles.modalTitle, { marginTop: Spacing.md, marginBottom: 0 }]}>{selectedMemberAction?.name}</Text>
               <Text style={{ color: Colors.textSecondary, marginTop: 4 }}>
                 {selectedMemberAction?.role === 'ADMIN' ? 'Trưởng nhóm' : selectedMemberAction?.role === 'DEPUTY' ? 'Phó nhóm' : 'Thành viên'}

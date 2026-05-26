@@ -401,24 +401,46 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   }, [conversationId, isGroup, token]);
 
   useEffect(() => {
-    if (isGroup && participants && participants.length > 0) {
+    if (!isGroup) return;
+
+    // Lấy danh sách ID từ participants và messages
+    const messageSenderIds = messages.map(m => m.user._id as string).filter(id => id && id !== 'me' && id !== 'ai-assistant');
+    const allIds = Array.from(new Set([...(participants || []), ...messageSenderIds]));
+    
+    // Lọc ra những ID chưa có tên trong state
+    const missingIds = allIds.filter(id => !(id in groupMemberNames));
+
+    if (missingIds.length > 0) {
       const fetchGroupMemberProfiles = async () => {
+        // Cập nhật state tạm để tránh loop nếu API không trả về user đó
+        setGroupMemberNames(prev => {
+          const temp = { ...prev };
+          missingIds.forEach(id => { temp[id] = id; });
+          return temp;
+        });
+
         try {
           const res = await authFetch(`${API_URL}/api/v1/users/bulk-profiles`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify(participants),
+            body: JSON.stringify(missingIds),
           });
           if (res.ok) {
             const data = await res.json();
-            const names: Record<string, string> = {};
-            const avatars: Record<string, string> = {};
-            Object.keys(data).forEach(key => {
-              names[key] = data[key].fullName || data[key].username || key;
-              avatars[key] = data[key].avatarUrl;
+            setGroupMemberNames(prev => {
+              const newNames = { ...prev };
+              Object.keys(data).forEach(key => {
+                newNames[key] = data[key].fullName || data[key].full_name || data[key].username || key;
+              });
+              return newNames;
             });
-            setGroupMemberNames(names);
-            setGroupMemberAvatars(avatars);
+            setGroupMemberAvatars(prev => {
+              const newAvatars = { ...prev };
+              Object.keys(data).forEach(key => {
+                newAvatars[key] = data[key].avatarUrl || data[key].avatar_url;
+              });
+              return newAvatars;
+            });
           }
         } catch (error) {
           console.log('Error fetching member profiles', error);
@@ -426,7 +448,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       };
       fetchGroupMemberProfiles();
     }
-  }, [isGroup, participants, token]);
+  }, [isGroup, participants, token, messages, groupMemberNames]);
 
   const mergeMessageIntoState = useCallback((nextMessage: ExtendedMessage) => {
     setMessages(prev => {
@@ -1295,8 +1317,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
       return (
         <Avatar
-          name={isGroup ? (groupMemberNames[props.currentMessage.senderId] || props.currentMessage.senderId) : displayRecipientName}
-          uri={isGroup ? groupMemberAvatars[props.currentMessage.senderId] : recipientAvatar}
+          name={isGroup ? (groupMemberNames[message.user._id as string] || message.user._id as string) : displayRecipientName}
+          uri={isGroup ? groupMemberAvatars[message.user._id as string] : recipientAvatar}
+          localSource={message.user._id === 'ai-assistant' ? require('../botai.png') : undefined}
           size="small"
         />
       );
@@ -1388,6 +1411,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
               {isMediaMessage ? (
                 <Bubble
                   {...props}
+                  currentMessage={{
+                    ...message,
+                    user: {
+                      ...message.user,
+                      name: isGroup ? (groupMemberNames[message.user._id as string] || message.user._id as string) : message.user.name,
+                    },
+                  }}
                   wrapperStyle={{
                     left: styles.bubbleWrapperLeft,
                     right: styles.bubbleWrapperRight,
@@ -1399,6 +1429,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                 />
               ) : (
                 <View style={isMine ? styles.bubbleWrapperRight : styles.bubbleWrapperLeft}>
+                  {!isMine && isGroup && (
+                    <Text style={styles.bubbleUsername}>
+                      {groupMemberNames[message.user._id as string] || message.user._id as string}
+                    </Text>
+                  )}
                   <Text style={isMine ? styles.bubbleTextRight : styles.bubbleTextLeft}>
                     {message.text}
                   </Text>
@@ -1836,6 +1871,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                 navigation.navigate('GroupSettings', {
                   conversationId,
                   groupName: displayRecipientName,
+                  groupMemberAvatars,
+                  groupMemberNames,
                 });
               } else {
                 // Future profile settings navigation for 1-1 chat
@@ -1845,9 +1882,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             <Avatar
               name={displayRecipientName}
               uri={recipientAvatar}
+              localSource={recipientId === 'ai-assistant' ? require('../botai.png') : undefined}
               size="medium"
               isOnline={recipientPresence.status === 'ONLINE'}
-              showOnlineStatus
+              showOnlineStatus={!isGroup}
             />
             <View style={styles.headerInfo}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1900,12 +1938,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                     navigation.navigate('GroupSettings', {
                       conversationId,
                       groupName: displayRecipientName,
+                      groupMemberAvatars,
+                      groupMemberNames,
                     });
                   } else {
                     navigation.navigate('ChatSettings', {
                       conversationId,
                       recipientId,
                       recipientName: displayRecipientName,
+                      recipientAvatar,
                     });
                   }
                 }
@@ -1968,6 +2009,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         renderMessageAudio={renderMessageAudio}
         renderMessageImage={renderMessageImage}
         renderAvatar={renderAvatar}
+        renderUsernameOnMessage={isGroup}
         onInputTextChanged={setInputText}
         extraData={replyTo}
         bottomOffset={0}
@@ -2413,6 +2455,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignSelf: 'flex-end',
     maxWidth: 280,
+  },
+  bubbleUsername: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0284C7',
+    marginBottom: 4,
   },
   bubbleBottom: {
     flexDirection: 'row',

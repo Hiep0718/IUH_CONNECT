@@ -24,7 +24,7 @@ interface ChatSettingsScreenProps {
 }
 
 const ChatSettingsScreen: React.FC<ChatSettingsScreenProps> = ({ navigation, route, currentUser, token }) => {
-  const { conversationId, recipientId, recipientName } = route.params;
+  const { conversationId, recipientId, recipientName, recipientAvatar } = route.params;
   
   const [isMuted, setIsMuted] = useState(false);
   const [mutedUntil, setMutedUntil] = useState<number | null>(null);
@@ -112,7 +112,12 @@ const ChatSettingsScreen: React.FC<ChatSettingsScreenProps> = ({ navigation, rou
               Alert.alert('Trang cá nhân', `Bạn đang xem trang cá nhân của ${recipientName}`);
             }}
           >
-            <Avatar name={recipientName} size="xlarge" />
+            <Avatar 
+              name={recipientName} 
+              uri={recipientAvatar} 
+              localSource={recipientId === 'ai-assistant' ? require('../botai.png') : undefined}
+              size="xlarge" 
+            />
           </TouchableOpacity>
           <View style={styles.nameRow}>
             <Text style={styles.userName}>{recipientName}</Text>

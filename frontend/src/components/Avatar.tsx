@@ -5,6 +5,7 @@ import { Colors, BorderRadius, Shadows } from '../theme/theme';
 
 interface AvatarProps {
   uri?: string;
+  localSource?: any;
   name?: string;
   size?: 'small' | 'medium' | 'large' | 'xlarge' | 'xxlarge';
   isOnline?: boolean;
@@ -79,6 +80,7 @@ const getGradientFromName = (name?: string): [string, string] => {
 
 const Avatar: React.FC<AvatarProps> = ({
   uri,
+  localSource,
   name,
   size = 'medium',
   isOnline = false,
@@ -118,6 +120,22 @@ const Avatar: React.FC<AvatarProps> = ({
 
   const renderAvatarContent = () => {
     const innerSize = showGradientRing ? avatarSize - 4 : avatarSize;
+
+    if (localSource) {
+      return (
+        <Image
+          source={localSource}
+          style={[
+            styles.image,
+            {
+              width: innerSize,
+              height: innerSize,
+              borderRadius: innerSize / 2,
+            },
+          ]}
+        />
+      );
+    }
 
     if (uri) {
       return (

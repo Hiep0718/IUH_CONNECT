@@ -544,6 +544,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
               <Avatar
                 name={user.name}
                 uri={user.avatar}
+                localSource={user.id === 'ai-assistant' ? require('../botai.png') : undefined}
                 size="medium"
                 isOnline={user.isOnline}
                 showOnlineStatus
@@ -597,6 +598,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
           <Avatar
             name={item.name}
             uri={item.avatar}
+            localSource={item.targetUserId === 'ai-assistant' ? require('../botai.png') : undefined}
             size="large"
             isOnline={item.isOnline}
             showOnlineStatus={!item.isGroup}
@@ -851,7 +853,12 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
           <View style={styles.menuSheet}>
             {/* Header */}
             <View style={styles.menuHeader}>
-              <Avatar name={longPressItem?.name} size="medium" />
+              <Avatar 
+                name={longPressItem?.name} 
+                uri={longPressItem?.avatar} 
+                localSource={longPressItem?.targetUserId === 'ai-assistant' ? require('../botai.png') : undefined}
+                size="medium" 
+              />
               <View style={styles.menuHeaderInfo}>
                 <Text style={styles.menuHeaderName} numberOfLines={1}>
                   {longPressItem?.name}
