@@ -49,7 +49,7 @@ public class MessageService {
                                         .append("unreadCount", new org.bson.Document("$sum",
                                                 new org.bson.Document("$cond", java.util.Arrays.asList(
                                                         new org.bson.Document("$and", java.util.Arrays.asList(
-                                                                new org.bson.Document("$eq", java.util.Arrays.asList("$receiver_id", username)),
+                                                                new org.bson.Document("$ne", java.util.Arrays.asList("$sender_id", username)),
                                                                 new org.bson.Document("$ne", java.util.Arrays.asList("$is_read", true))
                                                         )),
                                                         1, 0
@@ -80,7 +80,7 @@ public class MessageService {
     public void markAsRead(String conversationId, String userId) {
         List<MessageEntity> unreadMessages = messageRepository.findByConversationIdOrderByTimestampDesc(conversationId, Pageable.unpaged())
                 .stream()
-                .filter(msg -> !msg.isRead() && userId.equals(msg.getReceiverId()))
+                .filter(msg -> !msg.isRead() && !userId.equals(msg.getSenderId()))
                 .toList();
         
         for (MessageEntity msg : unreadMessages) {

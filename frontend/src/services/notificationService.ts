@@ -132,7 +132,28 @@ export const setupNotificationListeners = () => {
     })();
   }
 
-  return onMessage(messagingInstance, async remoteMessage => {
+  // Handle app opened from a killed state by tapping the Notifee notification
+  notifee.getInitialNotification().then(initialNotification => {
+    if (initialNotification) {
+      console.log('📬 [Notifee] App opened by notification:', initialNotification.notification.data);
+      const data = initialNotification.notification.data;
+      if (data?.type === 'CALL_INVITE') {
+        // Đợi 1.5s để app và WebSocketProvider mount xong
+        setTimeout(() => {
+          DeviceEventEmitter.emit(CALL_INVITE_EVENT, data);
+        }, 1500);
+      }
+    }
+  });
+
+  // Handle tapping the Notifee notification when app is in foreground/background
+  const unsubscribeNotifeeForeground = notifee.onForegroundEvent(({ type, detail }) => {
+    if (type === EventType.PRESS && detail.notification?.data?.type === 'CALL_INVITE') {
+      DeviceEventEmitter.emit(CALL_INVITE_EVENT, detail.notification.data);
+    }
+  });
+
+  const unsubscribeFCM = onMessage(messagingInstance, async remoteMessage => {
     console.log('📬 [FCM] Foreground message arrived:', JSON.stringify(remoteMessage));
 
     const data = remoteMessage.data as Record<string, string> | undefined;
@@ -152,6 +173,11 @@ export const setupNotificationListeners = () => {
       console.log('📬 [FCM] Chat message in foreground (handled by WebSocket)');
     }
   });
+
+  return () => {
+    unsubscribeFCM();
+    unsubscribeNotifeeForeground();
+  };
 };
 
 export const registerBackgroundMessageHandler = () => {

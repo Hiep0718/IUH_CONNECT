@@ -35,19 +35,22 @@ public class CallSignalService {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.chatservice.dto.ChatMessageDto> kafkaTemplate;
+    private final com.iuhconnect.chatservice.repository.ConversationRepository conversationRepository;
 
     public CallSignalService(WebSocketSessionManager sessionManager,
                              MeetingSessionService meetingSessionService,
                              PresenceService presenceService,
                              StringRedisTemplate redisTemplate,
                              ObjectMapper objectMapper,
-                             org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.chatservice.dto.ChatMessageDto> kafkaTemplate) {
+                             org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.chatservice.dto.ChatMessageDto> kafkaTemplate,
+                             com.iuhconnect.chatservice.repository.ConversationRepository conversationRepository) {
         this.sessionManager = sessionManager;
         this.meetingSessionService = meetingSessionService;
         this.presenceService = presenceService;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.kafkaTemplate = kafkaTemplate;
+        this.conversationRepository = conversationRepository;
     }
 
     /**
@@ -124,12 +127,21 @@ public class CallSignalService {
     }
 
     /**
-     * CALL_REJECT: Kết thúc meeting, relay tới caller.
+     * CALL_REJECT: Kết thúc meeting (chỉ khi là cuộc gọi 1-1), relay tới caller.
      */
     private void handleReject(CallSignalDto signal) {
-        if (signal.getMeetingId() != null) {
-            meetingSessionService.endMeeting(signal.getMeetingId());
+        // Chỉ end meeting nếu KHÔNG phải nhóm
+        com.iuhconnect.chatservice.model.ConversationEntity conv = null;
+        if (signal.getConversationId() != null) {
+            conv = conversationRepository.findById(signal.getConversationId()).orElse(null);
         }
+        
+        if (conv == null || !"GROUP".equals(conv.getType().name())) {
+            if (signal.getMeetingId() != null) {
+                meetingSessionService.endMeeting(signal.getMeetingId());
+            }
+        }
+        
         signal.setTimestamp(System.currentTimeMillis());
 
         log.info("❌ CALL_REJECT processed [meetingId={}, from={}]",
@@ -168,45 +180,60 @@ public class CallSignalService {
         try {
             String payload = objectMapper.writeValueAsString(signal);
 
-            // LUÔN LUÔN gửi Push Notification cho CALL_INVITE để đề phòng "Ghost Socket" (app bị kill nhưng chưa timeout)
-            if ("CALL_INVITE".equals(signal.getSignalType())) {
-                com.iuhconnect.chatservice.dto.ChatMessageDto fakeMsg = new com.iuhconnect.chatservice.dto.ChatMessageDto();
-                fakeMsg.setSenderId(signal.getSenderId());
-                fakeMsg.setReceiverId(receiverId);
-                fakeMsg.setConversationId(receiverId); // Use receiverId as a fallback
-                fakeMsg.setMessageType("CALL_INVITE");
-                fakeMsg.setContent("Đang gọi video cho bạn");
-                kafkaTemplate.send("chat-messages", receiverId, fakeMsg);
-                log.info("🔔 Sent fallback CALL_INVITE push notification to Kafka for receiver: {}", receiverId);
-            }
-
-            // Ưu tiên 1: Gửi trực tiếp nếu receiver có session local
-            WebSocketSession receiverSession = sessionManager.getSession(receiverId);
-            if (receiverSession != null && receiverSession.isOpen()) {
-                try {
-                    receiverSession.sendMessage(new TextMessage(payload));
-                    log.info("✅ Call Signal delivered directly [to={}]", receiverId);
-                    return;
-                } catch (Exception ex) {
-                    log.warn("⚠️ Failed to deliver signal directly, connection might be dead: {}", ex.getMessage());
-                    try { receiverSession.close(); } catch (Exception ignore) {}
-                    // fall through to fallback
+            com.iuhconnect.chatservice.model.ConversationEntity conv = conversationRepository.findById(receiverId).orElse(null);
+            
+            if (conv != null && "GROUP".equals(conv.getType().name())) {
+                log.info("Relaying call signal to group members of {}", receiverId);
+                for (com.iuhconnect.chatservice.model.GroupMember member : conv.getMembers()) {
+                    if (member.getUserId().equals(signal.getSenderId())) continue;
+                    sendSignalToUser(member.getUserId(), signal, payload);
                 }
-            }
-
-            // Ưu tiên 2: Route qua Redis Pub/Sub tới instance khác
-            String targetInstance = presenceService.getUserInstanceId(receiverId);
-            if (targetInstance != null) {
-                redisTemplate.convertAndSend("signaling:" + targetInstance, payload);
-                log.info("📡 Call Signal routed via Redis [to={}, instance={}]",
-                        receiverId, targetInstance);
             } else {
-                log.warn("⚠️ Receiver {} is not online, signal dropped [signalType={}]",
-                        receiverId, signal.getSignalType());
+                sendSignalToUser(receiverId, signal, payload);
             }
         } catch (Exception e) {
             log.error("❌ Failed to relay call signal [to={}, signalType={}]: {}",
                     receiverId, signal.getSignalType(), e.getMessage(), e);
+        }
+    }
+
+    private void sendSignalToUser(String targetUserId, CallSignalDto signal, String payload) {
+        try {
+            // LUÔN LUÔN gửi Push Notification cho CALL_INVITE để đề phòng "Ghost Socket"
+            if ("CALL_INVITE".equals(signal.getSignalType())) {
+                com.iuhconnect.chatservice.dto.ChatMessageDto fakeMsg = new com.iuhconnect.chatservice.dto.ChatMessageDto();
+                fakeMsg.setSenderId(signal.getSenderId());
+                fakeMsg.setReceiverId(targetUserId);
+                fakeMsg.setConversationId(signal.getReceiverId()); // Lấy ID gốc (group ID hoặc user ID)
+                fakeMsg.setMessageType("CALL_INVITE");
+                fakeMsg.setContent("Đang gọi video cho bạn");
+                kafkaTemplate.send("chat-messages", targetUserId, fakeMsg);
+                log.info("🔔 Sent fallback CALL_INVITE push notification to Kafka for user: {}", targetUserId);
+            }
+
+            // Ưu tiên 1: Gửi trực tiếp nếu receiver có session local
+            WebSocketSession receiverSession = sessionManager.getSession(targetUserId);
+            if (receiverSession != null && receiverSession.isOpen()) {
+                try {
+                    receiverSession.sendMessage(new TextMessage(payload));
+                    log.info("✅ Call Signal delivered directly [to={}]", targetUserId);
+                    return;
+                } catch (Exception ex) {
+                    log.warn("⚠️ Failed to deliver signal directly: {}", ex.getMessage());
+                    try { receiverSession.close(); } catch (Exception ignore) {}
+                }
+            }
+
+            // Ưu tiên 2: Route qua Redis Pub/Sub tới instance khác
+            String targetInstance = presenceService.getUserInstanceId(targetUserId);
+            if (targetInstance != null) {
+                redisTemplate.convertAndSend("signaling:" + targetInstance, payload);
+                log.info("📡 Call Signal routed via Redis [to={}, instance={}]", targetUserId, targetInstance);
+            } else {
+                log.warn("⚠️ Receiver {} is not online, signal dropped", targetUserId);
+            }
+        } catch (Exception e) {
+            log.error("Error in sendSignalToUser", e);
         }
     }
 }

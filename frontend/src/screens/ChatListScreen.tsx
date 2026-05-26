@@ -130,7 +130,7 @@ const mapConversationPreview = (
         timestamp: new Date(msg.timestamp),
         senderId: msg.senderId,
       },
-      unreadCount: msg.unreadCount || 0,
+      unreadCount: msg.unreadCount !== undefined ? msg.unreadCount : (msg.unread_count || 0),
       isOnline: false,
       isPinned: settings.pinned || false,
       isMuted: settings.muted || false,
