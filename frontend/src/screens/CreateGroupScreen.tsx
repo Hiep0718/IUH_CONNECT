@@ -34,6 +34,13 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route
   useEffect(() => {
     const fetchUsers = async () => {
       try {
+        // MOCK DATA: Injecting mock friends for testing
+        setUsers([
+          { id: 'user_2', name: 'Nguyễn Văn A' },
+          { id: 'user_3', name: 'Trần Thị B' },
+          { id: 'user_4', name: 'Lê Văn C' }
+        ]);
+        /*
         const response = await authFetch(`${API_URL}/api/v1/contacts/list`, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -43,6 +50,7 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route
           const data = await response.json();
           setUsers(data.map((c: any) => ({ id: c.username, name: c.fullName || c.username })));
         }
+        */
       } catch (error) {
         console.error('Lỗi tải danh sách bạn bè:', error);
       }
@@ -50,7 +58,7 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route
     fetchUsers();
   }, [token]);
 
-  const filteredUsers = users.filter(u => 
+  const filteredUsers = users.filter(u =>
     u.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -106,7 +114,7 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route
   const renderUserItem = ({ item }: { item: any }) => {
     const isSelected = selectedUsers.includes(item.id);
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.userItem, isSelected && styles.userItemSelected]}
         onPress={() => toggleUserSelection(item.id)}
         activeOpacity={0.7}
@@ -123,15 +131,15 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
           <Icon name="arrow-left" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Tạo nhóm mới</Text>
-        <TouchableOpacity 
-          onPress={handleCreateGroup} 
+        <TouchableOpacity
+          onPress={handleCreateGroup}
           style={styles.headerButton}
           disabled={isLoading || selectedUsers.length === 0 || !groupName.trim()}
         >
@@ -139,7 +147,7 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route
             <ActivityIndicator size="small" color={Colors.primary} />
           ) : (
             <Text style={[
-              styles.createButtonText, 
+              styles.createButtonText,
               (selectedUsers.length === 0 || !groupName.trim()) && styles.createButtonDisabled
             ]}>
               Tạo
