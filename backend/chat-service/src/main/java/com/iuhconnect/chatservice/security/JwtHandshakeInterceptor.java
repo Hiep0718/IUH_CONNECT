@@ -34,9 +34,9 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
     @Override
     public boolean beforeHandshake(ServerHttpRequest request,
-                                   ServerHttpResponse response,
-                                   WebSocketHandler wsHandler,
-                                   Map<String, Object> attributes) {
+            ServerHttpResponse response,
+            WebSocketHandler wsHandler,
+            Map<String, Object> attributes) {
         try {
             // Extract token from query parameter: ?token=xxx
             String query = ((ServletServerHttpRequest) request).getServletRequest().getQueryString();
@@ -73,14 +73,15 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
     @Override
     public void afterHandshake(ServerHttpRequest request,
-                               ServerHttpResponse response,
-                               WebSocketHandler wsHandler,
-                               Exception exception) {
+            ServerHttpResponse response,
+            WebSocketHandler wsHandler,
+            Exception exception) {
         // No-op
     }
 
     private String extractTokenFromQuery(String query) {
-        if (query == null) return null;
+        if (query == null)
+            return null;
 
         for (String param : query.split("&")) {
             String[] pair = param.split("=", 2);

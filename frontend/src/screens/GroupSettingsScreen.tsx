@@ -11,12 +11,15 @@ import {
   FlatList,
   Modal,
   TextInput,
+  Switch,
+  Share,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/theme';
 import Avatar from '../components/Avatar';
 import { API_URL } from '../config/env';
 import { authFetch } from '../services/authService';
+import QRCode from 'react-native-qrcode-svg';
 
 interface GroupSettingsScreenProps {
   navigation: any;
@@ -50,6 +53,22 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
   const [mutedUntil, setMutedUntil] = useState<number | null>(null);
   const [isMuteModalVisible, setIsMuteModalVisible] = useState(false);
 
+  // Group Settings states
+  const [requireApproval, setRequireApproval] = useState(false);
+  const [allowMemberInvite, setAllowMemberInvite] = useState(true);
+  
+  // QR Code states
+  const [isQRModalVisible, setIsQRModalVisible] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
+  
+  // Pending members states
+  const [pendingMembers, setPendingMembers] = useState<any[]>([]);
+  const [isPendingModalVisible, setIsPendingModalVisible] = useState(false);
+  
+  // Transfer leadership modal
+  const [isTransferLeadershipModal, setIsTransferLeadershipModal] = useState(false);
+  const [selectedNewLeader, setSelectedNewLeader] = useState<string | null>(null);
+
   useEffect(() => {
     fetchGroupDetails();
   }, []);
@@ -63,8 +82,12 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
         const data = await res.json();
         setCurrentGroupName(data.name);
         setEditNameInput(data.name);
+        setRequireApproval(data.requireApproval || false);
+        setAllowMemberInvite(data.allowMemberInvite !== false);
+        setPendingMembers((data.pendingMembers || []).map((m: any) => ({
+          id: m.userId, name: m.userId, role: m.role
+        })));
         
-        // Cập nhật danh sách thành viên với tên (tạm thời lấy userId làm tên, nếu có user-service thì gọi thêm)
         const mappedMembers = data.members.map((m: any) => ({
           id: m.userId,
           name: m.userId === currentUser ? 'Bạn' : (groupMemberNames[m.userId] || m.userId),
@@ -72,8 +95,6 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
           role: m.role
         }));
         setMembers(mappedMembers);
-      } else {
-        console.log('API returned not ok');
       }
       
       // Fetch settings
@@ -87,7 +108,6 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
       }
     } catch (error) {
       console.error('Failed to fetch group details:', error);
-      // Fallback nếu API lỗi mạng
       setMembers([
         { id: currentUser, name: currentUser, role: 'ADMIN' },
         { id: 'mock_user_1', name: 'Thành viên Test 1', role: 'MEMBER' }
@@ -426,6 +446,27 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
             </View>
             <Text style={styles.actionText}>Thêm thành viên</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.actionItem} onPress={async () => {
+            try {
+              const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/invite-link`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              if (res.ok) {
+                const data = await res.json();
+                setInviteLink(data.inviteLink);
+              } else {
+                setInviteLink(`iuhconnect://join-group/${conversationId}`);
+              }
+            } catch (e) {
+              setInviteLink(`iuhconnect://join-group/${conversationId}`);
+            }
+            setIsQRModalVisible(true);
+          }}>
+            <View style={styles.actionIconWrapper}>
+              <Icon name="qrcode" size={24} color={Colors.textPrimary} />
+            </View>
+            <Text style={styles.actionText}>Mã QR nhóm</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.actionItem} onPress={() => setIsMuteModalVisible(true)}>
             <View style={styles.actionIconWrapper}>
               <Icon name={isMuted ? "bell-off-outline" : "bell-outline"} size={24} color={isMuted ? Colors.primary : Colors.textPrimary} />
@@ -467,10 +508,19 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
                 { text: 'Hủy', style: 'cancel' },
                 { text: 'Giải tán', style: 'destructive', onPress: async () => {
                     try {
-                      // Gọi API giải tán nhóm hoặc xử lý
-                      Alert.alert('Thông báo', 'Tính năng đang được cập nhật');
+                      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}?requesterId=${currentUser}`, {
+                        method: 'DELETE',
+                        headers: { Authorization: `Bearer ${token}` }
+                      });
+                      if (res.ok) {
+                        Alert.alert('Thành công', 'Nhóm đã được giải tán');
+                        navigation.navigate('MainTabs');
+                      } else {
+                        Alert.alert('Lỗi', 'Không thể giải tán nhóm');
+                      }
                     } catch (error) {
                       console.error('Disband group error:', error);
+                      Alert.alert('Lỗi', 'Lỗi kết nối');
                     }
                   }
                 }
@@ -481,6 +531,86 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Group Management Section - ADMIN only */}
+        {isLeader && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Quản lý nhóm</Text>
+            
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Icon name="shield-check-outline" size={22} color={Colors.primary} />
+                <View style={{marginLeft: Spacing.md, flex: 1}}>
+                  <Text style={styles.settingLabel}>Phê duyệt thành viên mới</Text>
+                  <Text style={styles.settingDesc}>Yêu cầu Admin/Phó nhóm duyệt trước khi vào nhóm</Text>
+                </View>
+              </View>
+              <Switch
+                value={requireApproval}
+                onValueChange={async (val) => {
+                  try {
+                    const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/settings?requesterId=${currentUser}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ requireApproval: val })
+                    });
+                    if (res.ok) { setRequireApproval(val); }
+                    else { Alert.alert('Lỗi', 'Không thể cập nhật'); }
+                  } catch (e) { Alert.alert('Lỗi', 'Lỗi kết nối'); }
+                }}
+                trackColor={{ false: Colors.border, true: Colors.primarySurface }}
+                thumbColor={requireApproval ? Colors.primary : '#f4f3f4'}
+              />
+            </View>
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Icon name="account-plus-outline" size={22} color={Colors.primary} />
+                <View style={{marginLeft: Spacing.md, flex: 1}}>
+                  <Text style={styles.settingLabel}>Cho phép thành viên mời người khác</Text>
+                  <Text style={styles.settingDesc}>Tất cả thành viên có thể thêm người mới</Text>
+                </View>
+              </View>
+              <Switch
+                value={allowMemberInvite}
+                onValueChange={async (val) => {
+                  try {
+                    const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/settings?requesterId=${currentUser}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ allowMemberInvite: val })
+                    });
+                    if (res.ok) { setAllowMemberInvite(val); }
+                    else { Alert.alert('Lỗi', 'Không thể cập nhật'); }
+                  } catch (e) { Alert.alert('Lỗi', 'Lỗi kết nối'); }
+                }}
+                trackColor={{ false: Colors.border, true: Colors.primarySurface }}
+                thumbColor={allowMemberInvite ? Colors.primary : '#f4f3f4'}
+              />
+            </View>
+
+            <TouchableOpacity style={styles.dangerRow} onPress={() => {
+              setSelectedNewLeader(null);
+              setIsTransferLeadershipModal(true);
+            }}>
+              <Icon name="account-switch-outline" size={24} color="#FF9800" />
+              <Text style={[styles.dangerText, { color: '#FF9800' }]}>Chuyển quyền Trưởng nhóm</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Pending Members Section */}
+        {hasPrivilege && pendingMembers.length > 0 && (
+          <View style={styles.section}>
+            <TouchableOpacity style={styles.dangerRow} onPress={() => setIsPendingModalVisible(true)}>
+              <Icon name="account-clock-outline" size={24} color="#FF9800" />
+              <Text style={[styles.dangerText, { color: '#FF9800', flex: 1 }]}>Yêu cầu tham gia</Text>
+              <View style={{backgroundColor: Colors.danger, borderRadius: 12, minWidth: 24, height: 24, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6}}>
+                <Text style={{color: Colors.white, fontSize: 12, fontWeight: '700'}}>{pendingMembers.length}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       {/* Edit Name Modal */}
@@ -684,6 +814,158 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
             </View>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* QR Code Modal */}
+      <Modal visible={isQRModalVisible} transparent animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsQRModalVisible(false)}>
+          <View style={[styles.editNameModal, { alignItems: 'center' }]}>
+            <Text style={styles.modalTitle}>Mã QR nhóm</Text>
+            <Text style={{ color: Colors.textSecondary, marginBottom: Spacing.lg, textAlign: 'center', fontSize: Typography.bodySmall }}>
+              Chia sẻ mã QR này để mời người khác tham gia nhóm "{currentGroupName}"
+            </Text>
+            <View style={{ padding: Spacing.lg, backgroundColor: Colors.white, borderRadius: BorderRadius.lg, marginBottom: Spacing.lg }}>
+              <QRCode value={inviteLink || `iuhconnect://join-group/${conversationId}`} size={200} backgroundColor="white" color="#004A82" />
+            </View>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.caption, marginBottom: Spacing.lg, textAlign: 'center' }}>
+              {inviteLink || `iuhconnect://join-group/${conversationId}`}
+            </Text>
+            <TouchableOpacity
+              style={{ backgroundColor: Colors.primary, paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.md, borderRadius: BorderRadius.round }}
+              onPress={async () => {
+                try {
+                  await Share.share({ message: `Tham gia nhóm "${currentGroupName}" trên IUH Connect: ${inviteLink || `iuhconnect://join-group/${conversationId}`}` });
+                } catch (e) { console.error(e); }
+              }}
+            >
+              <Text style={{ color: Colors.white, fontWeight: Typography.bold, fontSize: Typography.body }}>Chia sẻ link</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Transfer Leadership Modal */}
+      <Modal visible={isTransferLeadershipModal} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.addMemberModalContainer}>
+          <View style={styles.addMemberModalHeader}>
+            <TouchableOpacity onPress={() => setIsTransferLeadershipModal(false)} style={styles.backButton}>
+              <Icon name="close" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Chuyển quyền Trưởng nhóm</Text>
+            <TouchableOpacity
+              onPress={async () => {
+                if (!selectedNewLeader) return;
+                Alert.alert('Xác nhận', 'Bạn sẽ trở thành Thành viên sau khi chuyển quyền. Tiếp tục?', [
+                  { text: 'Hủy', style: 'cancel' },
+                  { text: 'Chuyển quyền', onPress: async () => {
+                    try {
+                      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/transfer?requesterId=${currentUser}&newAdminId=${selectedNewLeader}`, {
+                        method: 'PUT', headers: { Authorization: `Bearer ${token}` }
+                      });
+                      if (res.ok) {
+                        setIsTransferLeadershipModal(false);
+                        fetchGroupDetails();
+                        Alert.alert('Thành công', 'Đã chuyển quyền Trưởng nhóm');
+                      } else { Alert.alert('Lỗi', 'Không thể chuyển quyền'); }
+                    } catch (e) { Alert.alert('Lỗi', 'Lỗi kết nối'); }
+                  }}
+                ]);
+              }}
+              style={styles.headerRightButton}
+              disabled={!selectedNewLeader}
+            >
+              <Text style={[styles.headerRightButtonText, !selectedNewLeader && styles.headerRightButtonTextDisabled]}>Xác nhận</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md }}>
+            <Text style={{ fontSize: Typography.bodySmall, color: Colors.textSecondary }}>
+              Chọn thành viên sẽ trở thành Trưởng nhóm mới. Bạn sẽ trở thành Thành viên thường.
+            </Text>
+          </View>
+          <FlatList
+            data={members.filter(m => m.id !== currentUser)}
+            renderItem={({ item }) => {
+              const isSelected = selectedNewLeader === item.id;
+              return (
+                <TouchableOpacity style={[styles.userAddRow, isSelected && styles.userAddRowSelected]} onPress={() => setSelectedNewLeader(item.id)} activeOpacity={0.7}>
+                  <Avatar name={item.name} size="medium" />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <Text style={styles.userAddName}>{item.name}</Text>
+                    <Text style={{ fontSize: Typography.caption, color: Colors.textSecondary, marginTop: 2 }}>
+                      {item.role === 'DEPUTY' ? 'Phó nhóm' : 'Thành viên'}
+                    </Text>
+                  </View>
+                  <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
+                    {isSelected && <Icon name="check" size={16} color={Colors.white} />}
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+            keyExtractor={item => item.id}
+            contentContainerStyle={{ paddingBottom: Spacing.xxl }}
+          />
+        </SafeAreaView>
+      </Modal>
+
+      {/* Pending Members Modal */}
+      <Modal visible={isPendingModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.addMemberModalContainer}>
+          <View style={styles.addMemberModalHeader}>
+            <TouchableOpacity onPress={() => setIsPendingModalVisible(false)} style={styles.backButton}>
+              <Icon name="close" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Yêu cầu tham gia ({pendingMembers.length})</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <FlatList
+            data={pendingMembers}
+            renderItem={({ item }) => (
+              <View style={[styles.memberItem, { paddingVertical: Spacing.md }]}>
+                <Avatar name={item.name} size="medium" />
+                <View style={styles.memberInfo}>
+                  <Text style={styles.memberName}>{item.name}</Text>
+                  <Text style={{ fontSize: Typography.caption, color: Colors.textMuted }}>Đang chờ duyệt</Text>
+                </View>
+                <TouchableOpacity
+                  style={{ backgroundColor: Colors.primary, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: BorderRadius.round, marginRight: Spacing.sm }}
+                  onPress={async () => {
+                    try {
+                      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/approve/${item.id}?requesterId=${currentUser}`, {
+                        method: 'POST', headers: { Authorization: `Bearer ${token}` }
+                      });
+                      if (res.ok) {
+                        setPendingMembers(prev => prev.filter(m => m.id !== item.id));
+                        fetchGroupDetails();
+                      } else { Alert.alert('Lỗi', 'Không thể duyệt'); }
+                    } catch (e) { Alert.alert('Lỗi', 'Lỗi kết nối'); }
+                  }}
+                >
+                  <Text style={{ color: Colors.white, fontWeight: Typography.bold, fontSize: Typography.caption }}>Duyệt</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ backgroundColor: '#FFEBEE', paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: BorderRadius.round }}
+                  onPress={async () => {
+                    try {
+                      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}/reject/${item.id}?requesterId=${currentUser}`, {
+                        method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
+                      });
+                      if (res.ok) {
+                        setPendingMembers(prev => prev.filter(m => m.id !== item.id));
+                      } else { Alert.alert('Lỗi', 'Không thể từ chối'); }
+                    } catch (e) { Alert.alert('Lỗi', 'Lỗi kết nối'); }
+                  }}
+                >
+                  <Text style={{ color: Colors.danger, fontWeight: Typography.bold, fontSize: Typography.caption }}>Từ chối</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            keyExtractor={item => item.id}
+            contentContainerStyle={{ paddingBottom: Spacing.xxl }}
+            ListEmptyComponent={
+              <Text style={{ textAlign: 'center', marginTop: 40, color: Colors.textMuted }}>Không có yêu cầu nào</Text>
+            }
+          />
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -981,6 +1263,31 @@ const styles = StyleSheet.create({
   checkboxActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  settingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  settingLabel: {
+    fontSize: Typography.bodySmall,
+    fontWeight: Typography.medium,
+    color: Colors.textPrimary,
+  },
+  settingDesc: {
+    fontSize: Typography.caption,
+    color: Colors.textMuted,
+    marginTop: 2,
   },
 });
 

@@ -39,4 +39,15 @@ public class ConversationEntity {
 
     @Field("last_message_id")
     private String lastMessageId;
+
+    @Field("require_approval")
+    @Builder.Default
+    private boolean requireApproval = false;
+
+    @Field("allow_member_invite")
+    @Builder.Default
+    private boolean allowMemberInvite = true;
+
+    @Field("pending_members")
+    private List<GroupMember> pendingMembers;
 }

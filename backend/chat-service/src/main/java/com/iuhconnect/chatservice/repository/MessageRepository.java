@@ -29,4 +29,10 @@ public interface MessageRepository extends MongoRepository<MessageEntity, String
             "{ $sort: { 'timestamp': -1 } }"
     })
     List<com.iuhconnect.chatservice.dto.ConversationSummaryDto> findRecentConversationsForUser(String userId, List<String> groupIds);
+
+    /**
+     * Delete all messages in a conversation (used when disbanding group).
+     */
+    void deleteByConversationId(String conversationId);
 }
+

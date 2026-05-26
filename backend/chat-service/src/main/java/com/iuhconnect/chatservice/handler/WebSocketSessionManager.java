@@ -24,7 +24,8 @@ public class WebSocketSessionManager {
         WebSocketSession oldSession = sessions.put(username, session);
         if (oldSession != null && oldSession.isOpen() && !oldSession.getId().equals(session.getId())) {
             try {
-                oldSession.sendMessage(new org.springframework.web.socket.TextMessage("{\"type\":\"SESSION_REVOKED\"}"));
+                oldSession
+                        .sendMessage(new org.springframework.web.socket.TextMessage("{\"type\":\"SESSION_REVOKED\"}"));
                 oldSession.close(org.springframework.web.socket.CloseStatus.NORMAL.withReason("SESSION_REVOKED"));
                 log.info("🚫 Closed previous session for user [{}] because a new login occurred", username);
             } catch (Exception e) {
