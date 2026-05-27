@@ -343,9 +343,9 @@ services:
     - 8084:8084
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      OLLAMA_HOST: http://host.docker.internal:11434
+      OLLAMA_HOST: http://10.10.10.1:11434
       OLLAMA_MODEL: qwen2:1.5b
-      CHROMADB_HOST: http://host.docker.internal:8000
+      CHROMADB_HOST: http://10.10.10.1:8000
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     extra_hosts:
     - host.docker.internal:host-gateway

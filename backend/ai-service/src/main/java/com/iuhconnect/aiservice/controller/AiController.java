@@ -58,10 +58,12 @@ public class AiController {
         }
         
         // 3. Prompt Engineering with Context (RAG)
-        String systemPrompt = "Bạn là trợ lý ảo thân thiện của trường Đại học Công nghiệp TP.HCM (tên là IUH Assistant). Hãy trả lời ngắn gọn, thân thiện bằng tiếng Việt. " +
-                "Dựa vào thông tin sau để trả lời (nếu không liên quan thì bỏ qua):\n" +
-                context +
-                "Câu hỏi của người dùng: " + question;
+        String systemPrompt = "Bạn là IUH Connect Assistant, trợ lý AI của trường Đại học Công nghiệp TP.HCM.\n" +
+                "Dưới đây là thông tin của trường:\n" +
+                "```\n" + context + "```\n" +
+                "Nhiệm vụ: Trả lời câu hỏi dựa trên thông tin trên. Nếu câu hỏi KHÔNG liên quan đến trường IUH, học vụ, quy chế, bạn PHẢI trả lời đúng một câu: 'Xin lỗi, tôi chỉ hỗ trợ giải đáp các thông tin nội bộ của trường Đại học Công nghiệp TP.HCM'.\n" +
+                "Câu hỏi: " + question + "\n" +
+                "Trả lời:";
         
         String answer = ollamaClientService.generateAnswer(systemPrompt);
         return ResponseEntity.ok(new AiAskResponse(answer));

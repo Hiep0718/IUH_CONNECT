@@ -210,6 +210,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, currentUser
                   <TextInput
                       style={styles.modalInput}
                       placeholder="Nhập tên tài khoản (Username)"
+                      placeholderTextColor={Colors.textSecondary}
                       value={targetUsername}
                       onChangeText={setTargetUsername}
                       autoCapitalize="none"
@@ -249,8 +250,8 @@ const styles = StyleSheet.create({
   separator: { height: 1, backgroundColor: Colors.borderLight, marginLeft: 88 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '80%', backgroundColor: Colors.white, borderRadius: 16, padding: 24 },
-  modalTitle: { fontSize: Typography.h3, fontWeight: Typography.bold, marginBottom: 16 },
-  modalInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 8, padding: 12, marginBottom: 20 },
+  modalTitle: { fontSize: Typography.h3, fontWeight: Typography.bold, marginBottom: 16, color: Colors.textPrimary },
+  modalInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 8, padding: 12, marginBottom: 20, color: Colors.textPrimary },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
   modalButton: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
   modalButtonPrimary: { backgroundColor: Colors.primary },

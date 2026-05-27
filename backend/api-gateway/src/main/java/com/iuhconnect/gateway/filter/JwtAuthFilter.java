@@ -39,7 +39,8 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             "/api/v1/auth/register",
             "/api/v1/auth/refresh",
             "/api/v1/ai",
-            "/meeting"
+            "/meeting",
+            "/api/v1/meetings/desktop-session"
     );
 
     /**

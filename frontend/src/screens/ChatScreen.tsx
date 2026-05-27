@@ -155,6 +155,21 @@ const mapServerMessage = (
     !!msg.content &&
     msg.content.startsWith('http');
 
+  // MEETING messages render as system messages
+  if (msg.messageType === 'MEETING') {
+    const senderLabel = msg.senderId === currentUser ? 'Bạn' : (msg.senderName || msg.senderId);
+    return {
+      _id: msg.id || createLocalMessageId(),
+      serverId: msg.id,
+      rawContent: msg.content,
+      text: `📹 ${senderLabel} đã bắt đầu cuộc họp nhóm`,
+      createdAt: new Date(msg.timestamp),
+      user: { _id: msg.senderId === currentUser ? 'me' : msg.senderId, name: msg.senderId },
+      system: true,
+      messageType: 'MEETING',
+    };
+  }
+
   return {
     _id: msg.id || createLocalMessageId(),
     serverId: msg.id,
@@ -734,6 +749,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
       if (data.conversationId !== conversationId) {
         return;
+      }
+
+      // Cập nhật activeMeeting nếu nhận được tin nhắn MEETING
+      if (data.messageType === 'MEETING' && data.senderId !== currentUser && isGroup) {
+        try {
+          const meetingInfo = JSON.parse(data.content);
+          setActiveMeeting({ meetingId: meetingInfo.meetingId || '', roomName: meetingInfo.roomName });
+        } catch (e) {
+          console.log('Parse MEETING message error', e);
+        }
       }
 
       const incoming = mapServerMessage(data, currentUser);
@@ -1911,13 +1936,33 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
               style={styles.headerIcon}
               onPress={() => {
                 const roomName = `IUHConnect_${recipientId}_${Date.now()}`;
-                navigation.navigate('Meeting', {
-                  callerId: recipientId,
-                  callerName: displayRecipientName,
-                  callerAvatar: recipientAvatar,
-                  roomName,
-                  conversationId,
-                });
+                if (isGroup) {
+                  // Gọi nhóm: gửi tin nhắn MEETING vào group rồi tự vào Jitsi
+                  sendMessage({
+                    senderId: currentUser,
+                    receiverId: recipientId,
+                    content: JSON.stringify({ roomName, action: 'MEETING_STARTED' }),
+                    conversationId,
+                    messageType: 'MEETING',
+                  });
+                  navigation.navigate('Meeting', {
+                    callerId: recipientId,
+                    callerName: displayRecipientName,
+                    callerAvatar: recipientAvatar,
+                    roomName,
+                    conversationId,
+                    isLateJoin: true,
+                  });
+                } else {
+                  // Gọi 1-1: giữ nguyên luồng cũ (CALL_INVITE)
+                  navigation.navigate('Meeting', {
+                    callerId: recipientId,
+                    callerName: displayRecipientName,
+                    callerAvatar: recipientAvatar,
+                    roomName,
+                    conversationId,
+                  });
+                }
               }}
             >
               <Icon name="video-outline" size={22} color="#FFFFFF" />

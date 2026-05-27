@@ -28,8 +28,8 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 10
-                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
                 key-resolver: "#{@userKeyResolver}"
             - name: CircuitBreaker
               args:
@@ -44,8 +44,8 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 10
-                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
                 key-resolver: "#{@userKeyResolver}"
             - name: CircuitBreaker
               args:
@@ -66,8 +66,8 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 10
-                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
                 key-resolver: "#{@userKeyResolver}"
 
         # -------- Meeting Web (Static page from chat-service) --------
@@ -84,8 +84,8 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 5
-                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
                 key-resolver: "#{@userKeyResolver}"
 
         # -------- Presence Service (HTTP) --------
@@ -96,8 +96,8 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 10
-                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
                 key-resolver: "#{@userKeyResolver}"
 
         # -------- Presence Service (WebSocket) --------
@@ -114,8 +114,8 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 10
-                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
                 key-resolver: "#{@userKeyResolver}"
             - name: CircuitBreaker
               args:

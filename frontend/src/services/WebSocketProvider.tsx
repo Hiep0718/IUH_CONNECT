@@ -190,6 +190,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       const senderName = data.senderFullName || data.senderUsername || 'Người dùng';
 
       if (eventType === 'FRIEND_REQUEST_SENT') {
+        // Chỉ hiện thông báo cho người nhận
+        if (data.senderUsername === currentUser) return;
+        
         showNotification({
           id: `contact-${Date.now()}`,
           title: '👋 Lời mời kết bạn mới',
@@ -201,17 +204,25 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           },
         });
       } else if (eventType === 'FRIEND_REQUEST_ACCEPTED') {
+        // Người nhận lời mời là người bấm chấp nhận -> Người gửi ban đầu mới cần nhận thông báo
+        // data.senderUsername: Người gửi lời mời ban đầu
+        // data.receiverUsername: Người vừa bấm chấp nhận
+        // Do đó, nếu mình là người bấm chấp nhận thì không hiện thông báo cho mình.
+        if (data.receiverUsername === currentUser) return;
+        
+        const acceptorName = data.receiverFullName || data.receiverUsername || 'Người dùng';
+        
         showNotification({
           id: `contact-${Date.now()}`,
           title: '🎉 Đã trở thành bạn bè',
-          body: `${senderName} đã chấp nhận lời mời kết bạn của bạn`,
-          senderName: senderName,
+          body: `${acceptorName} đã chấp nhận lời mời kết bạn của bạn`,
+          senderName: acceptorName,
           type: 'contact',
           onPress: () => {
             navigationRef?.current?.navigate('Chat', {
               conversationId: `${data.receiverUsername}-${data.senderUsername}`,
-              recipientName: senderName,
-              recipientId: data.senderUsername,
+              recipientName: acceptorName,
+              recipientId: data.receiverUsername,
               isOnline: true,
             });
           },
@@ -261,6 +272,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       };
 
       ws.onmessage = event => {
+        if (wsRef.current !== ws || !isMountedRef.current) return;
         try {
           const data = JSON.parse(event.data);
           
@@ -295,8 +307,30 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
             handleGlobalContactEvent(data);
           }
 
+          // ── Handle MEETING message → in-app notification (không reo chuông) ──
+          if (!data.type && data.messageType === 'MEETING' && data.senderId && data.senderId !== currentUser && data.conversationId) {
+            const senderLabel = data.senderName || data.senderId;
+            showNotification({
+              id: `meeting-${Date.now()}`,
+              title: '📹 Cuộc họp nhóm',
+              body: `${senderLabel} đã bắt đầu cuộc họp nhóm. Tham gia ngay!`,
+              senderName: senderLabel,
+              senderAvatar: data.senderAvatar,
+              type: 'chat',
+              onPress: () => {
+                navigationRef?.current?.navigate('Chat', {
+                  conversationId: data.conversationId,
+                  recipientName: senderLabel,
+                  recipientId: data.senderId,
+                  isOnline: true,
+                  isGroup: true,
+                });
+              },
+            });
+          }
+
           // ── Handle CHAT MESSAGE → in-app notification ──
-          if (!data.type && data.senderId && data.senderId !== currentUser && data.conversationId) {
+          if (!data.type && data.messageType !== 'MEETING' && data.senderId && data.senderId !== currentUser && data.conversationId) {
             const senderLabel = data.senderName || data.senderId;
             const msgPreview = data.messageType === 'IMAGE' ? '📷 Hình ảnh'
               : data.messageType === 'VIDEO' ? '🎬 Video'
