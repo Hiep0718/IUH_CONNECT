@@ -192,6 +192,7 @@ const mapServerMessage = (
         : isStickerImage
           ? msg.content
           : undefined,
+    video: msg.messageType === 'VIDEO' ? msg.mediaUrl : undefined,
     audio: msg.messageType === 'AUDIO' ? msg.mediaUrl : undefined,
     messageType: msg.messageType || 'TEXT',
     isAutoReply: msg.messageType === 'AUTO_REPLY',
@@ -1540,52 +1541,79 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const renderCustomView = useCallback((props: any) => {
     const msg = props.currentMessage as ExtendedMessage;
+    const isMine = msg.user._id === currentUser;
     if (msg.messageType === 'FILE' && msg.mediaUrl) {
       return (
-        <TouchableOpacity style={styles.fileCard} onPress={() => Linking.openURL(msg.mediaUrl!)} activeOpacity={0.8}>
-          <View style={styles.fileIconWrap}>
-            <Icon name="file-document-outline" size={32} color="#FFF" />
+        <TouchableOpacity style={[styles.fileCard, { backgroundColor: isMine ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)' }]} onPress={() => Linking.openURL(msg.mediaUrl!)} activeOpacity={0.8}>
+          <View style={[styles.fileIconWrap, { backgroundColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }]}>
+            <Icon name="file-document-outline" size={28} color={isMine ? '#FFF' : '#1D6FD7'} />
           </View>
           <View style={styles.fileInfo}>
-            <Text style={styles.fileName} numberOfLines={1}>{msg.fileName || 'Document'}</Text>
-            <Text style={styles.fileSize}>
+            <Text style={[styles.fileName, { color: isMine ? '#FFF' : '#333' }]} numberOfLines={1}>{msg.fileName || 'Tệp đính kèm'}</Text>
+            <Text style={[styles.fileSize, { color: isMine ? 'rgba(255,255,255,0.7)' : '#666' }]}>
               {msg.fileSize
                 ? (msg.fileSize / 1024 > 1024
                     ? (msg.fileSize / 1024 / 1024).toFixed(2) + ' MB'
                     : (msg.fileSize / 1024).toFixed(0) + ' KB')
-                : 'Unknown size'}
+                : 'Tệp'}
             </Text>
           </View>
         </TouchableOpacity>
       );
     }
     return null;
-  }, []);
+  }, [currentUser]);
 
   const renderMessageAudio = useCallback((props: any) => {
     const msg = props.currentMessage as ExtendedMessage;
+    const isMine = msg.user._id === currentUser;
     if (msg.audio) {
       return (
-        <TouchableOpacity 
-          style={styles.audioCard} 
-          onPress={async () => {
-            try {
-              await audioRecorderPlayerRef.current.stopPlayer();
-              await audioRecorderPlayerRef.current.startPlayer(msg.audio!);
-              audioRecorderPlayerRef.current.addPlayBackListener((e) => {
-                if (e.currentPosition === e.duration) {
-                  audioRecorderPlayerRef.current.stopPlayer();
-                  audioRecorderPlayerRef.current.removePlayBackListener();
-                }
-              });
-            } catch (error) {
-              console.error('Error playing audio', error);
-            }
-          }}
-          activeOpacity={0.8}
-        >
-          <Icon name="play-circle" size={36} color="#1D6FD7" />
-          <Text style={styles.audioText}>Tin nhắn thoại</Text>
+        <View style={styles.audioCard}>
+          <TouchableOpacity 
+            style={[styles.audioPlayButton, { backgroundColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(29, 111, 215, 0.1)' }]} 
+            onPress={async () => {
+              try {
+                await audioRecorderPlayerRef.current.stopPlayer();
+                await audioRecorderPlayerRef.current.startPlayer(msg.audio!);
+                audioRecorderPlayerRef.current.addPlayBackListener((e) => {
+                  if (e.currentPosition === e.duration) {
+                    audioRecorderPlayerRef.current.stopPlayer();
+                    audioRecorderPlayerRef.current.removePlayBackListener();
+                  }
+                });
+              } catch (error) {
+                console.error('Error playing audio', error);
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            <Icon name="play" size={24} color={isMine ? '#FFF' : '#1D6FD7'} />
+          </TouchableOpacity>
+          <View style={styles.waveformContainer}>
+            {[2, 4, 3, 5, 2, 6, 4, 3, 5, 2, 4, 3, 6, 4, 2].map((h, idx) => (
+              <View key={idx} style={[styles.waveformBar, { height: h * 4, backgroundColor: isMine ? 'rgba(255,255,255,0.5)' : 'rgba(29, 111, 215, 0.4)' }]} />
+            ))}
+          </View>
+          <Text style={[styles.audioDurationText, { color: isMine ? 'rgba(255,255,255,0.8)' : '#888' }]}>0:00</Text>
+        </View>
+      );
+    }
+    return null;
+  }, [currentUser]);
+
+  const renderMessageVideo = useCallback((props: any) => {
+    const msg = props.currentMessage as ExtendedMessage;
+    if (msg.video) {
+      return (
+        <TouchableOpacity style={styles.videoCard} onPress={() => Linking.openURL(msg.video!)} activeOpacity={0.8}>
+          <View style={styles.videoPlaceholder}>
+            <Icon name="video" size={32} color="#FFF" style={{ opacity: 0.8 }} />
+            <View style={styles.videoPlayOverlay}>
+              <Icon name="play" size={40} color="#FFF" />
+            </View>
+          </View>
+          <Text style={styles.videoLabel}>Phát video</Text>
         </TouchableOpacity>
       );
     }
@@ -2052,6 +2080,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         renderChatFooter={renderChatFooter}
         renderCustomView={renderCustomView}
         renderMessageAudio={renderMessageAudio}
+        renderMessageVideo={renderMessageVideo}
         renderMessageImage={renderMessageImage}
         renderAvatar={renderAvatar}
         renderUsernameOnMessage={isGroup}
@@ -2276,17 +2305,15 @@ const styles = StyleSheet.create({
   fileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#004A82',
     borderRadius: 12,
     padding: 12,
     margin: 4,
     maxWidth: 240,
   },
   fileIconWrap: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -2296,15 +2323,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fileName: {
-    color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 4,
   },
   fileSize: {
     fontSize: 12,
-    color: '#E0E7FF',
-    marginTop: 2,
   },
   audioCard: {
     flexDirection: 'row',

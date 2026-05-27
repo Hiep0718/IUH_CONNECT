@@ -19,24 +19,31 @@ public class S3Config {
     @Value("${aws.s3.region:ap-southeast-1}")
     private String region;
 
-    @Value("${aws.s3.access-key}")
+    @Value("${aws.s3.access-key:}")
     private String accessKey;
 
-    @Value("${aws.s3.secret-key}")
+    @Value("${aws.s3.secret-key:}")
     private String secretKey;
+
+    private boolean isAwsConfigured() {
+        return accessKey != null && !accessKey.trim().isEmpty()
+            && secretKey != null && !secretKey.trim().isEmpty();
+    }
 
     @Bean
     public S3Client s3Client() {
+        if (!isAwsConfigured()) {
+            log.warn("⚠️ AWS S3 credentials are missing or empty. S3Client will NOT be created. File upload features are disabled.");
+            return null;
+        }
         try {
-            if (accessKey == null || accessKey.isBlank()) {
-                log.warn("⚠️ AWS S3 access key is missing. S3 features will be disabled.");
-                return null;
-            }
-            return S3Client.builder()
+            S3Client client = S3Client.builder()
                     .region(Region.of(region))
                     .credentialsProvider(StaticCredentialsProvider.create(
-                            AwsBasicCredentials.create(accessKey, secretKey)))
+                            AwsBasicCredentials.create(accessKey.trim(), secretKey.trim())))
                     .build();
+            log.info("✅ S3Client initialized successfully for region: {}", region);
+            return client;
         } catch (Exception e) {
             log.error("❌ Failed to initialize S3Client: {}", e.getMessage());
             return null;
@@ -45,19 +52,22 @@ public class S3Config {
 
     @Bean
     public S3Presigner s3Presigner() {
+        if (!isAwsConfigured()) {
+            log.warn("⚠️ AWS S3 credentials are missing or empty. S3Presigner will NOT be created. Presigned URL features are disabled.");
+            return null;
+        }
         try {
-            if (accessKey == null || accessKey.isBlank()) {
-                log.warn("⚠️ AWS S3 access key is missing. Presigner features will be disabled.");
-                return null;
-            }
-            return S3Presigner.builder()
+            S3Presigner presigner = S3Presigner.builder()
                     .region(Region.of(region))
                     .credentialsProvider(StaticCredentialsProvider.create(
-                            AwsBasicCredentials.create(accessKey, secretKey)))
+                            AwsBasicCredentials.create(accessKey.trim(), secretKey.trim())))
                     .build();
+            log.info("✅ S3Presigner initialized successfully for region: {}", region);
+            return presigner;
         } catch (Exception e) {
             log.error("❌ Failed to initialize S3Presigner: {}", e.getMessage());
             return null;
         }
     }
 }
+

@@ -34,13 +34,15 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route
   useEffect(() => {
     const fetchUsers = async () => {
       try {
+        /*
         // MOCK DATA: Injecting mock friends for testing
         setUsers([
           { id: 'user_2', name: 'Nguyễn Văn A' },
           { id: 'user_3', name: 'Trần Thị B' },
           { id: 'user_4', name: 'Lê Văn C' }
         ]);
-        /*
+        */
+        
         const response = await authFetch(`${API_URL}/api/v1/contacts/list`, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -50,7 +52,6 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({ navigation, route
           const data = await response.json();
           setUsers(data.map((c: any) => ({ id: c.username, name: c.fullName || c.username })));
         }
-        */
       } catch (error) {
         console.error('Lỗi tải danh sách bạn bè:', error);
       }

@@ -2,6 +2,7 @@ package com.iuhconnect.chatservice.controller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,17 +24,14 @@ public class FileUploadController {
 
     private static final Logger log = LoggerFactory.getLogger(FileUploadController.class);
 
-    private final S3Presigner s3Presigner;
+    @Autowired(required = false)
+    private S3Presigner s3Presigner;
 
     @Value("${aws.s3.bucket-name:iuh-connect-chat-media}")
     private String bucketName;
     
     @Value("${aws.s3.region:ap-southeast-1}")
     private String region;
-
-    public FileUploadController(S3Presigner s3Presigner) {
-        this.s3Presigner = s3Presigner;
-    }
 
     /**
      * Generate a presigned PUT URL for the client to upload a file directly to AWS S3.
@@ -45,7 +43,7 @@ public class FileUploadController {
             @RequestParam String contentType,
             @RequestParam(required = false) String clientHost) {
         if (s3Presigner == null) {
-            log.error("⚠️ S3 Presigner is not initialized. AWS credentials may be missing.");
+            log.warn("⚠️ S3 Presigner is not initialized. AWS credentials may be missing.");
             Map<String, String> error = new HashMap<>();
             error.put("error", "File upload is temporarily disabled due to missing configuration.");
             return ResponseEntity.status(503).body(error);
@@ -91,7 +89,7 @@ public class FileUploadController {
     public ResponseEntity<Map<String, String>> getDownloadUrl(
             @RequestParam String objectKey) {
         if (s3Presigner == null) {
-            log.error("⚠️ S3 Presigner is not initialized. AWS credentials may be missing.");
+            log.warn("⚠️ S3 Presigner is not initialized. AWS credentials may be missing.");
             Map<String, String> error = new HashMap<>();
             error.put("error", "File download is temporarily disabled due to missing configuration.");
             return ResponseEntity.status(503).body(error);
@@ -123,3 +121,4 @@ public class FileUploadController {
         }
     }
 }
+

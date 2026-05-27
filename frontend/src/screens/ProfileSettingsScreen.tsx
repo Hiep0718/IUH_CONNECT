@@ -26,6 +26,7 @@ import { API_URL } from '../config/env';
 import { authFetch } from '../services/authService';
 import { setWorkStatus, clearWorkStatus, getWorkStatus, AUTO_REPLY_TEMPLATES, WorkStatusInfo } from '../services/presenceApi';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { uploadMedia } from '../services/mediaUploadService';
 
 interface ProfileSettingsScreenProps {
   navigation: any;
@@ -280,26 +281,14 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
       const fileName = asset.fileName || `avatar_${Date.now()}.jpg`;
       const mimeType = asset.type || 'image/jpeg';
       
-      const presignRes = await authFetch(`${API_URL}/api/v1/files/presigned-url?fileName=${fileName}&contentType=${mimeType}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (!presignRes.ok) throw new Error('Failed to get presigned URL');
-      const presignData = await presignRes.json();
-      const { presignedUrl, downloadUrl } = presignData;
-
-      const fileData = await fetch(asset.uri!);
-      const blob = await fileData.blob();
-      
-      const uploadRes = await fetch(presignedUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': mimeType },
-        body: blob,
+      const uploadResult = await uploadMedia(token!, {
+        uri: asset.uri!,
+        fileName: fileName,
+        type: mimeType,
+        fileSize: asset.fileSize,
       });
 
-      if (!uploadRes.ok) throw new Error('Failed to upload to S3');
-
-      setEditForm(prev => ({...prev, avatarUrl: downloadUrl}));
+      setEditForm(prev => ({...prev, avatarUrl: uploadResult.mediaUrl}));
     } catch (err) {
       console.log('Error uploading avatar:', err);
       Alert.alert('Lỗi', 'Không thể tải ảnh lên. Vui lòng thử lại.');

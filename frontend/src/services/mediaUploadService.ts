@@ -123,5 +123,6 @@ export async function uploadMedia(
 export function getMessageTypeFromMime(mimeType: string): string {
   if (mimeType.startsWith('image/')) return 'IMAGE';
   if (mimeType.startsWith('video/')) return 'VIDEO';
+  if (mimeType.startsWith('audio/')) return 'AUDIO';
   return 'FILE';
 }
