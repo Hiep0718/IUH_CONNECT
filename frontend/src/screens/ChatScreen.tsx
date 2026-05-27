@@ -179,9 +179,9 @@ const mapServerMessage = (
     text:
       msg.messageType === 'CALL'
         ? msg.content
-        : (msg.messageType === 'IMAGE' || msg.messageType === 'VIDEO' || msg.messageType === 'AUDIO' || isStickerImage)
+        : (msg.messageType === 'IMAGE' || msg.messageType === 'VIDEO' || msg.messageType === 'AUDIO' || msg.messageType === 'FILE' || isStickerImage)
           ? ''
-          : (msg.messageType === 'FILE' ? ' ' : normalizeMessageText(msg.messageType, msg.content, msg.fileName)),
+          : normalizeMessageText(msg.messageType, msg.content, msg.fileName),
     createdAt: new Date(msg.timestamp),
     user: {
       _id: msg.senderId === currentUser ? 'me' : msg.senderId,
@@ -374,7 +374,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [recipientPresence, setRecipientPresence] = useState({ status: 'OFFLINE', lastSeen: 0 });
   const [groupMemberNames, setGroupMemberNames] = useState<Record<string, string>>({});
   const [groupMemberAvatars, setGroupMemberAvatars] = useState<Record<string, string>>({});
-  const [viewerImage, setViewerImage] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime, setRecordTime] = useState('00:00');
   const [activeMeeting, setActiveMeeting] = useState<{ meetingId: string; roomName: string } | null>(null);
@@ -585,7 +584,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         const data: ServerMessage[] = await res.json();
         const historyMessages = data
           .map(msg => mapServerMessage(msg, currentUser))
-          .filter(msg => msg.text || msg.image || msg.audio || msg.messageType === 'CALL');
+          .filter(msg => msg.text || msg.image || msg.audio || msg.video || msg.messageType === 'FILE' || msg.messageType === 'CALL');
 
         setHasEarlierMessages(data.length === LIMIT);
 
@@ -1072,7 +1071,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
         const optimisticMessage: ExtendedMessage = {
           _id: optimisticId,
-          text: (messageType === 'IMAGE' || messageType === 'VIDEO' || messageType === 'AUDIO') ? '' : (messageType === 'FILE' ? ' ' : normalizeMessageText(messageType, '', upload.fileName)),
+          text: (messageType === 'IMAGE' || messageType === 'VIDEO' || messageType === 'AUDIO' || messageType === 'FILE') ? '' : normalizeMessageText(messageType, '', upload.fileName),
           rawContent: normalizeMessageText(messageType, '', upload.fileName),
           createdAt: new Date(),
           user: { _id: 'me', name: currentUser },
