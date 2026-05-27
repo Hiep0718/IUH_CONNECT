@@ -27,6 +27,7 @@ import {
   Send,
   SystemMessage,
   Time,
+  MessageText,
 } from 'react-native-gifted-chat';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
@@ -177,9 +178,9 @@ const mapServerMessage = (
     text:
       msg.messageType === 'CALL'
         ? msg.content
-        : (msg.messageType === 'IMAGE' || msg.messageType === 'VIDEO' || msg.messageType === 'FILE' || msg.messageType === 'AUDIO' || isStickerImage)
+        : (msg.messageType === 'IMAGE' || msg.messageType === 'VIDEO' || msg.messageType === 'AUDIO' || isStickerImage)
           ? ''
-          : normalizeMessageText(msg.messageType, msg.content, msg.fileName),
+          : (msg.messageType === 'FILE' ? ' ' : normalizeMessageText(msg.messageType, msg.content, msg.fileName)),
     createdAt: new Date(msg.timestamp),
     user: {
       _id: msg.senderId === currentUser ? 'me' : msg.senderId,
@@ -1068,11 +1069,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
         const optimisticMessage: ExtendedMessage = {
           _id: optimisticId,
-          text: (messageType === 'IMAGE' || messageType === 'VIDEO' || messageType === 'FILE') ? '' : normalizeMessageText(messageType, '', upload.fileName),
+          text: (messageType === 'IMAGE' || messageType === 'VIDEO' || messageType === 'AUDIO') ? '' : (messageType === 'FILE' ? ' ' : normalizeMessageText(messageType, '', upload.fileName)),
           rawContent: normalizeMessageText(messageType, '', upload.fileName),
           createdAt: new Date(),
           user: { _id: 'me', name: currentUser },
           image: messageType === 'IMAGE' ? upload.mediaUrl : undefined,
+          video: messageType === 'VIDEO' ? upload.mediaUrl : undefined,
+          audio: messageType === 'AUDIO' ? upload.mediaUrl : undefined,
           messageType,
           mediaUrl: upload.mediaUrl,
           fileName: upload.fileName,
@@ -1595,7 +1598,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
               <View key={idx} style={[styles.waveformBar, { height: h * 4, backgroundColor: isMine ? 'rgba(255,255,255,0.5)' : 'rgba(29, 111, 215, 0.4)' }]} />
             ))}
           </View>
-          <Text style={[styles.audioDurationText, { color: isMine ? 'rgba(255,255,255,0.8)' : '#888' }]}>0:00</Text>
         </View>
       );
     }
@@ -2081,6 +2083,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         renderCustomView={renderCustomView}
         renderMessageAudio={renderMessageAudio}
         renderMessageVideo={renderMessageVideo}
+        renderMessageText={(props: any) => {
+          if (props.currentMessage?.messageType === 'FILE') {
+            return null;
+          }
+          return <MessageText {...props} />;
+        }}
         renderMessageImage={renderMessageImage}
         renderAvatar={renderAvatar}
         renderUsernameOnMessage={isGroup}
