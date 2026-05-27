@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
-
+import com.google.api.core.ApiFuture;
 @Service
 public class FcmPushService {
 
@@ -79,15 +79,22 @@ public class FcmPushService {
                 messageBuilder.putAllData(data);
             }
 
-            String response = FirebaseMessaging.getInstance().send(messageBuilder.build());
-            log.info("✅ Sent push notification to user {}: {}", userId, response);
-            
+            ApiFuture<String> responseFuture = FirebaseMessaging.getInstance().sendAsync(messageBuilder.build());
+            responseFuture.addListener(() -> {
+                try {
+                    String response = responseFuture.get();
+                    log.info("✅ Sent push notification to user {}: {}", userId, response);
+                } catch (Exception e) {
+                    log.error("❌ Failed to send push to user {}: {}", userId, e.getMessage());
+                    if (e.getMessage() != null && e.getMessage().contains("registration-token-not-registered")) {
+                        localCacheService.removeToken(userId);
+                        log.info("Removed invalid token for user {}", userId);
+                    }
+                }
+            }, java.util.concurrent.Executors.newSingleThreadExecutor());
+
         } catch (Exception e) {
-            log.error("❌ Failed to send push to user {}: {}", userId, e.getMessage());
-            if (e.getMessage() != null && e.getMessage().contains("registration-token-not-registered")) {
-                localCacheService.removeToken(userId);
-                log.info("Removed invalid token for user {}", userId);
-            }
+            log.error("❌ Failed to build push message for user {}: {}", userId, e.getMessage());
         }
     }
 }

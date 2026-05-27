@@ -44,6 +44,12 @@ public class FileUploadController {
             @RequestParam String fileName,
             @RequestParam String contentType,
             @RequestParam(required = false) String clientHost) {
+        if (s3Presigner == null) {
+            log.error("⚠️ S3 Presigner is not initialized. AWS credentials may be missing.");
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "File upload is temporarily disabled due to missing configuration.");
+            return ResponseEntity.status(503).body(error);
+        }
         try {
             String objectKey = System.currentTimeMillis() + "_" + fileName.replaceAll("[^a-zA-Z0-9.-]", "_");
 
@@ -84,6 +90,12 @@ public class FileUploadController {
     @GetMapping("/download-url")
     public ResponseEntity<Map<String, String>> getDownloadUrl(
             @RequestParam String objectKey) {
+        if (s3Presigner == null) {
+            log.error("⚠️ S3 Presigner is not initialized. AWS credentials may be missing.");
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "File download is temporarily disabled due to missing configuration.");
+            return ResponseEntity.status(503).body(error);
+        }
         try {
             GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                     .bucket(bucketName)
