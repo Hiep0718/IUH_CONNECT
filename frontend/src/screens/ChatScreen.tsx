@@ -29,6 +29,7 @@ import {
   Time,
   MessageText,
 } from 'react-native-gifted-chat';
+import { WebView } from 'react-native-webview';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -357,6 +358,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [inputText, setInputText] = useState('');
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
+  const [viewerVideo, setViewerVideo] = useState<string | null>(null);
   const [showMessageActions, setShowMessageActions] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<ExtendedMessage | null>(null);
   const [replyTo, setReplyTo] = useState<ExtendedMessage | null>(null);
@@ -1544,10 +1547,23 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const renderCustomView = useCallback((props: any) => {
     const msg = props.currentMessage as ExtendedMessage;
-    const isMine = msg.user._id === currentUser;
+    const isMine = msg.user._id === currentUser || msg.user._id === 'me';
     if (msg.messageType === 'FILE' && msg.mediaUrl) {
       return (
-        <TouchableOpacity style={[styles.fileCard, { backgroundColor: isMine ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)' }]} onPress={() => Linking.openURL(msg.mediaUrl!)} activeOpacity={0.8}>
+        <TouchableOpacity 
+          style={[styles.fileCard, { backgroundColor: isMine ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)' }]} 
+          onPress={() => {
+            Alert.alert(
+              'Tệp đính kèm',
+              msg.fileName || 'Tệp đính kèm',
+              [
+                { text: 'Hủy', style: 'cancel' },
+                { text: 'Mở / Tải xuống', onPress: () => Linking.openURL(msg.mediaUrl!) }
+              ]
+            );
+          }} 
+          activeOpacity={0.8}
+        >
           <View style={[styles.fileIconWrap, { backgroundColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }]}>
             <Icon name="file-document-outline" size={28} color={isMine ? '#FFF' : '#1D6FD7'} />
           </View>
@@ -1569,7 +1585,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const renderMessageAudio = useCallback((props: any) => {
     const msg = props.currentMessage as ExtendedMessage;
-    const isMine = msg.user._id === currentUser;
+    const isMine = msg.user._id === currentUser || msg.user._id === 'me';
     if (msg.audio) {
       return (
         <View style={styles.audioCard}>
@@ -1608,7 +1624,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     const msg = props.currentMessage as ExtendedMessage;
     if (msg.video) {
       return (
-        <TouchableOpacity style={styles.videoCard} onPress={() => Linking.openURL(msg.video!)} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.videoCard} onPress={() => setViewerVideo(msg.video!)} activeOpacity={0.8}>
           <View style={styles.videoPlaceholder}>
             <Icon name="video" size={32} color="#FFF" style={{ opacity: 0.8 }} />
             <View style={styles.videoPlayOverlay}>
@@ -2268,6 +2284,34 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
               source={{ uri: viewerImage }} 
               style={styles.viewerImage} 
               resizeMode="contain" 
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Video Viewer Modal */}
+      <Modal visible={!!viewerVideo} transparent animationType="fade" onRequestClose={() => setViewerVideo(null)}>
+        <View style={styles.viewerContainer}>
+          <TouchableOpacity 
+            style={styles.viewerCloseBtn} 
+            onPress={() => setViewerVideo(null)}
+          >
+            <Icon name="close" size={32} color="#fff" />
+          </TouchableOpacity>
+          {viewerVideo && (
+            <WebView
+              source={{ html: `
+                <html>
+                  <body style="margin:0;padding:0;background-color:black;display:flex;justify-content:center;align-items:center;">
+                    <video width="100%" height="100%" controls autoplay name="media">
+                      <source src="${viewerVideo}" type="video/mp4">
+                    </video>
+                  </body>
+                </html>
+              ` }}
+              style={{ width: '100%', height: '100%', backgroundColor: 'black' }}
+              allowsFullscreenVideo={true}
+              allowsInlineMediaPlayback={true}
             />
           )}
         </View>
