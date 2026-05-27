@@ -177,7 +177,7 @@ const mapServerMessage = (
     text:
       msg.messageType === 'CALL'
         ? msg.content
-        : (msg.messageType === 'IMAGE' || msg.messageType === 'VIDEO' || msg.messageType === 'FILE' || isStickerImage)
+        : (msg.messageType === 'IMAGE' || msg.messageType === 'VIDEO' || msg.messageType === 'FILE' || msg.messageType === 'AUDIO' || isStickerImage)
           ? ''
           : normalizeMessageText(msg.messageType, msg.content, msg.fileName),
     createdAt: new Date(msg.timestamp),
@@ -2333,17 +2333,71 @@ const styles = StyleSheet.create({
   audioCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
     padding: 8,
-    borderRadius: 16,
-    margin: 4,
-    minWidth: 150,
+    paddingRight: 12,
+    minWidth: 160,
   },
-  audioText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#374151',
+  audioPlayButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  waveformContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 24,
+    marginRight: 8,
+  },
+  waveformBar: {
+    width: 3,
+    borderRadius: 1.5,
+    marginHorizontal: 1,
+  },
+  audioDurationText: {
+    fontSize: 12,
     fontWeight: '500',
+  },
+  videoCard: {
+    width: 220,
+    height: 160,
+    margin: 4,
+    borderRadius: 12,
+    backgroundColor: '#1E1E1E',
+    overflow: 'hidden',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#2A2A2A',
+  },
+  videoPlayOverlay: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoLabel: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   customImage: {
     width: 220,
