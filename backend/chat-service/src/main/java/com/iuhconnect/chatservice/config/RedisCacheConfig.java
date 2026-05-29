@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 
@@ -13,14 +14,21 @@ import java.time.Duration;
 
 /**
  * Redis Cache Configuration for Chat Service.
- * Implements Cache-Aside pattern for CRUD operations.
- * - conversations: cached for 5 minutes
- * - messages: cached for 3 minutes
- * - default: cached for 10 minutes
+ * - Cache-Aside pattern for CRUD operations (conversations, messages)
+ * - CQRS Read Model via StringRedisTemplate (conversation summaries)
  */
 @Configuration
 @EnableCaching
 public class RedisCacheConfig {
+
+    /**
+     * StringRedisTemplate for CQRS Read Model operations.
+     * Used by ConversationReadModelService to read/write conversation summaries.
+     */
+    @Bean
+    public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory connectionFactory) {
+        return new StringRedisTemplate(connectionFactory);
+    }
 
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {

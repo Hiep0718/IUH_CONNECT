@@ -1,8 +1,11 @@
 package com.iuhconnect.chatservice.service;
 
+import com.iuhconnect.chatservice.dto.ConversationSummaryDto;
 import com.iuhconnect.chatservice.model.MessageEntity;
 import com.iuhconnect.chatservice.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,9 +17,12 @@ import org.springframework.data.domain.Pageable;
 @RequiredArgsConstructor
 public class MessageService {
 
+    private static final Logger log = LoggerFactory.getLogger(MessageService.class);
+
     private final MessageRepository messageRepository;
     private final com.iuhconnect.chatservice.repository.ConversationRepository conversationRepository;
     private final org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
+    private final ConversationReadModelService conversationReadModelService;
 
     public List<MessageEntity> getHistory(String conversationId, Long before, int limit) {
         Pageable pageable = PageRequest.of(0, limit);
@@ -27,7 +33,34 @@ public class MessageService {
         }
     }
 
-    public List<com.iuhconnect.chatservice.dto.ConversationSummaryDto> getRecentConversations(String username) {
+    /**
+     * CQRS Query: Đọc danh sách chat từ Redis (siêu nhanh).
+     * Nếu Redis trống (lần đầu) → fallback về MongoDB aggregation → ghi kết quả vào Redis.
+     */
+    public List<ConversationSummaryDto> getRecentConversations(String username) {
+        // Bước 1: Thử đọc từ Redis (CQRS Read Model)
+        List<ConversationSummaryDto> fromRedis = conversationReadModelService.getRecentConversations(username);
+        if (fromRedis != null && !fromRedis.isEmpty()) {
+            log.info("⚡ CQRS: Loaded {} conversations from Redis for user [{}]", fromRedis.size(), username);
+            return fromRedis;
+        }
+
+        // Bước 2: Fallback — Chạy aggregation pipeline từ MongoDB (chậm hơn)
+        log.info("📦 CQRS Fallback: Reading from MongoDB for user [{}]", username);
+        List<ConversationSummaryDto> fromMongo = getRecentConversationsFromMongo(username);
+
+        // Bước 3: Rebuild Read Model vào Redis (để lần sau đọc nhanh)
+        if (!fromMongo.isEmpty()) {
+            conversationReadModelService.rebuildReadModel(username, fromMongo);
+        }
+
+        return fromMongo;
+    }
+
+    /**
+     * Aggregation pipeline gốc từ MongoDB (giữ lại làm fallback).
+     */
+    private List<ConversationSummaryDto> getRecentConversationsFromMongo(String username) {
         List<String> groupIds = conversationRepository.findByMembersUserId(username)
                 .stream().map(com.iuhconnect.chatservice.model.ConversationEntity::getId).toList();
 
@@ -74,7 +107,7 @@ public class MessageService {
                 org.springframework.data.mongodb.core.aggregation.Aggregation.sort(org.springframework.data.domain.Sort.Direction.DESC, "timestamp")
         );
 
-        return mongoTemplate.aggregate(aggregation, "messages", com.iuhconnect.chatservice.dto.ConversationSummaryDto.class).getMappedResults();
+        return mongoTemplate.aggregate(aggregation, "messages", ConversationSummaryDto.class).getMappedResults();
     }
 
     public void markAsRead(String conversationId, String userId) {
@@ -87,6 +120,9 @@ public class MessageService {
             msg.setRead(true);
         }
         messageRepository.saveAll(unreadMessages);
+
+        // CQRS: Reset unreadCount trong Redis
+        conversationReadModelService.resetUnreadCount(conversationId, userId);
     }
 
     public MessageEntity toggleReaction(String messageId, String userId, String emoji) {

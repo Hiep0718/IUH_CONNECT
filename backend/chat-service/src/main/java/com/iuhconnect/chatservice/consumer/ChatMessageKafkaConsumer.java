@@ -7,10 +7,10 @@ import com.iuhconnect.chatservice.repository.MessageRepository;
 import com.iuhconnect.chatservice.repository.ConversationRepository;
 import com.iuhconnect.chatservice.service.RealtimeEventService;
 import com.iuhconnect.chatservice.service.AutoReplyService;
+import com.iuhconnect.chatservice.service.ConversationReadModelService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Component;
 import java.util.Optional;
 
@@ -24,19 +24,22 @@ public class ChatMessageKafkaConsumer {
     private final com.iuhconnect.chatservice.repository.ChatUserRepository chatUserRepository;
     private final RealtimeEventService realtimeEventService;
     private final AutoReplyService autoReplyService;
+    private final ConversationReadModelService conversationReadModelService;
 
     public ChatMessageKafkaConsumer(
             MessageRepository messageRepository,
             ConversationRepository conversationRepository,
             com.iuhconnect.chatservice.repository.ChatUserRepository chatUserRepository,
             RealtimeEventService realtimeEventService,
-            AutoReplyService autoReplyService
+            AutoReplyService autoReplyService,
+            ConversationReadModelService conversationReadModelService
     ) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
         this.chatUserRepository = chatUserRepository;
         this.realtimeEventService = realtimeEventService;
         this.autoReplyService = autoReplyService;
+        this.conversationReadModelService = conversationReadModelService;
     }
 
     @KafkaListener(
@@ -78,6 +81,9 @@ public class ChatMessageKafkaConsumer {
             entity = messageRepository.save(entity);
             message.setId(entity.getId());
             log.info("Message saved to MongoDB [id={}]", entity.getId());
+
+            // CQRS: Cập nhật Read Model (bảng tóm tắt) vào Redis
+            conversationReadModelService.updateReadModel(message);
 
             Optional<com.iuhconnect.chatservice.model.ConversationEntity> convOpt = 
                     conversationRepository.findById(message.getConversationId());
