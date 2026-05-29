@@ -18,25 +18,47 @@ spring:
 
   cloud:
     gateway:
-      # ---------- Route Definitions ----------
+      # ---------- Route Definitions (Hybrid Rate Limiter) ----------
       routes:
-        # -------- Auth Service (HTTP) --------
-        - id: auth-service
+        # ======== AUTH SERVICE ========
+
+        # -------- Auth Public APIs (IP-based, strict — anti brute-force) --------
+        - id: auth-public
+          uri: ${AUTH_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/api/v1/auth/login,/api/v1/auth/register
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 3
+                redis-rate-limiter.burstCapacity: 5
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+            - name: CircuitBreaker
+              args:
+                name: authServiceCircuitBreaker
+                fallbackUri: forward:/fallback/auth
+
+        # -------- Auth Private APIs (User-based — refresh, contacts, users) --------
+        - id: auth-private
           uri: ${AUTH_SERVICE_URL:http://localhost:8085}
           predicates:
             - Path=/api/v1/auth/**,/api/v1/contacts/**,/api/v1/users/**
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 200
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+                redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
             - name: CircuitBreaker
               args:
                 name: authServiceCircuitBreaker
                 fallbackUri: forward:/fallback/auth
 
-        # -------- Chat Service (HTTP) --------
+        # ======== CHAT SERVICE ========
+
+        # -------- Chat Service HTTP (User-based) --------
         - id: chat-service-http
           uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
           predicates:
@@ -44,21 +66,24 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 200
+                redis-rate-limiter.replenishRate: 30
+                redis-rate-limiter.burstCapacity: 50
+                redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
             - name: CircuitBreaker
               args:
                 name: chatServiceCircuitBreaker
                 fallbackUri: forward:/fallback/chat
 
-        # -------- Chat Service (WebSocket) --------
+        # -------- Chat Service WebSocket (no rate limit at handshake) --------
         - id: chat-service-ws
           uri: ${CHAT_SERVICE_WS_URL:ws://localhost:8082}
           predicates:
             - Path=/ws/chat/**
 
-        # -------- Meeting Service (HTTP) --------
+        # ======== MEETING SERVICE ========
+
+        # -------- Meeting Service HTTP (User-based) --------
         - id: meeting-service-http
           uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
           predicates:
@@ -66,17 +91,20 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 200
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 40
+                redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
 
-        # -------- Meeting Web (Static page from chat-service) --------
+        # -------- Meeting Web (Static page — no rate limit) --------
         - id: meeting-web
           uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
           predicates:
             - Path=/meeting/**
 
-        # -------- File Upload (chat-service) --------
+        # ======== FILE SERVICE ========
+
+        # -------- File Upload (User-based, strict — heavy IO/S3) --------
         - id: file-service
           uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
           predicates:
@@ -84,11 +112,14 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 50
-                redis-rate-limiter.burstCapacity: 100
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
 
-        # -------- Presence Service (HTTP) --------
+        # ======== PRESENCE SERVICE ========
+
+        # -------- Presence Service HTTP (User-based) --------
         - id: presence-service-http
           uri: ${PRESENCE_SERVICE_URL:http://localhost:8083}
           predicates:
@@ -96,17 +127,20 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 200
+                redis-rate-limiter.replenishRate: 30
+                redis-rate-limiter.burstCapacity: 50
+                redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
 
-        # -------- Presence Service (WebSocket) --------
+        # -------- Presence Service WebSocket (no rate limit at handshake) --------
         - id: presence-service-ws
           uri: ${PRESENCE_SERVICE_WS_URL:ws://localhost:8083}
           predicates:
             - Path=/ws/presence/**
 
-        # -------- AI Service (HTTP) --------
+        # ======== AI SERVICE ========
+
+        # -------- AI Service HTTP (User-based, very strict — heavy GPU/CPU) --------
         - id: ai-service-http
           uri: ${AI_SERVICE_URL:http://ai-service:8084}
           predicates:
@@ -114,8 +148,9 @@ spring:
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 200
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 5
+                redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
             - name: CircuitBreaker
               args:

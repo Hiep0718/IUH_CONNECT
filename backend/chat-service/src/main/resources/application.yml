@@ -89,5 +89,5 @@ aws:
   s3:
     region: ${AWS_REGION:ap-southeast-1}
     bucket-name: ${AWS_S3_BUCKET:iuh-connect-chat-media}
-    access-key: ${AWS_ACCESS_KEY_ID:}
-    secret-key: ${AWS_SECRET_ACCESS_KEY:}
+    access-key: ${AWS_ACCESS_KEY_ID:dummy-access-key}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:dummy-secret-key}

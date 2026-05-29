@@ -306,4 +306,197 @@ public class ConversationService {
         broadcastGroupUpdate(saved);
         return saved;
     }
+
+    @CacheEvict(value = "conversations", key = "#conversationId")
+    public void disbandGroup(String conversationId, String requesterId) {
+        ConversationEntity group = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (group.getType() != ConversationType.GROUP) {
+            throw new RuntimeException("Not a group conversation");
+        }
+
+        boolean isAdmin = group.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requesterId) && m.getRole() == GroupRole.ADMIN);
+        if (!isAdmin) {
+            throw new RuntimeException("Only ADMIN can disband the group");
+        }
+
+        conversationRepository.delete(group);
+        
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("type", "GROUP_DISBANDED");
+        payload.put("conversationId", conversationId);
+        for (GroupMember member : group.getMembers()) {
+            realtimeEventService.sendToUser(member.getUserId(), payload);
+        }
+    }
+
+    @CacheEvict(value = "conversations", key = "#conversationId")
+    public ConversationEntity transferLeadership(String conversationId, String requesterId, String newAdminId) {
+        ConversationEntity group = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (group.getType() != ConversationType.GROUP) {
+            throw new RuntimeException("Not a group conversation");
+        }
+
+        boolean isAdmin = group.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requesterId) && m.getRole() == GroupRole.ADMIN);
+        if (!isAdmin) {
+            throw new RuntimeException("Only ADMIN can transfer leadership");
+        }
+
+        GroupMember newAdmin = group.getMembers().stream()
+                .filter(m -> m.getUserId().equals(newAdminId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("New admin is not in the group"));
+                
+        GroupMember currentAdmin = group.getMembers().stream()
+                .filter(m -> m.getUserId().equals(requesterId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Current admin is not in the group"));
+
+        newAdmin.setRole(GroupRole.ADMIN);
+        currentAdmin.setRole(GroupRole.MEMBER); // Demote the current admin to MEMBER
+
+        group.setUpdatedAt(System.currentTimeMillis());
+        ConversationEntity saved = conversationRepository.save(group);
+        broadcastGroupUpdate(saved);
+        return saved;
+    }
+
+    @CacheEvict(value = "conversations", key = "#conversationId")
+    public ConversationEntity updateGroupSettings(String conversationId, String requesterId, com.iuhconnect.chatservice.dto.GroupSettingsRequest settings) {
+        ConversationEntity group = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (group.getType() != ConversationType.GROUP) {
+            throw new RuntimeException("Not a group conversation");
+        }
+
+        boolean hasPrivilege = group.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requesterId) && (m.getRole() == GroupRole.ADMIN || m.getRole() == GroupRole.DEPUTY));
+        
+        if (!hasPrivilege) {
+            throw new RuntimeException("Only ADMIN or DEPUTY can update settings");
+        }
+
+        if (settings.getRequireApproval() != null) {
+            group.setRequireApproval(settings.getRequireApproval());
+        }
+        if (settings.getAllowMemberInvite() != null) {
+            group.setAllowMemberInvite(settings.getAllowMemberInvite());
+        }
+
+        group.setUpdatedAt(System.currentTimeMillis());
+        ConversationEntity saved = conversationRepository.save(group);
+        broadcastGroupUpdate(saved);
+        return saved;
+    }
+
+    public String getInviteLink(String conversationId) {
+        ConversationEntity group = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+        // Return a simple invite link format
+        return "https://iuhconnect.com/join/" + conversationId;
+    }
+
+    @CacheEvict(value = "conversations", key = "#conversationId")
+    public ConversationEntity joinViaInvite(String conversationId, String userId) {
+        ConversationEntity group = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (group.getType() != ConversationType.GROUP) {
+            throw new RuntimeException("Not a group conversation");
+        }
+        
+        boolean alreadyMember = group.getMembers().stream().anyMatch(m -> m.getUserId().equals(userId));
+        if (alreadyMember) {
+            return group; // Already a member
+        }
+
+        long now = System.currentTimeMillis();
+        GroupMember newMember = GroupMember.builder()
+                .userId(userId)
+                .role(GroupRole.MEMBER)
+                .joinedAt(now)
+                .build();
+
+        if (group.isRequireApproval()) {
+            if (group.getPendingMembers() == null) {
+                group.setPendingMembers(new java.util.ArrayList<>());
+            }
+            boolean alreadyPending = group.getPendingMembers().stream().anyMatch(m -> m.getUserId().equals(userId));
+            if (!alreadyPending) {
+                group.getPendingMembers().add(newMember);
+                group.setUpdatedAt(now);
+                group = conversationRepository.save(group);
+                // Broadcast update so admins can see the pending request
+                broadcastGroupUpdate(group);
+            }
+            return group;
+        } else {
+            group.getMembers().add(newMember);
+            group.setUpdatedAt(now);
+            ConversationEntity saved = conversationRepository.save(group);
+            broadcastGroupUpdate(saved);
+            return saved;
+        }
+    }
+
+    @CacheEvict(value = "conversations", key = "#conversationId")
+    public ConversationEntity approveMember(String conversationId, String requesterId, String userId) {
+        ConversationEntity group = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        boolean hasPrivilege = group.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requesterId) && (m.getRole() == GroupRole.ADMIN || m.getRole() == GroupRole.DEPUTY));
+        
+        if (!hasPrivilege) {
+            throw new RuntimeException("Only ADMIN or DEPUTY can approve members");
+        }
+
+        if (group.getPendingMembers() == null) {
+            return group;
+        }
+
+        GroupMember pendingUser = group.getPendingMembers().stream()
+                .filter(m -> m.getUserId().equals(userId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("User not in pending list"));
+
+        group.getPendingMembers().remove(pendingUser);
+        pendingUser.setJoinedAt(System.currentTimeMillis());
+        group.getMembers().add(pendingUser);
+        group.setUpdatedAt(System.currentTimeMillis());
+        
+        ConversationEntity saved = conversationRepository.save(group);
+        broadcastGroupUpdate(saved);
+        return saved;
+    }
+
+    @CacheEvict(value = "conversations", key = "#conversationId")
+    public ConversationEntity rejectMember(String conversationId, String requesterId, String userId) {
+        ConversationEntity group = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        boolean hasPrivilege = group.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requesterId) && (m.getRole() == GroupRole.ADMIN || m.getRole() == GroupRole.DEPUTY));
+        
+        if (!hasPrivilege) {
+            throw new RuntimeException("Only ADMIN or DEPUTY can reject members");
+        }
+
+        if (group.getPendingMembers() != null) {
+            boolean removed = group.getPendingMembers().removeIf(m -> m.getUserId().equals(userId));
+            if (removed) {
+                group.setUpdatedAt(System.currentTimeMillis());
+                ConversationEntity saved = conversationRepository.save(group);
+                broadcastGroupUpdate(saved);
+                return saved;
+            }
+        }
+        return group;
+    }
 }
