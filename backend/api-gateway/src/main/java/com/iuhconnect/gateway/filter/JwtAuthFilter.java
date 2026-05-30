@@ -70,21 +70,34 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        // 2. Skip WebSocket paths (JWT validated by downstream service)
+        String token;
+
+        // 2. Handle WebSocket paths (JWT passed as query param or standard header)
         if (isWebSocketPath(path)) {
-            return chain.filter(exchange);
+            token = exchange.getRequest().getQueryParams().getFirst("token");
+            if (token == null || token.isEmpty()) {
+                // Fallback to Authorization header if query param is not set
+                String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    token = authHeader.substring(7);
+                } else {
+                    log.warn("🚫 [Gateway] Missing token for WebSocket connection at path: {}", path);
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    return exchange.getResponse().setComplete();
+                }
+            }
+        } else {
+            // 3. Extract Bearer token from Authorization header for REST APIs
+            String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                log.warn("🚫 [Gateway] Missing or invalid Authorization header for path: {}", path);
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
+            }
+
+            token = authHeader.substring(7);
         }
-
-        // 3. Extract Bearer token from Authorization header
-        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.warn("🚫 [Gateway] Missing or invalid Authorization header for path: {}", path);
-            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
-        }
-
-        String token = authHeader.substring(7);
 
         // 4. Validate JWT
         try {
