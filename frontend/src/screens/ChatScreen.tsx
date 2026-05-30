@@ -16,6 +16,7 @@ import {
   Linking,
   Image,
   ScrollView,
+  Pressable,
 } from 'react-native';
 import DocumentPicker from 'react-native-document-picker';
 import {
@@ -381,6 +382,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [pinnedMessage, setPinnedMessage] = useState<{id: string; content: string; senderId: string; messageType: string; pinned: boolean} | null>(null);
   const [showMentionList, setShowMentionList] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
+  const [showMentionProfile, setShowMentionProfile] = useState(false);
+  const [mentionProfileData, setMentionProfileData] = useState<any>(null);
+  const [mentionProfileLoading, setMentionProfileLoading] = useState(false);
   const audioRecorderPlayerRef = useRef(new AudioRecorderPlayer());
   const headerAnim = useRef(new Animated.Value(0)).current;
   const attachMenuAnim = useRef(new Animated.Value(0)).current;
@@ -1117,13 +1121,30 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         optimisticMessages.forEach(message => {
           const mentionedIds: string[] = [];
           if (isGroup && message.text) {
-            const mentionRegex = /@([^@\s][^@]*?)(?=\s|$)/g;
-            let match;
-            while ((match = mentionRegex.exec(message.text)) !== null) {
-              const name = match[1].trim();
-              const userId = reverseMemberMap[name];
-              if (userId && !mentionedIds.includes(userId)) {
-                mentionedIds.push(userId);
+            const sortedNames = Object.values(groupMemberNames)
+              .filter(Boolean)
+              .sort((a, b) => b.length - a.length);
+            
+            if (sortedNames.length > 0) {
+              const escapedNames = sortedNames.map(n => n.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+              const mentionRegex = new RegExp(`@(${escapedNames.join('|')})(?=\\s|@|$)`, 'g');
+              let match;
+              while ((match = mentionRegex.exec(message.text)) !== null) {
+                const name = match[1];
+                const userId = reverseMemberMap[name];
+                if (userId && !mentionedIds.includes(userId)) {
+                  mentionedIds.push(userId);
+                }
+              }
+            } else {
+              const mentionRegex = /@([^@\s][^@]*?)(?=\s|$)/g;
+              let match;
+              while ((match = mentionRegex.exec(message.text)) !== null) {
+                const name = match[1].trim();
+                const userId = reverseMemberMap[name];
+                if (userId && !mentionedIds.includes(userId)) {
+                  mentionedIds.push(userId);
+                }
               }
             }
           }
@@ -1542,8 +1563,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
               </View>
             )}
 
-            <TouchableOpacity
-              activeOpacity={0.7}
+            <Pressable
               onLongPress={() => handleMessageLongPress(message)}
               delayLongPress={260}
             >
@@ -1574,14 +1594,68 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                     </Text>
                   )}
                   <Text style={isMine ? styles.bubbleTextRight : styles.bubbleTextLeft}>
-                    {message.text && isGroup ? (
-                      message.text.split(/(@[^@\s][^@]*?)(?=\s|@|$)/).map((part: string, i: number) => {
+                    {message.text && isGroup ? (() => {
+                      const sortedNames = Object.values(groupMemberNames)
+                        .filter(Boolean)
+                        .sort((a, b) => b.length - a.length);
+
+                      let splitRegex = /(@[^@\s][^@]*?)(?=\s|@|$)/;
+                      if (sortedNames.length > 0) {
+                        const escapedNames = sortedNames.map(n => n.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+                        splitRegex = new RegExp(`(@(?:${escapedNames.join('|')}))(?=\\s|@|$)`);
+                      }
+
+                      return message.text.split(splitRegex).map((part: string, i: number) => {
                         if (part.startsWith('@') && part.length > 1) {
-                          return <Text key={i} style={styles.mentionText}>{part}</Text>;
+                          const mentionName = part.substring(1);
+                          return (
+                            <Text
+                              key={i}
+                              style={styles.mentionText}
+                              onPress={() => {
+                                // Find userId from name
+                                const userId = Object.entries(groupMemberNames).find(
+                                  ([, name]) => name === mentionName
+                                )?.[0];
+                                if (userId) {
+                                  setMentionProfileLoading(true);
+                                  setShowMentionProfile(true);
+                                  
+                                  // Fetch profile + check friend status in parallel
+                                  Promise.all([
+                                    authFetch(`${API_URL}/api/v1/users/bulk-profiles`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                      body: JSON.stringify([userId]),
+                                    }).then(res => res.json()),
+                                    authFetch(`${API_URL}/api/v1/contacts/list`, {
+                                      headers: { Authorization: `Bearer ${token}` },
+                                    }).then(res => res.ok ? res.json() : []),
+                                  ])
+                                    .then(([profileData, contactsList]) => {
+                                      if (profileData[userId]) {
+                                        const isFriend = Array.isArray(contactsList) && 
+                                          contactsList.some((c: any) => c.username === profileData[userId].username);
+                                        setMentionProfileData({
+                                          ...profileData[userId],
+                                          userId: userId,
+                                          avatarUrl: profileData[userId].avatarUrl || groupMemberAvatars[userId],
+                                          isFriend: isFriend ? true : false,
+                                        });
+                                      }
+                                      setMentionProfileLoading(false);
+                                    })
+                                    .catch(() => setMentionProfileLoading(false));
+                                }
+                              }}
+                            >
+                              {part}
+                            </Text>
+                          );
                         }
                         return part;
-                      })
-                    ) : message.text}
+                      });
+                    })() : message.text}
                   </Text>
                   <View style={styles.bubbleBottom}>
                     <Text style={isMine ? styles.timeRight : styles.timeLeft}>
@@ -1597,7 +1671,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                   </View>
                 </View>
               )}
-            </TouchableOpacity>
+            </Pressable>
 
             {reactionEntries.length > 0 && (
               <View
@@ -2550,6 +2624,134 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
           )}
         </View>
       </Modal>
+
+      {/* Mention Profile Modal */}
+      <Modal
+        visible={showMentionProfile}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setShowMentionProfile(false); setMentionProfileData(null); }}
+      >
+        <TouchableOpacity
+          style={styles.mentionProfileOverlay}
+          activeOpacity={1}
+          onPress={() => { setShowMentionProfile(false); setMentionProfileData(null); }}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.mentionProfileCard}>
+            {mentionProfileLoading ? (
+              <ActivityIndicator size="large" color="#1D6FD7" style={{padding: 40}} />
+            ) : mentionProfileData ? (
+              <>
+                <View style={styles.mentionProfileAvatarWrap}>
+                  {mentionProfileData.avatarUrl ? (
+                    <Image source={{uri: mentionProfileData.avatarUrl}} style={styles.mentionProfileAvatar} />
+                  ) : (
+                    <View style={[styles.mentionProfileAvatar, styles.mentionProfileAvatarPlaceholder]}>
+                      <Text style={styles.mentionProfileAvatarLetter}>
+                        {(mentionProfileData.fullName || mentionProfileData.username || '?').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.mentionProfileName}>
+                  {mentionProfileData.fullName || mentionProfileData.username || 'Không rõ'}
+                </Text>
+                {mentionProfileData.username && (
+                  <Text style={styles.mentionProfileUsername}>@{mentionProfileData.username}</Text>
+                )}
+                <View style={styles.mentionProfileDivider} />
+                {mentionProfileData.email && (
+                  <View style={styles.mentionProfileRow}>
+                    <Icon name="email-outline" size={16} color="#6B7280" />
+                    <Text style={styles.mentionProfileInfo}>{mentionProfileData.email}</Text>
+                  </View>
+                )}
+                {mentionProfileData.department && (
+                  <View style={styles.mentionProfileRow}>
+                    <Icon name="school-outline" size={16} color="#6B7280" />
+                    <Text style={styles.mentionProfileInfo}>{mentionProfileData.department}</Text>
+                  </View>
+                )}
+                {mentionProfileData.studentId && (
+                  <View style={styles.mentionProfileRow}>
+                    <Icon name="card-account-details-outline" size={16} color="#6B7280" />
+                    <Text style={styles.mentionProfileInfo}>MSSV: {mentionProfileData.studentId}</Text>
+                  </View>
+                )}
+                {mentionProfileData.phone && (
+                  <View style={styles.mentionProfileRow}>
+                    <Icon name="phone-outline" size={16} color="#6B7280" />
+                    <Text style={styles.mentionProfileInfo}>{mentionProfileData.phone}</Text>
+                  </View>
+                )}
+                {mentionProfileData.isFriend === false && (
+                  <TouchableOpacity
+                    style={styles.mentionProfileFriendBtn}
+                    onPress={async () => {
+                      try {
+                        const res = await authFetch(
+                          `${API_URL}/api/v1/contacts/request?targetUsername=${mentionProfileData.username}`,
+                          { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
+                        );
+                        if (res.ok) {
+                          Alert.alert('Thành công', 'Đã gửi lời mời kết bạn!');
+                          setMentionProfileData((prev: any) => prev ? {...prev, isFriend: 'pending'} : prev);
+                        } else {
+                          const errText = await res.text();
+                          Alert.alert('Lỗi', errText || 'Không thể gửi lời mời');
+                        }
+                      } catch (e) {
+                        Alert.alert('Lỗi', 'Không thể gửi lời mời kết bạn');
+                      }
+                    }}
+                  >
+                    <Icon name="account-plus-outline" size={18} color="#FFF" />
+                    <Text style={styles.mentionProfileFriendBtnText}>Kết bạn</Text>
+                  </TouchableOpacity>
+                )}
+                {mentionProfileData.isFriend === 'pending' && (
+                  <View style={styles.mentionProfilePendingBadge}>
+                    <Icon name="clock-outline" size={16} color="#F59E0B" />
+                    <Text style={styles.mentionProfilePendingText}>Đã gửi lời mời kết bạn</Text>
+                  </View>
+                )}
+                <View style={styles.mentionProfileBtnRow}>
+                  <TouchableOpacity
+                    style={styles.mentionProfileBtn}
+                    onPress={() => {
+                      const targetUsername = mentionProfileData.username;
+                      const targetName = mentionProfileData.fullName || targetUsername;
+                      const targetAvatar = mentionProfileData.avatarUrl;
+                      setShowMentionProfile(false);
+                      setMentionProfileData(null);
+                      navigation.navigate('Chat', {
+                        conversationId: `${currentUser}-${targetUsername}`,
+                        recipientName: targetName,
+                        recipientId: targetUsername,
+                        recipientAvatar: targetAvatar,
+                        isGroup: false,
+                        participants: [],
+                      });
+                    }}
+                  >
+                    <Icon name="chat-outline" size={18} color="#FFF" style={{marginRight: 6}} />
+                    <Text style={styles.mentionProfileBtnText}>Nhắn tin</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.mentionProfileCloseBtn}
+                    onPress={() => {
+                      setShowMentionProfile(false);
+                      setMentionProfileData(null);
+                    }}
+                  >
+                    <Text style={styles.mentionProfileCloseBtnText}>Đóng</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : null}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -3464,6 +3666,134 @@ const styles = StyleSheet.create({
   mentionText: {
     color: '#1D6FD7',
     fontWeight: '700',
+  },
+  // ---- Mention Profile Modal ----
+  mentionProfileOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+  },
+  mentionProfileCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+  },
+  mentionProfileAvatarWrap: {
+    marginBottom: 14,
+  },
+  mentionProfileAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  mentionProfileAvatarPlaceholder: {
+    backgroundColor: '#1D6FD7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mentionProfileAvatarLetter: {
+    color: '#FFF',
+    fontSize: 32,
+    fontWeight: '700',
+  },
+  mentionProfileName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  mentionProfileUsername: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  mentionProfileDivider: {
+    width: '80%',
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 12,
+  },
+  mentionProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+    paddingHorizontal: 8,
+    width: '100%',
+  },
+  mentionProfileInfo: {
+    fontSize: 14,
+    color: '#374151',
+    marginLeft: 8,
+    flexShrink: 1,
+  },
+  mentionProfileBtnRow: {
+    flexDirection: 'row',
+    marginTop: 18,
+    gap: 10,
+  },
+  mentionProfileBtn: {
+    backgroundColor: '#1D6FD7',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mentionProfileBtnText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  mentionProfileCloseBtn: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  mentionProfileCloseBtnText: {
+    color: '#6B7280',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  mentionProfileFriendBtn: {
+    marginTop: 14,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  mentionProfileFriendBtnText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  mentionProfilePendingBadge: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  mentionProfilePendingText: {
+    color: '#92400E',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
 
