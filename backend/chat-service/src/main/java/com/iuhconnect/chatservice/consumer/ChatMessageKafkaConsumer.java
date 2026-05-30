@@ -135,7 +135,7 @@ public class ChatMessageKafkaConsumer {
                         java.util.Map<String, Object> mentionPayload = new java.util.HashMap<>();
                         mentionPayload.put("type", "MENTION_NOTIFICATION");
                         mentionPayload.put("conversationId", message.getConversationId());
-                        mentionPayload.put("messageId", entity.getId());
+                        mentionPayload.put("messageId", message.getId());
                         mentionPayload.put("senderId", message.getSenderId());
                         mentionPayload.put("senderName", senderDisplayName);
                         mentionPayload.put("content", message.getContent());

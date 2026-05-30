@@ -125,9 +125,11 @@ const GroupsScreen: React.FC<GroupsScreenProps> = ({ navigation, currentUser, to
           style={styles.groupItem} 
           activeOpacity={0.6}
           onPress={() => {
-            navigation.navigate('GroupSettings', {
+            navigation.navigate('Chat', {
               conversationId: item.id,
-              groupName: item.name
+              recipientName: item.name,
+              recipientId: item.id,
+              isGroup: true
             });
           }}
         >
