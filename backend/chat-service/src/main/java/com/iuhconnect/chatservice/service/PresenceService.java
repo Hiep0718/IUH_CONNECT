@@ -47,17 +47,10 @@ public class PresenceService {
         // 1. Internal routing key — which chat-service instance hosts this session
         redisTemplate.opsForValue().set(INSTANCE_KEY_PREFIX + userId, currentInstanceId, 24, TimeUnit.HOURS);
 
-        // 2. Presence keys — respect manual work status if set
-        String workStatus = redisTemplate.opsForValue().get("workstatus:" + userId);
-        String presenceValue = ("BUSY".equals(workStatus) || "AVAILABLE".equals(workStatus))
-                ? workStatus : "ONLINE";
-        redisTemplate.opsForValue().set(PRESENCE_KEY_PREFIX + userId, presenceValue, 90, TimeUnit.SECONDS);
-        redisTemplate.opsForValue().set(LAST_SEEN_KEY_PREFIX + userId, String.valueOf(now));
+        log.info("🟢 User ONLINE (via chat-ws): {} (delegating presence write to presence-service)", userId);
 
-        log.info("🟢 User ONLINE (via chat-ws): {} (presence={})", userId, presenceValue);
-
-        // 3. Publish presence event to Kafka → other users get PRESENCE_UPDATE via WebSocket
-        publishPresenceEvent(userId, presenceValue, now);
+        // 2. Publish presence event to Kafka → presence-service will write presence data
+        publishPresenceEvent(userId, "ONLINE", now);
     }
 
     public void userDisconnected(String userId) {
@@ -66,13 +59,9 @@ public class PresenceService {
         // 1. Remove internal routing key
         redisTemplate.delete(INSTANCE_KEY_PREFIX + userId);
 
-        // 2. Remove presence key + update lastSeen
-        redisTemplate.delete(PRESENCE_KEY_PREFIX + userId);
-        redisTemplate.opsForValue().set(LAST_SEEN_KEY_PREFIX + userId, String.valueOf(now));
+        log.info("🔴 User OFFLINE (via chat-ws): {} (delegating presence write to presence-service)", userId);
 
-        log.info("🔴 User OFFLINE (via chat-ws): {}", userId);
-
-        // 3. Publish presence event to Kafka
+        // 2. Publish presence event to Kafka
         publishPresenceEvent(userId, "OFFLINE", now);
     }
 
@@ -81,27 +70,11 @@ public class PresenceService {
      * Called when the client sends a PING/heartbeat via the chat WebSocket.
      */
     public void refreshHeartbeat(String userId) {
-        String presenceKey = PRESENCE_KEY_PREFIX + userId;
-        Boolean exists = redisTemplate.hasKey(presenceKey);
-
-        if (Boolean.TRUE.equals(exists)) {
-            redisTemplate.expire(presenceKey, 90, TimeUnit.SECONDS);
-            redisTemplate.opsForValue().set(LAST_SEEN_KEY_PREFIX + userId,
-                    String.valueOf(System.currentTimeMillis()));
-        } else {
-            // Key expired (e.g., no heartbeat for >90s) — re-establish with correct status
-            long now = System.currentTimeMillis();
-            String workStatus = redisTemplate.opsForValue().get("workstatus:" + userId);
-            String presenceValue = ("BUSY".equals(workStatus) || "AVAILABLE".equals(workStatus))
-                    ? workStatus : "ONLINE";
-            redisTemplate.opsForValue().set(presenceKey, presenceValue, 90, TimeUnit.SECONDS);
-            redisTemplate.opsForValue().set(LAST_SEEN_KEY_PREFIX + userId, String.valueOf(now));
-            log.info("🔄 Re-established presence for {} (key had expired, status={})", userId, presenceValue);
-            publishPresenceEvent(userId, presenceValue, now);
-        }
-
-        // Also refresh the routing key
+        // 1. Refresh internal routing key
         redisTemplate.expire(INSTANCE_KEY_PREFIX + userId, 24, TimeUnit.HOURS);
+        
+        // 2. Publish heartbeat to Kafka -> presence-service handles actual presence update
+        publishPresenceEvent(userId, "ONLINE", System.currentTimeMillis());
     }
 
     public String getUserInstanceId(String userId) {
