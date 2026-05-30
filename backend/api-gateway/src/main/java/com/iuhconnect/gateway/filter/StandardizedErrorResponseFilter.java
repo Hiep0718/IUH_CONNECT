@@ -46,6 +46,9 @@ public class StandardizedErrorResponseFilter implements GlobalFilter, Ordered {
                 } else if (status == HttpStatus.FORBIDDEN) {
                     errorCode = "FORBIDDEN";
                     message = "Access denied. Your request has been blocked or you do not have permission.";
+                } else if (status == HttpStatus.CONFLICT) {
+                    errorCode = "DUPLICATE_REQUEST";
+                    message = "A duplicate request was detected. Please try again later.";
                 } else {
                     errorCode = status.name();
                     message = status.getReasonPhrase();
@@ -65,7 +68,8 @@ public class StandardizedErrorResponseFilter implements GlobalFilter, Ordered {
                     HttpStatus httpStatus = (HttpStatus) status;
                     return httpStatus == HttpStatus.TOO_MANY_REQUESTS
                             || httpStatus == HttpStatus.UNAUTHORIZED
-                            || httpStatus == HttpStatus.FORBIDDEN;
+                            || httpStatus == HttpStatus.FORBIDDEN
+                            || httpStatus == HttpStatus.CONFLICT;
                 }
                 return false;
             }
