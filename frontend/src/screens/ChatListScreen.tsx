@@ -1001,7 +1001,7 @@ const ChatListScreen: React.FC<ChatListScreenProps> = ({
                   openConversation(item);
                 }}
               >
-                <Avatar name={item.name} size="large" isOnline={item.isOnline} showOnlineStatus={!item.isGroup} />
+                <Avatar name={item.name} uri={item.avatar} size="large" isOnline={item.isOnline} showOnlineStatus={!item.isGroup} />
                 <View style={styles.rowContent}>
                   <View style={styles.rowTop}>
                     <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>

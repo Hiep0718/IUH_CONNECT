@@ -125,6 +125,29 @@ public class ConversationService {
     }
 
     @CacheEvict(value = "conversations", key = "#conversationId")
+    public ConversationEntity updateGroupAvatar(String conversationId, String requesterId, String avatarUrl) {
+        ConversationEntity group = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (group.getType() != ConversationType.GROUP) {
+            throw new RuntimeException("Not a group conversation");
+        }
+
+        boolean hasPrivilege = group.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requesterId) && (m.getRole() == GroupRole.ADMIN || m.getRole() == GroupRole.DEPUTY));
+        
+        if (!hasPrivilege) {
+            throw new RuntimeException("Only ADMIN or DEPUTY can update group avatar");
+        }
+
+        group.setAvatar(avatarUrl);
+        group.setUpdatedAt(System.currentTimeMillis());
+        ConversationEntity saved = conversationRepository.save(group);
+        broadcastGroupUpdate(saved);
+        return saved;
+    }
+
+    @CacheEvict(value = "conversations", key = "#conversationId")
     public ConversationEntity addMembers(String conversationId, String requesterId, List<String> newMemberIds) {
         ConversationEntity group = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));

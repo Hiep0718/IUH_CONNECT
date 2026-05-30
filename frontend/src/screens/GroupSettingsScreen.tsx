@@ -13,6 +13,8 @@ import {
   TextInput,
   Switch,
   Share,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme/theme';
@@ -20,6 +22,8 @@ import Avatar from '../components/Avatar';
 import { API_URL } from '../config/env';
 import { authFetch } from '../services/authService';
 import QRCode from 'react-native-qrcode-svg';
+import { launchImageLibrary } from 'react-native-image-picker';
+import { uploadMedia } from '../services/mediaUploadService';
 
 interface GroupSettingsScreenProps {
   navigation: any;
@@ -35,6 +39,9 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
   const [currentGroupName, setCurrentGroupName] = useState(groupName);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameInput, setEditNameInput] = useState(groupName);
+
+  const [groupAvatar, setGroupAvatar] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [members, setMembers] = useState<any[]>([]);
 
@@ -77,6 +84,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
         const data = await res.json();
         setCurrentGroupName(data.name);
         setEditNameInput(data.name);
+        setGroupAvatar(data.avatar || null);
         setRequireApproval(data.requireApproval || false);
         setAllowMemberInvite(data.allowMemberInvite !== false);
         setPendingMembers((data.pendingMembers || []).map((m: any) => ({
@@ -114,6 +122,57 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
   const isLeader = members.find(m => m.id?.toLowerCase() === currentUserLower)?.role?.toUpperCase() === 'ADMIN';
   const isDeputy = members.find(m => m.id?.toLowerCase() === currentUserLower)?.role?.toUpperCase() === 'DEPUTY';
   const hasPrivilege = isLeader || isDeputy;
+
+  const handleUploadGroupAvatar = async () => {
+    if (!hasPrivilege) {
+      Alert.alert('Quyền hạn', 'Chỉ Trưởng nhóm hoặc Phó nhóm mới có quyền đổi ảnh đại diện');
+      return;
+    }
+    
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 0.8,
+        selectionLimit: 1,
+      });
+
+      if (result.didCancel || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      setUploadingAvatar(true);
+
+      const fileName = asset.fileName || `group_avatar_${Date.now()}.jpg`;
+      const mimeType = asset.type || 'image/jpeg';
+      
+      const uploadResult = await uploadMedia(token!, {
+        uri: asset.uri!,
+        fileName: fileName,
+        type: mimeType,
+        fileSize: asset.fileSize,
+      });
+
+      const res = await authFetch(
+        `${API_URL}/api/v1/chat/conversations/group/${conversationId}/avatar?requesterId=${currentUser}&avatarUrl=${encodeURIComponent(uploadResult.mediaUrl)}`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (res.ok) {
+        setGroupAvatar(uploadResult.mediaUrl);
+        Alert.alert('Thành công', 'Đã đổi ảnh đại diện nhóm!');
+      } else {
+        const errText = await res.text();
+        Alert.alert('Lỗi', errText || 'Không thể cập nhật ảnh đại diện');
+      }
+    } catch (err) {
+      console.log('Error uploading group avatar:', err);
+      Alert.alert('Lỗi', 'Không thể tải ảnh lên. Vui lòng thử lại.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const [isTransferModalVisible, setIsTransferModalVisible] = useState(false);
   const [selectedSuccessor, setSelectedSuccessor] = useState<string | null>(null);
@@ -433,9 +492,25 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
 
         {/* Group Info Profile */}
         <View style={styles.profileSection}>
-          <View style={styles.groupAvatar}>
-            <Text style={styles.groupEmoji}>👥</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.groupAvatar}
+            onPress={handleUploadGroupAvatar}
+            disabled={!hasPrivilege || uploadingAvatar}
+            activeOpacity={0.8}
+          >
+            {uploadingAvatar ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : groupAvatar ? (
+              <Image source={{ uri: groupAvatar }} style={styles.groupAvatarImage} />
+            ) : (
+              <Text style={styles.groupEmoji}>👥</Text>
+            )}
+            {hasPrivilege && !uploadingAvatar && (
+              <View style={styles.changeAvatarBadge}>
+                <Icon name="camera" size={12} color={Colors.white} />
+              </View>
+            )}
+          </TouchableOpacity>
           <View style={styles.groupNameRow}>
             <Text style={styles.groupName}>{currentGroupName}</Text>
             {isMuted && (
@@ -1050,6 +1125,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.md,
+    position: 'relative',
+  },
+  groupAvatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  changeAvatarBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.white,
   },
   groupEmoji: {
     fontSize: 40,

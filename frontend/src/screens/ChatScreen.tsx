@@ -355,6 +355,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     participants = [],
   } = route.params;
   const [displayRecipientName, setDisplayRecipientName] = useState(recipientName || recipientId || 'Người dùng');
+  const [displayRecipientAvatar, setDisplayRecipientAvatar] = useState<string | undefined>(recipientAvatar);
 
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -668,6 +669,22 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     }
   }, [currentUser, conversationId, token]);
 
+  const fetchGroupDetails = useCallback(async () => {
+    if (!isGroup) return;
+    try {
+      const res = await authFetch(`${API_URL}/api/v1/chat/conversations/group/${conversationId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.name) setDisplayRecipientName(data.name);
+        if (data.avatar) setDisplayRecipientAvatar(data.avatar);
+      }
+    } catch (e) {
+      console.log('Failed to fetch group details in ChatScreen:', e);
+    }
+  }, [isGroup, conversationId, token]);
+
   const handleAISummarize = useCallback(async () => {
     setShowSummaryModal(true);
     setIsSummarizing(true);
@@ -691,7 +708,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   useFocusEffect(
     useCallback(() => {
       fetchSettings();
-    }, [fetchSettings])
+      fetchGroupDetails();
+    }, [fetchSettings, fetchGroupDetails])
   );
 
   const fetchPinnedMessages = useCallback(async () => {
@@ -767,8 +785,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
       if (data?.type === 'GROUP_UPDATED') {
         const conv = data.conversation;
-        if (conv && conv.id === conversationId && conv.name) {
-          setDisplayRecipientName(conv.name);
+        if (conv && conv.id === conversationId) {
+          if (conv.name) setDisplayRecipientName(conv.name);
+          if (conv.avatar !== undefined) setDisplayRecipientAvatar(conv.avatar);
         }
         return;
       }
@@ -1478,13 +1497,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       return (
         <Avatar
           name={isGroup ? (groupMemberNames[message.user._id as string] || message.user._id as string) : displayRecipientName}
-          uri={isGroup ? groupMemberAvatars[message.user._id as string] : recipientAvatar}
+          uri={isGroup ? groupMemberAvatars[message.user._id as string] : displayRecipientAvatar}
           localSource={message.user._id === 'ai-assistant' ? require('../botai.png') : undefined}
           size="small"
         />
       );
     },
-    [currentUser, displayRecipientName, recipientAvatar, groupMemberNames, groupMemberAvatars, isGroup],
+    [currentUser, displayRecipientName, displayRecipientAvatar, groupMemberNames, groupMemberAvatars, isGroup],
   );
 
   const renderBubble = useCallback(
@@ -2157,7 +2176,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
           >
             <Avatar
               name={displayRecipientName}
-              uri={recipientAvatar}
+              uri={displayRecipientAvatar}
               localSource={recipientId === 'ai-assistant' ? require('../botai.png') : undefined}
               size="medium"
               isOnline={recipientPresence.status === 'ONLINE'}
@@ -2188,7 +2207,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
               onPress={() => {
                 const roomName = `IUHConnect_${recipientId}_${Date.now()}`;
                 if (isGroup) {
-                  // Gọi nhóm: gửi tin nhắn MEETING vào group rồi tự vào Jitsi
+                  // Gửi tin nhắn cuộc họp nhóm
                   sendMessage({
                     senderId: currentUser,
                     receiverId: recipientId,
@@ -2199,7 +2218,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                   navigation.navigate('Meeting', {
                     callerId: recipientId,
                     callerName: displayRecipientName,
-                    callerAvatar: recipientAvatar,
+                    callerAvatar: displayRecipientAvatar,
                     roomName,
                     conversationId,
                     isLateJoin: true,
@@ -2209,7 +2228,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                   navigation.navigate('Meeting', {
                     callerId: recipientId,
                     callerName: displayRecipientName,
-                    callerAvatar: recipientAvatar,
+                    callerAvatar: displayRecipientAvatar,
                     roomName,
                     conversationId,
                   });
@@ -2242,7 +2261,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                       conversationId,
                       recipientId,
                       recipientName: displayRecipientName,
-                      recipientAvatar,
+                      recipientAvatar: displayRecipientAvatar,
                     });
                   }
                 }
@@ -2253,9 +2272,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
           </View>
         </LinearGradient>
       </Animated.View>
-
+ 
       <OfflineBanner isOffline={isOffline} />
-
+ 
       {activeMeeting && (
         <TouchableOpacity
           style={styles.activeMeetingBanner}
@@ -2263,7 +2282,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             navigation.navigate('Meeting', {
               callerId: recipientId,
               callerName: displayRecipientName,
-              callerAvatar: recipientAvatar,
+              callerAvatar: displayRecipientAvatar,
               roomName: activeMeeting.roomName,
               meetingId: activeMeeting.meetingId,
               isIncoming: false,

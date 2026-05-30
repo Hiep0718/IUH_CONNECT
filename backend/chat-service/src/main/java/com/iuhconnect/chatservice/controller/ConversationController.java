@@ -41,6 +41,14 @@ public class ConversationController {
         return ResponseEntity.ok(conversationService.updateGroupName(conversationId, requesterId, newName));
     }
 
+    @PutMapping("/group/{conversationId}/avatar")
+    public ResponseEntity<ConversationEntity> updateGroupAvatar(
+            @PathVariable String conversationId,
+            @RequestParam String requesterId,
+            @RequestParam String avatarUrl) {
+        return ResponseEntity.ok(conversationService.updateGroupAvatar(conversationId, requesterId, avatarUrl));
+    }
+
     @PostMapping("/group/{conversationId}/members")
     public ResponseEntity<ConversationEntity> addMembers(
             @PathVariable String conversationId,
