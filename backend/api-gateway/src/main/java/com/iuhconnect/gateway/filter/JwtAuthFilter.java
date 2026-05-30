@@ -110,6 +110,11 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             String username = claims.getSubject();
             String role = claims.get("role", String.class);
 
+            if (isWebSocketPath(path)) {
+                log.debug("✅ [Gateway] JWT valid for WS path={} — user={}", path, username);
+                return chain.filter(exchange);
+            }
+
             // 5. Add user info to request headers for downstream services
             ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                     .header("X-Auth-User", username)
@@ -136,6 +141,6 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     }
 
     private boolean isWebSocketPath(String path) {
-        return WS_PATHS.stream().anyMatch(path::startsWith);
+        return path.startsWith("/ws/");
     }
 }

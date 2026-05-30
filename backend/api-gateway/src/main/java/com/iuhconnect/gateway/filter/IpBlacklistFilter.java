@@ -39,6 +39,14 @@ public class IpBlacklistFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        String path = exchange.getRequest().getURI().getPath();
+        String upgradeHeader = exchange.getRequest().getHeaders().getFirst("Upgrade");
+
+        // Skip dynamic blacklist processing for WebSocket upgrade paths to prevent connection closure
+        if (path.startsWith("/ws/") || "websocket".equalsIgnoreCase(upgradeHeader)) {
+            return chain.filter(exchange);
+        }
+
         String clientIp = getClientIp(exchange);
         String blacklistKey = BLACKLIST_KEY_PREFIX + clientIp;
 

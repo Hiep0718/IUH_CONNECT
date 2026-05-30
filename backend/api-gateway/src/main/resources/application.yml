@@ -75,18 +75,11 @@ spring:
                 name: chatServiceCircuitBreaker
                 fallbackUri: forward:/fallback/chat
 
-        # -------- Chat Service WebSocket (IP-based, connection throttling) --------
+        # -------- Chat Service WebSocket (JWT-protected, no rate limit on handshake) --------
         - id: chat-service-ws
           uri: ${CHAT_SERVICE_WS_URL:ws://localhost:8082}
           predicates:
             - Path=/ws/chat/**
-          filters:
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 3
-                redis-rate-limiter.burstCapacity: 5
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@ipKeyResolver}"
 
         # ======== MEETING SERVICE ========
 
@@ -139,18 +132,11 @@ spring:
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
 
-        # -------- Presence Service WebSocket (IP-based, connection throttling) --------
+        # -------- Presence Service WebSocket (JWT-protected, no rate limit on handshake) --------
         - id: presence-service-ws
           uri: ${PRESENCE_SERVICE_WS_URL:ws://localhost:8083}
           predicates:
             - Path=/ws/presence/**
-          filters:
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 3
-                redis-rate-limiter.burstCapacity: 5
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@ipKeyResolver}"
 
         # ======== AI SERVICE ========
 
