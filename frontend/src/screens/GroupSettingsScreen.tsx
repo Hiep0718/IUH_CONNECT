@@ -451,7 +451,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
         </View>
 
         {/* Actions Grid */}
-        <View style={styles.actionsGrid}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.actionsGridScroll} contentContainerStyle={styles.actionsGrid}>
           <TouchableOpacity style={styles.actionItem} onPress={() => {
             navigation.navigate('Chat', {
               conversationId: conversationId,
@@ -503,10 +503,10 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
               <Icon name={isMuted ? "bell-off-outline" : "bell-outline"} size={24} color={isMuted ? Colors.primary : Colors.textPrimary} />
             </View>
             <Text style={[styles.actionText, isMuted && { color: Colors.primary }]}>
-              {isMuted ? 'Đang tắt thông báo' : 'Tắt thông báo'}
+              {isMuted ? 'Đang tắt\nthông báo' : 'Tắt\nthông báo'}
             </Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
 
         {/* Members Section */}
         <View style={styles.section}>
@@ -1064,12 +1064,14 @@ const styles = StyleSheet.create({
     fontSize: Typography.bodySmall,
     color: Colors.textSecondary,
   },
-  actionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: Spacing.lg,
+  actionsGridScroll: {
     backgroundColor: Colors.white,
     marginBottom: Spacing.md,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.md,
   },
   actionItem: {
     alignItems: 'center',
