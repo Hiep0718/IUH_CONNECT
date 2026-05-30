@@ -3,6 +3,8 @@ package com.iuhconnect.chatservice.service;
 import com.iuhconnect.chatservice.dto.ConversationSummaryDto;
 import com.iuhconnect.chatservice.model.MessageEntity;
 import com.iuhconnect.chatservice.repository.MessageRepository;
+import com.iuhconnect.chatservice.exception.AppException;
+import com.iuhconnect.chatservice.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -128,7 +130,7 @@ public class MessageService {
 
     public MessageEntity toggleReaction(String messageId, String userId, String emoji) {
         MessageEntity msg = messageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found: " + messageId));
+                .orElseThrow(() -> new AppException(ErrorCode.MESSAGE_NOT_FOUND));
 
         java.util.Map<String, java.util.List<String>> reactions = msg.getReactions();
         if (reactions == null) {

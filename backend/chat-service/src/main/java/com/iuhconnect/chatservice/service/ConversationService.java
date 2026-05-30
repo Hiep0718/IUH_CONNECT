@@ -6,6 +6,8 @@ import com.iuhconnect.chatservice.model.ConversationType;
 import com.iuhconnect.chatservice.model.GroupMember;
 import com.iuhconnect.chatservice.model.GroupRole;
 import com.iuhconnect.chatservice.repository.ConversationRepository;
+import com.iuhconnect.chatservice.exception.AppException;
+import com.iuhconnect.chatservice.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -98,23 +100,23 @@ public class ConversationService {
     @Cacheable(value = "conversations", key = "#conversationId")
     public ConversationEntity getConversation(String conversationId) {
         return conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Group not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
     }
 
     @CacheEvict(value = "conversations", key = "#conversationId")
     public ConversationEntity updateGroupName(String conversationId, String requesterId, String newName) {
         ConversationEntity group = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Group not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
 
         if (group.getType() != ConversationType.GROUP) {
-            throw new RuntimeException("Not a group conversation");
+            throw new AppException(ErrorCode.NOT_GROUP_CONVERSATION);
         }
 
         boolean hasPrivilege = group.getMembers().stream()
                 .anyMatch(m -> m.getUserId().equals(requesterId) && (m.getRole() == GroupRole.ADMIN || m.getRole() == GroupRole.DEPUTY));
         
         if (!hasPrivilege) {
-            throw new RuntimeException("Only ADMIN or DEPUTY can update group name");
+            throw new AppException(ErrorCode.INSUFFICIENT_ROLE);
         }
 
         group.setName(newName);
@@ -150,17 +152,17 @@ public class ConversationService {
     @CacheEvict(value = "conversations", key = "#conversationId")
     public ConversationEntity addMembers(String conversationId, String requesterId, List<String> newMemberIds) {
         ConversationEntity group = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Group not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
 
         if (group.getType() != ConversationType.GROUP) {
-            throw new RuntimeException("Not a group conversation");
+            throw new AppException(ErrorCode.NOT_GROUP_CONVERSATION);
         }
 
         boolean hasPrivilege = group.getMembers().stream()
                 .anyMatch(m -> m.getUserId().equals(requesterId) && (m.getRole() == GroupRole.ADMIN || m.getRole() == GroupRole.DEPUTY));
         
         if (!hasPrivilege) {
-            throw new RuntimeException("Only ADMIN or DEPUTY can add members");
+            throw new AppException(ErrorCode.INSUFFICIENT_ROLE);
         }
 
         long now = System.currentTimeMillis();
@@ -184,10 +186,10 @@ public class ConversationService {
     @CacheEvict(value = "conversations", key = "#conversationId")
     public ConversationEntity removeMember(String conversationId, String requesterId, String targetUserId) {
         ConversationEntity group = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Group not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
 
         if (group.getType() != ConversationType.GROUP) {
-            throw new RuntimeException("Not a group conversation");
+            throw new AppException(ErrorCode.NOT_GROUP_CONVERSATION);
         }
 
         boolean isSelfLeave = requesterId.equals(targetUserId);
@@ -197,20 +199,20 @@ public class ConversationService {
             GroupMember requesterMember = group.getMembers().stream()
                     .filter(m -> m.getUserId().equals(requesterId))
                     .findFirst()
-                    .orElseThrow(() -> new RuntimeException("Requester is not in the group"));
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_IN_GROUP));
                     
             GroupMember targetMemberObj = group.getMembers().stream()
                     .filter(m -> m.getUserId().equals(targetUserId))
                     .findFirst()
-                    .orElseThrow(() -> new RuntimeException("Target user is not in the group"));
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_IN_GROUP));
 
             if (requesterMember.getRole() == GroupRole.MEMBER) {
-                throw new RuntimeException("Only ADMIN or DEPUTY can remove members");
+                throw new AppException(ErrorCode.INSUFFICIENT_ROLE);
             }
             
             if (requesterMember.getRole() == GroupRole.DEPUTY) {
                 if (targetMemberObj.getRole() == GroupRole.ADMIN || targetMemberObj.getRole() == GroupRole.DEPUTY) {
-                    throw new RuntimeException("DEPUTY can only remove MEMBERs");
+                    throw new AppException(ErrorCode.INSUFFICIENT_ROLE);
                 }
             }
         }
@@ -220,21 +222,21 @@ public class ConversationService {
             GroupMember leavingMember = group.getMembers().stream()
                     .filter(m -> m.getUserId().equals(requesterId))
                     .findFirst()
-                    .orElseThrow(() -> new RuntimeException("Requester is not in the group"));
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_IN_GROUP));
 
             if (leavingMember.getRole() == GroupRole.ADMIN && group.getMembers().size() > 1) {
                 // Check if there is a deputy to auto-promote
                 boolean hasDeputy = group.getMembers().stream()
                         .anyMatch(m -> m.getRole() == GroupRole.DEPUTY);
                 if (!hasDeputy) {
-                    throw new RuntimeException("ADMIN_MUST_TRANSFER");
+                    throw new AppException(ErrorCode.ADMIN_MUST_TRANSFER);
                 }
             }
         }
 
         boolean removed = group.getMembers().removeIf(m -> m.getUserId().equals(targetUserId));
         if (!removed) {
-            throw new RuntimeException("User is not a member of this group");
+            throw new AppException(ErrorCode.USER_NOT_IN_GROUP);
         }
 
         // Handle case where the last ADMIN leaves (auto-promote deputy)
@@ -265,22 +267,22 @@ public class ConversationService {
     @CacheEvict(value = "conversations", key = "#conversationId")
     public ConversationEntity leaveAndTransfer(String conversationId, String requesterId, String successorId) {
         ConversationEntity group = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Group not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
 
         if (group.getType() != ConversationType.GROUP) {
-            throw new RuntimeException("Not a group conversation");
+            throw new AppException(ErrorCode.NOT_GROUP_CONVERSATION);
         }
 
         boolean isAdmin = group.getMembers().stream()
                 .anyMatch(m -> m.getUserId().equals(requesterId) && m.getRole() == GroupRole.ADMIN);
         if (!isAdmin) {
-            throw new RuntimeException("Only ADMIN can transfer leadership");
+            throw new AppException(ErrorCode.INSUFFICIENT_ROLE);
         }
 
         GroupMember successor = group.getMembers().stream()
                 .filter(m -> m.getUserId().equals(successorId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Successor is not in the group"));
+                .orElseThrow(() -> new AppException(ErrorCode.SUCCESSOR_NOT_IN_GROUP));
 
         // Promote successor to ADMIN
         successor.setRole(GroupRole.ADMIN);
@@ -304,23 +306,23 @@ public class ConversationService {
     @CacheEvict(value = "conversations", key = "#conversationId")
     public ConversationEntity assignRole(String conversationId, String requesterId, String targetUserId, GroupRole newRole) {
         ConversationEntity group = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Group not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
 
         if (group.getType() != ConversationType.GROUP) {
-            throw new RuntimeException("Not a group conversation");
+            throw new AppException(ErrorCode.NOT_GROUP_CONVERSATION);
         }
 
         boolean isAdmin = group.getMembers().stream()
                 .anyMatch(m -> m.getUserId().equals(requesterId) && m.getRole() == GroupRole.ADMIN);
         
         if (!isAdmin) {
-            throw new RuntimeException("Only ADMIN can assign roles");
+            throw new AppException(ErrorCode.INSUFFICIENT_ROLE);
         }
 
         GroupMember targetMember = group.getMembers().stream()
                 .filter(m -> m.getUserId().equals(targetUserId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Target user is not in the group"));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_IN_GROUP));
 
         targetMember.setRole(newRole);
 
