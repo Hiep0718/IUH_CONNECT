@@ -76,6 +76,7 @@ public class ChatMessageKafkaConsumer {
                     .replyToId(message.getReplyToId())
                     .replyToText(message.getReplyToText())
                     .replyToSender(message.getReplyToSender())
+                    .mentions(message.getMentions())
                     .build();
 
             entity = messageRepository.save(entity);
@@ -103,6 +104,25 @@ public class ChatMessageKafkaConsumer {
             } else {
                 realtimeEventService.sendToUser(message.getReceiverId(), message);
                 log.info("Delivered chat message to receiver [{}]", message.getReceiverId());
+            }
+
+            // ===== Mention Notifications =====
+            if (message.getMentions() != null && !message.getMentions().isEmpty()) {
+                String senderDisplayName = message.getSenderName() != null ? message.getSenderName() : message.getSenderId();
+                for (String mentionedUserId : message.getMentions()) {
+                    if (!mentionedUserId.equals(message.getSenderId())) {
+                        java.util.Map<String, Object> mentionPayload = new java.util.HashMap<>();
+                        mentionPayload.put("type", "MENTION_NOTIFICATION");
+                        mentionPayload.put("conversationId", message.getConversationId());
+                        mentionPayload.put("messageId", entity.getId());
+                        mentionPayload.put("senderId", message.getSenderId());
+                        mentionPayload.put("senderName", senderDisplayName);
+                        mentionPayload.put("content", message.getContent());
+                        mentionPayload.put("timestamp", message.getTimestamp());
+                        realtimeEventService.sendToUser(mentionedUserId, mentionPayload);
+                        log.info("📢 Sent MENTION_NOTIFICATION to [{}] from [{}]", mentionedUserId, message.getSenderId());
+                    }
+                }
             }
 
             // ===== UC11: Auto-Reply Check =====

@@ -83,4 +83,8 @@ public class MessageEntity {
 
     @Field("pinned_at")
     private long pinnedAt;
+
+    // ---- Mentions ----
+    /** List of user IDs mentioned in this message */
+    private java.util.List<String> mentions;
 }

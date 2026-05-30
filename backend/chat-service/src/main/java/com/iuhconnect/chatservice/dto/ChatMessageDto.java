@@ -42,4 +42,8 @@ public class ChatMessageDto {
     private String replyToId;
     private String replyToText;
     private String replyToSender;
+
+    // ---- Mentions ----
+    /** List of user IDs mentioned in this message */
+    private java.util.List<String> mentions;
 }

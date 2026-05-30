@@ -67,14 +67,15 @@ class RateLimiter {
 
 /**
  * Rate limiter cho HTTP API calls (login, load contacts, etc.)
- * 10 tokens max, refill 2 tokens/giây
+ * 50 tokens max, refill 10 tokens/giây
+ * → Cho phép burst 50 request, sau đó 10 req/s bình thường
  */
-export const apiRateLimiter = new RateLimiter(10, 2);
+export const apiRateLimiter = new RateLimiter(50, 10);
 
 /**
  * Rate limiter cho chat messages (WebSocket send)
- * 5 tokens max, refill 1 token/giây
+ * 20 tokens max, refill 5 token/giây
  */
-export const chatRateLimiter = new RateLimiter(5, 1);
+export const chatRateLimiter = new RateLimiter(20, 5);
 
 export default RateLimiter;

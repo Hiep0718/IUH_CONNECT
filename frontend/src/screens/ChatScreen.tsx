@@ -15,6 +15,7 @@ import {
   View,
   Linking,
   Image,
+  ScrollView,
 } from 'react-native';
 import DocumentPicker from 'react-native-document-picker';
 import {
@@ -378,6 +379,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [recordTime, setRecordTime] = useState('00:00');
   const [activeMeeting, setActiveMeeting] = useState<{ meetingId: string; roomName: string } | null>(null);
   const [pinnedMessage, setPinnedMessage] = useState<{id: string; content: string; senderId: string; messageType: string; pinned: boolean} | null>(null);
+  const [showMentionList, setShowMentionList] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
   const audioRecorderPlayerRef = useRef(new AudioRecorderPlayer());
   const headerAnim = useRef(new Animated.Value(0)).current;
   const attachMenuAnim = useRef(new Animated.Value(0)).current;
@@ -723,9 +726,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     return unsubscribe;
   }, [navigation, fetchSettings, fetchPinnedMessages]);
 
-  // Re-sync tin nhắn khi reconnect sau mất mạng
+  // Re-sync tin nhắn khi reconnect sau mất mạng (debounce 3s để tránh spam)
+  const lastReconnectSyncRef = useRef(0);
   useEffect(() => {
     if (wasReconnected && isConnected) {
+      const now = Date.now();
+      if (now - lastReconnectSyncRef.current < 3000) {
+        return; // Skip nếu vừa sync trong vòng 3s
+      }
+      lastReconnectSyncRef.current = now;
       console.log('🔄 [ChatScreen] Reconnected — syncing missed messages');
       fetchHistory();
       markMessagesAsRead();
@@ -783,6 +792,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             lastSeen: data.lastSeen,
           });
         }
+        return;
+      }
+
+      if (data?.type === 'MENTION_NOTIFICATION' && data.conversationId === conversationId) {
+        // User was mentioned in this chat — could show in-app alert
         return;
       }
 
@@ -1094,12 +1108,32 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       } else {
         setMessages(prev => GiftedChat.append(prev, optimisticMessages));
 
+        // Parse @mentions from text → resolve to userIds
+        const reverseMemberMap: Record<string, string> = {};
+        Object.entries(groupMemberNames).forEach(([userId, name]) => {
+          reverseMemberMap[name] = userId;
+        });
+
         optimisticMessages.forEach(message => {
+          const mentionedIds: string[] = [];
+          if (isGroup && message.text) {
+            const mentionRegex = /@([^@\s][^@]*?)(?=\s|$)/g;
+            let match;
+            while ((match = mentionRegex.exec(message.text)) !== null) {
+              const name = match[1].trim();
+              const userId = reverseMemberMap[name];
+              if (userId && !mentionedIds.includes(userId)) {
+                mentionedIds.push(userId);
+              }
+            }
+          }
+
           sendMessage({
             senderId: currentUser,
             receiverId: recipientId,
             content: message.text,
             conversationId,
+            ...(mentionedIds.length > 0 ? { mentions: mentionedIds } : {}),
             ...(replyTo
               ? {
                   replyToId: String(replyTo._id),
@@ -1540,7 +1574,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
                     </Text>
                   )}
                   <Text style={isMine ? styles.bubbleTextRight : styles.bubbleTextLeft}>
-                    {message.text}
+                    {message.text && isGroup ? (
+                      message.text.split(/(@[^@\s][^@]*?)(?=\s|@|$)/).map((part: string, i: number) => {
+                        if (part.startsWith('@') && part.length > 1) {
+                          return <Text key={i} style={styles.mentionText}>{part}</Text>;
+                        }
+                        return part;
+                      })
+                    ) : message.text}
                   </Text>
                   <View style={styles.bubbleBottom}>
                     <Text style={isMine ? styles.timeRight : styles.timeLeft}>
@@ -1892,6 +1933,23 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
               onTextChanged={(text: string) => {
                 setInputText(text);
                 props.onTextChanged?.(text);
+
+                // Detect @mention
+                if (isGroup) {
+                  const lastAtIdx = text.lastIndexOf('@');
+                  if (lastAtIdx >= 0) {
+                    const afterAt = text.substring(lastAtIdx + 1);
+                    // Only show if no space after the query (still typing)
+                    if (!afterAt.includes(' ') || afterAt.trim().length === 0) {
+                      setMentionQuery(afterAt);
+                      setShowMentionList(true);
+                    } else {
+                      setShowMentionList(false);
+                    }
+                  } else {
+                    setShowMentionList(false);
+                  }
+                }
               }}
             />
           )}
@@ -2197,8 +2255,45 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         </TouchableOpacity>
       )}
 
+      {showMentionList && isGroup && (
+        <View style={styles.mentionDropdown}>
+          <ScrollView keyboardShouldPersistTaps="always" style={{maxHeight: 180}}>
+            {Object.entries(groupMemberNames)
+              .filter(([userId, name]) => 
+                userId !== currentUser && 
+                name.toLowerCase().includes(mentionQuery.toLowerCase())
+              )
+              .map(([userId, name]) => (
+                <TouchableOpacity
+                  key={userId}
+                  style={styles.mentionItem}
+                  onPress={() => {
+                    // Replace @query with @Name
+                    const lastAtIdx = inputText.lastIndexOf('@');
+                    const newText = inputText.substring(0, lastAtIdx) + '@' + name + ' ';
+                    setInputText(newText);
+                    setShowMentionList(false);
+                  }}
+                >
+                  <View style={styles.mentionAvatar}>
+                    <Text style={styles.mentionAvatarText}>{name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <Text style={styles.mentionName}>{name}</Text>
+                </TouchableOpacity>
+              ))
+            }
+            {Object.entries(groupMemberNames).filter(([userId, name]) => 
+              userId !== currentUser && name.toLowerCase().includes(mentionQuery.toLowerCase())
+            ).length === 0 && (
+              <Text style={styles.mentionEmpty}>Không tìm thấy thành viên</Text>
+            )}
+          </ScrollView>
+        </View>
+      )}
+
       <GiftedChat
         messages={messages}
+        text={inputText}
         onSend={newMessages => onSend(newMessages)}
         user={{ _id: 'me', name: currentUser }}
         loadEarlier={hasEarlierMessages}
@@ -2224,7 +2319,24 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         renderMessageImage={renderMessageImage}
         renderAvatar={renderAvatar}
         renderUsernameOnMessage={isGroup}
-        onInputTextChanged={setInputText}
+        onInputTextChanged={(text: string) => {
+          setInputText(text);
+          // Detect @mention for GiftedChat level too
+          if (isGroup) {
+            const lastAtIdx = text.lastIndexOf('@');
+            if (lastAtIdx >= 0) {
+              const afterAt = text.substring(lastAtIdx + 1);
+              if (!afterAt.includes(' ') || afterAt.trim().length === 0) {
+                setMentionQuery(afterAt);
+                setShowMentionList(true);
+              } else {
+                setShowMentionList(false);
+              }
+            } else {
+              setShowMentionList(false);
+            }
+          }
+        }}
         extraData={replyTo}
         bottomOffset={0}
         minInputToolbarHeight={62}
@@ -3302,6 +3414,56 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#374151',
     marginTop: 1,
+  },
+  // ---- Mention ----
+  mentionDropdown: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    maxHeight: 200,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  mentionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F3F4F6',
+  },
+  mentionAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#1D6FD7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  mentionAvatarText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  mentionName: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  mentionEmpty: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#9CA3AF',
+    fontSize: 13,
+    fontStyle: 'italic',
+  },
+  mentionText: {
+    color: '#1D6FD7',
+    fontWeight: '700',
   },
 });
 
