@@ -28,14 +28,7 @@ interface GroupSettingsScreenProps {
   token: string | null;
 }
 
-// Giả lập danh sách user để thêm vào nhóm
-const MOCK_USERS_TO_ADD = [
-  { id: 'u2', name: 'Thị Bình' },
-  { id: 'u3', name: 'Hoàng Minh' },
-  { id: 'u4', name: 'Thị Lan' },
-  { id: 'u5', name: 'Minh Đức' },
-  { id: 'u6', name: 'Giáo viên ABC' },
-];
+
 
 const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, route, currentUser, token }) => {
   const { conversationId, groupName, groupMemberAvatars = {}, groupMemberNames = {} } = route.params as any;
@@ -48,6 +41,8 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNewUsers, setSelectedNewUsers] = useState<string[]>([]);
+  const [allFriends, setAllFriends] = useState<any[]>([]);
+  const [isFetchingFriends, setIsFetchingFriends] = useState(false);
   
   const [isMuted, setIsMuted] = useState(false);
   const [mutedUntil, setMutedUntil] = useState<number | null>(null);
@@ -257,6 +252,36 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
     }
   };
 
+  // Fetch danh sách bạn bè thật từ API contacts
+  const fetchFriends = async () => {
+    setIsFetchingFriends(true);
+    try {
+      const res = await authFetch(`${API_URL}/api/v1/contacts/list`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAllFriends(data.map((c: any) => ({
+          id: c.username,
+          name: c.fullName || c.username,
+          avatar: c.avatarUrl,
+        })));
+      }
+    } catch (error) {
+      console.error('Fetch friends error:', error);
+    } finally {
+      setIsFetchingFriends(false);
+    }
+  };
+
+  // Mở modal thêm thành viên - dùng chung cho cả 2 nút
+  const openAddMemberModal = () => {
+    setSelectedNewUsers([]);
+    setSearchQuery('');
+    fetchFriends();
+    setIsAddingMember(true);
+  };
+
   const handleAddMembers = async () => {
     if (selectedNewUsers.length === 0) return;
     
@@ -271,20 +296,23 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
       });
       
       if (res.ok) {
-        // Cập nhật lại danh sách sau khi thêm
         fetchGroupDetails();
         setIsAddingMember(false);
         setSelectedNewUsers([]);
         setSearchQuery('');
+        Alert.alert('Thành công', `Đã thêm ${selectedNewUsers.length} thành viên`);
       } else {
-        Alert.alert('Lỗi', 'Không thể thêm thành viên');
+        const errorText = await res.text();
+        Alert.alert('Lỗi', errorText || 'Không thể thêm thành viên');
       }
     } catch (error) {
       console.error('Add member error:', error);
+      Alert.alert('Lỗi', 'Lỗi kết nối');
     }
   };
 
-  const availableUsersToAdd = MOCK_USERS_TO_ADD.filter(
+  // Lọc bạn bè chưa là thành viên nhóm + khớp tìm kiếm
+  const availableUsersToAdd = allFriends.filter(
     u => !members.find(m => m.id === u.id) && u.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -377,7 +405,10 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
         activeOpacity={0.7}
       >
         <Avatar name={item.name} uri={item.avatar} size="medium" />
-        <Text style={styles.userAddName}>{item.name}</Text>
+        <View style={{flex: 1, marginLeft: Spacing.md}}>
+          <Text style={styles.userAddName}>{item.name}</Text>
+          <Text style={{fontSize: Typography.caption, color: Colors.textMuted, marginTop: 2}}>{item.id}</Text>
+        </View>
         <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
           {isSelected && <Icon name="check" size={16} color={Colors.white} />}
         </View>
@@ -440,7 +471,7 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
             </View>
             <Text style={styles.actionText}>Tìm tin nhắn</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionItem}>
+          <TouchableOpacity style={styles.actionItem} onPress={openAddMemberModal}>
             <View style={styles.actionIconWrapper}>
               <Icon name="account-plus-outline" size={24} color={Colors.textPrimary} />
             </View>
@@ -485,14 +516,12 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
               {renderMember({ item })}
             </View>
           ))}
-          {hasPrivilege && (
-            <TouchableOpacity style={styles.addMemberRow} onPress={() => setIsAddingMember(true)}>
-              <View style={styles.addMemberIcon}>
-                <Icon name="plus" size={24} color={Colors.primary} />
-              </View>
-              <Text style={styles.addMemberText}>Thêm thành viên mới</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity style={styles.addMemberRow} onPress={openAddMemberModal}>
+            <View style={styles.addMemberIcon}>
+              <Icon name="plus" size={24} color={Colors.primary} />
+            </View>
+            <Text style={styles.addMemberText}>Thêm thành viên mới</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Danger Zone (Đưa lại vào trong ScrollView) */}
@@ -669,17 +698,23 @@ const GroupSettingsScreen: React.FC<GroupSettingsScreenProps> = ({ navigation, r
             />
           </View>
 
-          <FlatList
-            data={availableUsersToAdd}
-            renderItem={renderUserToAdd}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingBottom: Spacing.xxl }}
-            ListEmptyComponent={
-              <Text style={{ textAlign: 'center', marginTop: 20, color: Colors.textMuted }}>
-                Không tìm thấy người dùng phù hợp
-              </Text>
-            }
-          />
+          {isFetchingFriends ? (
+            <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40}}>
+              <Text style={{color: Colors.textMuted}}>Đang tải danh sách bạn bè...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={availableUsersToAdd}
+              renderItem={renderUserToAdd}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: Spacing.xxl }}
+              ListEmptyComponent={
+                <Text style={{ textAlign: 'center', marginTop: 20, color: Colors.textMuted }}>
+                  {allFriends.length === 0 ? 'Bạn chưa có bạn bè nào' : 'Tất cả bạn bè đều đã trong nhóm'}
+                </Text>
+              }
+            />
+          )}
         </SafeAreaView>
       </Modal>
 
@@ -1246,8 +1281,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryGhost,
   },
   userAddName: {
-    flex: 1,
-    marginLeft: Spacing.md,
     fontSize: Typography.body,
     color: Colors.textPrimary,
   },

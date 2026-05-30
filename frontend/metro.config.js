@@ -8,6 +8,7 @@ const exclusionList = require('metro-config/src/defaults/exclusionList');
  * @type {import('metro-config').MetroConfig}
  */
 const config = {
+  maxWorkers: 1, // Workaround for spawn UNKNOWN error on Node.js 24 (downgrade to Node 20 LTS for best compatibility)
   resolver: {
     blockList: exclusionList([
       /node_modules\/.*\/android\/build\/.*/,
