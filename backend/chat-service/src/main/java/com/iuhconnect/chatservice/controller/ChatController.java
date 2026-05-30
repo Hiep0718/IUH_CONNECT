@@ -63,4 +63,20 @@ public class ChatController {
 
         return ResponseEntity.ok(updatedMessage);
     }
+
+    // ======== Pin Message ========
+
+    @PutMapping("/messages/{messageId}/pin")
+    public ResponseEntity<MessageEntity> togglePinMessage(
+            @PathVariable String messageId,
+            @RequestParam String userId,
+            @RequestParam String conversationId) {
+        return ResponseEntity.ok(messageService.togglePinMessage(messageId, userId, conversationId));
+    }
+
+    @GetMapping("/messages/{conversationId}/pinned")
+    public ResponseEntity<List<MessageEntity>> getPinnedMessages(
+            @PathVariable String conversationId) {
+        return ResponseEntity.ok(messageService.getPinnedMessages(conversationId));
+    }
 }

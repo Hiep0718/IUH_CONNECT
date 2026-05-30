@@ -377,6 +377,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime, setRecordTime] = useState('00:00');
   const [activeMeeting, setActiveMeeting] = useState<{ meetingId: string; roomName: string } | null>(null);
+  const [pinnedMessage, setPinnedMessage] = useState<{id: string; content: string; senderId: string; messageType: string; pinned: boolean} | null>(null);
   const audioRecorderPlayerRef = useRef(new AudioRecorderPlayer());
   const headerAnim = useRef(new Animated.Value(0)).current;
   const attachMenuAnim = useRef(new Animated.Value(0)).current;
@@ -686,15 +687,41 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     }, [fetchSettings])
   );
 
+  const fetchPinnedMessages = useCallback(async () => {
+    try {
+      const res = await authFetch(`${API_URL}/api/v1/chat/messages/${conversationId}/pinned`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.length > 0) {
+          const latest = data[data.length - 1];
+          setPinnedMessage({
+            id: latest.id,
+            content: latest.content,
+            senderId: latest.senderId || latest.sender_id,
+            messageType: latest.messageType || latest.message_type || 'TEXT',
+            pinned: true,
+          });
+        } else {
+          setPinnedMessage(null);
+        }
+      }
+    } catch (e) {
+      console.log('Failed to fetch pinned messages', e);
+    }
+  }, [conversationId, isGroup, token]);
+
   useEffect(() => {
     fetchHistory();
     fetchPresence();
     markMessagesAsRead();
+    fetchPinnedMessages();
     const unsubscribe = navigation.addListener('focus', () => {
       fetchSettings();
     });
     return unsubscribe;
-  }, [navigation, fetchSettings]);
+  }, [navigation, fetchSettings, fetchPinnedMessages]);
 
   // Re-sync tin nhắn khi reconnect sau mất mạng
   useEffect(() => {
@@ -729,6 +756,21 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         const conv = data.conversation;
         if (conv && conv.id === conversationId && conv.name) {
           setDisplayRecipientName(conv.name);
+        }
+        return;
+      }
+
+      if (data?.type === 'PIN_MESSAGE' && data.conversationId === conversationId) {
+        if (data.pinned) {
+          setPinnedMessage({
+            id: data.messageId,
+            content: data.content,
+            senderId: data.senderId,
+            messageType: data.messageType || 'TEXT',
+            pinned: true,
+          });
+        } else {
+          setPinnedMessage(prev => prev?.id === data.messageId ? null : prev);
         }
         return;
       }
@@ -955,6 +997,38 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     setSelectedMessage(null);
     Alert.alert('Forward', 'Forward flow is still under development.');
   }, []);
+
+  const handlePinMessage = useCallback(async () => {
+    if (!selectedMessage) return;
+    
+    setShowMessageActions(false);
+    const msgSnapshot = selectedMessage;
+    setSelectedMessage(null);
+
+    try {
+      const persistedId = await resolvePersistedMessageId(msgSnapshot);
+      if (!persistedId) {
+        Alert.alert('Lỗi', 'Tin nhắn chưa được lưu, không thể ghim.');
+        return;
+      }
+
+      const res = await authFetch(
+        `${API_URL}/api/v1/chat/messages/${persistedId}/pin?userId=${currentUser}&conversationId=${conversationId}`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!res.ok) {
+        const errText = await res.text();
+        Alert.alert('Lỗi', errText || 'Không thể ghim tin nhắn');
+      }
+    } catch (error) {
+      console.log('Pin message error:', error);
+      Alert.alert('Lỗi', 'Không thể ghim tin nhắn');
+    }
+  }, [selectedMessage, isGroup, conversationId, currentUser, token, resolvePersistedMessageId]);
 
   const onSend = useCallback(
     (newMessages: IMessage[] = []) => {
@@ -2080,6 +2154,49 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         </View>
       )}
 
+      {pinnedMessage && (
+        <TouchableOpacity
+          style={styles.pinnedBanner}
+          activeOpacity={0.8}
+          onPress={() => {
+            // Scroll đến tin nhắn ghim
+            const idx = messages.findIndex(m => m.serverId === pinnedMessage.id || String(m._id) === pinnedMessage.id);
+            if (idx >= 0) {
+              Alert.alert('📌 Tin nhắn ghim', pinnedMessage.messageType === 'TEXT' ? pinnedMessage.content : `[${pinnedMessage.messageType}]`);
+            } else {
+              Alert.alert('📌 Tin nhắn ghim', pinnedMessage.messageType === 'TEXT' ? pinnedMessage.content : `[${pinnedMessage.messageType}]`);
+            }
+          }}
+        >
+          <Icon name="pin" size={18} color="#1D6FD7" style={{marginRight: 8}} />
+          <View style={{flex: 1}}>
+            <Text style={styles.pinnedBannerLabel}>Tin nhắn đã ghim</Text>
+            <Text style={styles.pinnedBannerText} numberOfLines={1}>
+              {pinnedMessage.messageType === 'TEXT' ? pinnedMessage.content : `[${pinnedMessage.messageType}]`}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={async () => {
+              try {
+                const res = await authFetch(
+                  `${API_URL}/api/v1/chat/messages/${pinnedMessage.id}/pin?userId=${currentUser}&conversationId=${conversationId}`,
+                  { method: 'PUT', headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (!res.ok) {
+                  const errText = await res.text();
+                  Alert.alert('Lỗi', errText || 'Không thể bỏ ghim');
+                }
+              } catch (e) {
+                console.log('Unpin error:', e);
+              }
+            }}
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+          >
+            <Icon name="close" size={18} color="#8E99A4" />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      )}
+
       <GiftedChat
         messages={messages}
         onSend={newMessages => onSend(newMessages)}
@@ -2155,6 +2272,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             <TouchableOpacity style={styles.actionItem} onPress={handleCopyText}>
               <Icon name="content-copy" size={20} color="#1D6FD7" />
               <Text style={styles.actionItemText}>Copy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={handlePinMessage}>
+              <Icon name="pin" size={20} color="#F59E0B" />
+              <Text style={styles.actionItemText}>
+                {pinnedMessage?.id === String(selectedMessage?._id) || pinnedMessage?.id === selectedMessage?.serverId ? 'Bỏ ghim' : '📌 Ghim tin nhắn'}
+              </Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -3157,6 +3280,28 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginTop: 4,
     alignSelf: 'flex-end',
+  },
+  // ---- Pinned Banner ----
+  pinnedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DBEAFE',
+  },
+  pinnedBannerLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1D6FD7',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pinnedBannerText: {
+    fontSize: 13,
+    color: '#374151',
+    marginTop: 1,
   },
 });
 

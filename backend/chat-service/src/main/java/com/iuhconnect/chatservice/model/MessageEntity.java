@@ -73,4 +73,14 @@ public class MessageEntity {
 
     @Field("reply_to_sender")
     private String replyToSender;
+
+    // ---- Pin ----
+    @Builder.Default
+    private boolean pinned = false;
+
+    @Field("pinned_by")
+    private String pinnedBy;
+
+    @Field("pinned_at")
+    private long pinnedAt;
 }

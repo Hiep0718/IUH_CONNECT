@@ -34,5 +34,9 @@ public interface MessageRepository extends MongoRepository<MessageEntity, String
      * Delete all messages in a conversation (used when disbanding group).
      */
     void deleteByConversationId(String conversationId);
-}
 
+    /**
+     * Find all pinned messages in a conversation.
+     */
+    List<MessageEntity> findByConversationIdAndPinnedTrue(String conversationId);
+}

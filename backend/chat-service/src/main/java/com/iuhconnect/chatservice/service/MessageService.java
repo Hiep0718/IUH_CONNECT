@@ -23,6 +23,7 @@ public class MessageService {
     private final com.iuhconnect.chatservice.repository.ConversationRepository conversationRepository;
     private final org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
     private final ConversationReadModelService conversationReadModelService;
+    private final RealtimeEventService realtimeEventService;
 
     public List<MessageEntity> getHistory(String conversationId, Long before, int limit) {
         Pageable pageable = PageRequest.of(0, limit);
@@ -146,5 +147,77 @@ public class MessageService {
         }
         msg.setReactions(reactions);
         return messageRepository.save(msg);
+    }
+
+    public MessageEntity togglePinMessage(String messageId, String userId, String conversationId) {
+        MessageEntity msg = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found: " + messageId));
+
+        if (!msg.getConversationId().equals(conversationId)) {
+            throw new RuntimeException("Message does not belong to this conversation");
+        }
+
+        // Try to find conversation (only GROUP chats have a ConversationEntity)
+        java.util.Optional<com.iuhconnect.chatservice.model.ConversationEntity> optConversation =
+                conversationRepository.findById(conversationId);
+
+        // For GROUP chats: only ADMIN or DEPUTY can pin
+        if (optConversation.isPresent() && 
+            optConversation.get().getType() == com.iuhconnect.chatservice.model.ConversationType.GROUP) {
+            boolean hasPrivilege = optConversation.get().getMembers().stream()
+                    .anyMatch(m -> m.getUserId().equals(userId) &&
+                            (m.getRole() == com.iuhconnect.chatservice.model.GroupRole.ADMIN ||
+                             m.getRole() == com.iuhconnect.chatservice.model.GroupRole.DEPUTY));
+            if (!hasPrivilege) {
+                throw new RuntimeException("Only ADMIN or DEPUTY can pin/unpin messages");
+            }
+        }
+        // For SINGLE chats (no conversation entity): any participant can pin
+
+        // Toggle pin
+        boolean newPinState = !msg.isPinned();
+        msg.setPinned(newPinState);
+        if (newPinState) {
+            msg.setPinnedBy(userId);
+            msg.setPinnedAt(System.currentTimeMillis());
+        } else {
+            msg.setPinnedBy(null);
+            msg.setPinnedAt(0);
+        }
+
+        MessageEntity saved = messageRepository.save(msg);
+
+        // Broadcast PIN_MESSAGE event
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("type", "PIN_MESSAGE");
+        payload.put("conversationId", conversationId);
+        payload.put("messageId", saved.getId());
+        payload.put("pinned", saved.isPinned());
+        payload.put("pinnedBy", saved.getPinnedBy());
+        payload.put("content", saved.getContent());
+        payload.put("senderId", saved.getSenderId());
+        payload.put("messageType", saved.getMessageType());
+
+        if (optConversation.isPresent() && 
+            optConversation.get().getType() == com.iuhconnect.chatservice.model.ConversationType.GROUP) {
+            for (com.iuhconnect.chatservice.model.GroupMember member : optConversation.get().getMembers()) {
+                realtimeEventService.sendToUser(member.getUserId(), payload);
+            }
+        } else {
+            // SINGLE chat: notify both sender and receiver
+            realtimeEventService.sendToUser(saved.getSenderId(), payload);
+            if (saved.getReceiverId() != null && !saved.getReceiverId().equals(saved.getSenderId())) {
+                realtimeEventService.sendToUser(saved.getReceiverId(), payload);
+            }
+        }
+
+        log.info("📌 Message [{}] {} by [{}] in conversation [{}]",
+                messageId, newPinState ? "PINNED" : "UNPINNED", userId, conversationId);
+
+        return saved;
+    }
+
+    public java.util.List<MessageEntity> getPinnedMessages(String conversationId) {
+        return messageRepository.findByConversationIdAndPinnedTrue(conversationId);
     }
 }
