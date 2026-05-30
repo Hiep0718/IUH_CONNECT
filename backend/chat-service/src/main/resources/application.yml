@@ -57,7 +57,7 @@ resilience4j:
 
 # ---------- JWT Configuration (shared secret with auth-service) ----------
 jwt:
-  secret: IUHConnectSuperSecretKeyForJWT2024MustBeAtLeast256BitsLong!!
+  secret: ${JWT_SECRET:default-dev-secret-change-in-production-must-be-at-least-256-bits}
 
 # ---------- Actuator (Health Check) ----------
 management:
