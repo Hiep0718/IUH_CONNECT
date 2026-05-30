@@ -8,6 +8,7 @@ import com.iuhconnect.chatservice.repository.ConversationRepository;
 import com.iuhconnect.chatservice.service.RealtimeEventService;
 import com.iuhconnect.chatservice.service.AutoReplyService;
 import com.iuhconnect.chatservice.service.ConversationReadModelService;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -25,6 +26,10 @@ public class ChatMessageKafkaConsumer {
     private final RealtimeEventService realtimeEventService;
     private final AutoReplyService autoReplyService;
     private final ConversationReadModelService conversationReadModelService;
+    private final StringRedisTemplate redisTemplate;
+
+    private static final String DEDUP_KEY_PREFIX = "msg:dedup:";
+    private static final long DEDUP_TTL_MINUTES = 5;
 
     public ChatMessageKafkaConsumer(
             MessageRepository messageRepository,
@@ -32,7 +37,8 @@ public class ChatMessageKafkaConsumer {
             com.iuhconnect.chatservice.repository.ChatUserRepository chatUserRepository,
             RealtimeEventService realtimeEventService,
             AutoReplyService autoReplyService,
-            ConversationReadModelService conversationReadModelService
+            ConversationReadModelService conversationReadModelService,
+            StringRedisTemplate redisTemplate
     ) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
@@ -40,6 +46,7 @@ public class ChatMessageKafkaConsumer {
         this.realtimeEventService = realtimeEventService;
         this.autoReplyService = autoReplyService;
         this.conversationReadModelService = conversationReadModelService;
+        this.redisTemplate = redisTemplate;
     }
 
     @KafkaListener(
@@ -61,7 +68,15 @@ public class ChatMessageKafkaConsumer {
         );
 
         try {
-            MessageEntity entity = MessageEntity.builder()
+            // Deduplication check: Do not process message if it was already processed recently
+            String messageId = message.getId() != null ? message.getId() : java.util.UUID.randomUUID().toString();
+            String dedupKey = DEDUP_KEY_PREFIX + messageId;
+            Boolean isNewMessage = redisTemplate.opsForValue().setIfAbsent(dedupKey, "1", DEDUP_TTL_MINUTES, java.util.concurrent.TimeUnit.MINUTES);
+
+            if (Boolean.FALSE.equals(isNewMessage)) {
+                log.debug("Duplicate message received [id={}], skipping DB save.", messageId);
+            } else {
+                MessageEntity entity = MessageEntity.builder()
                     .senderId(message.getSenderId())
                     .receiverId(message.getReceiverId())
                     .content(message.getContent())
@@ -79,12 +94,18 @@ public class ChatMessageKafkaConsumer {
                     .mentions(message.getMentions())
                     .build();
 
-            entity = messageRepository.save(entity);
-            message.setId(entity.getId());
-            log.info("Message saved to MongoDB [id={}]", entity.getId());
+                // If message.getId() was null, ensure entity uses the generated one
+                if (message.getId() == null) {
+                    entity.setId(messageId);
+                }
 
-            // CQRS: Cập nhật Read Model (bảng tóm tắt) vào Redis
-            conversationReadModelService.updateReadModel(message);
+                entity = messageRepository.save(entity);
+                message.setId(entity.getId());
+                log.info("Message saved to MongoDB [id={}]", entity.getId());
+
+                // CQRS: Cập nhật Read Model (bảng tóm tắt) vào Redis
+                conversationReadModelService.updateReadModel(message);
+            }
 
             Optional<com.iuhconnect.chatservice.model.ConversationEntity> convOpt = 
                     conversationRepository.findById(message.getConversationId());
