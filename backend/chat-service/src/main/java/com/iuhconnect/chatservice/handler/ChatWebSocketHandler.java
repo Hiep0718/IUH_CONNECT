@@ -8,10 +8,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.iuhconnect.chatservice.dto.WebRTCSignalingMessage;
-import com.iuhconnect.chatservice.service.PresenceService;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import com.iuhconnect.chatservice.handler.strategy.WsMessageStrategy;
 import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.List;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -24,24 +30,20 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private static final String TOPIC = "chat-messages";
 
     private final WebSocketSessionManager sessionManager;
-    private final KafkaTemplate<String, ChatMessageDto> kafkaTemplate;
+    private final com.iuhconnect.chatservice.service.PresenceService presenceService;
     private final ObjectMapper objectMapper;
-    private final PresenceService presenceService;
-    private final StringRedisTemplate redisTemplate;
-    private final CallSignalService callSignalService;
+    private final Map<String, WsMessageStrategy> strategies;
 
     public ChatWebSocketHandler(WebSocketSessionManager sessionManager,
-                                KafkaTemplate<String, ChatMessageDto> kafkaTemplate,
+                                com.iuhconnect.chatservice.service.PresenceService presenceService,
                                 ObjectMapper objectMapper,
-                                PresenceService presenceService,
-                                StringRedisTemplate redisTemplate,
-                                CallSignalService callSignalService) {
+                                List<WsMessageStrategy> strategyList) {
         this.sessionManager = sessionManager;
-        this.kafkaTemplate = kafkaTemplate;
-        this.objectMapper = objectMapper;
         this.presenceService = presenceService;
-        this.redisTemplate = redisTemplate;
-        this.callSignalService = callSignalService;
+        this.objectMapper = objectMapper;
+        // Map Strategy beans into a dictionary by their getType() identifier
+        this.strategies = strategyList.stream()
+                .collect(Collectors.toMap(WsMessageStrategy::getType, strategy -> strategy));
     }
 
     @Override
@@ -61,82 +63,13 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             JsonNode jsonNode = objectMapper.readTree(message.getPayload());
             String type = jsonNode.has("type") ? jsonNode.get("type").asText() : "CHAT";
 
-            // ===== Presence Heartbeat — PING/PONG =====
-            if ("PING".equals(type)) {
-                String username = (String) session.getAttributes().get("username");
-                if (username != null) {
-                    presenceService.refreshHeartbeat(username);
-                }
-                try {
-                    session.sendMessage(new TextMessage("{\"type\":\"PONG\"}"));
-                } catch (Exception e) {
-                    log.warn("⚠️ Failed to send PONG to session {}: {}", session.getId(), e.getMessage());
-                }
-                return;
-            }
-
-            if ("CALL_SIGNAL".equals(type)) {
-                // ===== Meeting Call Signaling (new contract) =====
-                String senderUsername = (String) session.getAttributes().get("username");
-
-                // Override senderId from authenticated session — never trust client
-                ((com.fasterxml.jackson.databind.node.ObjectNode) jsonNode).put("senderId", senderUsername);
-
-                CallSignalDto signal = objectMapper.treeToValue(jsonNode, CallSignalDto.class);
-                callSignalService.handleSignal(signal);
-
-            } else if ("WEBRTC".equals(type)) {
-                // ===== Legacy WebRTC Signaling (kept for transition, will be removed) =====
-                String senderUsername = (String) session.getAttributes().get("username");
-
-                ((com.fasterxml.jackson.databind.node.ObjectNode) jsonNode).put("senderId", senderUsername);
-                String enrichedPayload = objectMapper.writeValueAsString(jsonNode);
-
-                WebRTCSignalingMessage signalingMessage = objectMapper.treeToValue(jsonNode, WebRTCSignalingMessage.class);
-                String receiverId = signalingMessage.getReceiverId();
-                String signalType = signalingMessage.getSignalType();
-
-                log.info("📡 [Legacy] WebRTC Signal [type={}, from={}, to={}]", signalType, senderUsername, receiverId);
-
-                WebSocketSession receiverSession = sessionManager.getSession(receiverId);
-                if (receiverSession != null && receiverSession.isOpen()) {
-                    receiverSession.sendMessage(new TextMessage(enrichedPayload));
-                } else {
-                    String targetInstance = presenceService.getUserInstanceId(receiverId);
-                    if (targetInstance != null) {
-                        redisTemplate.convertAndSend("signaling:" + targetInstance, enrichedPayload);
-                    } else {
-                        log.warn("⚠️ [Legacy] Receiver {} is not online", receiverId);
-                    }
-                }
-
-            } else if ("READ_RECEIPT".equals(type)) {
-                // Forward READ_RECEIPT directly to the receiver without saving to DB
-                String receiverId = jsonNode.has("receiverId") ? jsonNode.get("receiverId").asText() : null;
-                if (receiverId != null) {
-                    WebSocketSession receiverSession = sessionManager.getSession(receiverId);
-                    if (receiverSession != null && receiverSession.isOpen()) {
-                        receiverSession.sendMessage(new TextMessage(message.getPayload()));
-                    } else {
-                        String targetInstance = presenceService.getUserInstanceId(receiverId);
-                        if (targetInstance != null) {
-                            redisTemplate.convertAndSend("signaling:" + targetInstance, message.getPayload());
-                        }
-                    }
-                }
+            // 2. Delegate to Strategy
+            WsMessageStrategy strategy = strategies.get(type);
+            if (strategy != null) {
+                strategy.handle(session, jsonNode);
             } else {
-                // ===== Standard Chat Message to Kafka =====
-                ChatMessageDto chatMessage = objectMapper.treeToValue(jsonNode, ChatMessageDto.class);
-
-                if (chatMessage.getTimestamp() == 0) {
-                    chatMessage.setTimestamp(System.currentTimeMillis());
-                }
-
-                log.info("📤 Producing message to Kafka [from={}, to={}, conv={}]",
-                        chatMessage.getSenderId(), chatMessage.getReceiverId(),
-                        chatMessage.getConversationId());
-
-                kafkaTemplate.send(TOPIC, chatMessage.getConversationId(), chatMessage);
+                // Default fallback
+                strategies.get("CHAT").handle(session, jsonNode);
             }
 
         } catch (Exception e) {
