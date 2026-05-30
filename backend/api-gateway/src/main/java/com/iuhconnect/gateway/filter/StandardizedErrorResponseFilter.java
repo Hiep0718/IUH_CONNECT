@@ -28,6 +28,14 @@ public class StandardizedErrorResponseFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        String path = exchange.getRequest().getURI().getPath();
+        String upgradeHeader = exchange.getRequest().getHeaders().getFirst("Upgrade");
+
+        // Skip decorating response for WebSocket upgrade paths to prevent connection closure
+        if (path.startsWith("/ws/") || "websocket".equalsIgnoreCase(upgradeHeader)) {
+            return chain.filter(exchange);
+        }
+
         ServerHttpResponse originalResponse = exchange.getResponse();
         DataBufferFactory bufferFactory = originalResponse.bufferFactory();
 
