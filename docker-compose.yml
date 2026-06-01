@@ -161,10 +161,8 @@ services:
     ports:
       - "8085:8085"
     depends_on:
-      mariadb:
-        condition: service_healthy
-      kafka:
-        condition: service_started
+      - mariadb
+      - kafka
     environment:
       SPRING_DATASOURCE_URL: jdbc:mariadb://mariadb:3306/${MARIADB_DATABASE}
       SPRING_DATASOURCE_USERNAME: ${MARIADB_USER}
@@ -195,12 +193,9 @@ services:
     ports:
       - "8090:8090"
     depends_on:
-      mongodb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_started
+      - mongodb
+      - redis
+      - kafka
     environment:
       SPRING_DATA_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DATABASE}?authSource=admin
       SPRING_DATA_REDIS_HOST: redis
@@ -233,8 +228,7 @@ services:
     ports:
       - "8089:8089"
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     environment:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -269,10 +263,8 @@ services:
     ports:
       - "8088:8088"
     depends_on:
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_started
+      - redis
+      - kafka
     environment:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -345,10 +337,8 @@ services:
     ports:
       - "8083:8083"
     depends_on:
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_started
+      - redis
+      - kafka
     environment:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -378,8 +368,7 @@ services:
       dockerfile: Dockerfile
     container_name: iuh-notification-service
     depends_on:
-      kafka:
-        condition: service_started
+      - kafka
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
@@ -407,8 +396,7 @@ services:
     ports:
       - "8084:8084"
     depends_on:
-      kafka:
-        condition: service_started
+      - kafka
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       OLLAMA_HOST: http://host.docker.internal:11434
