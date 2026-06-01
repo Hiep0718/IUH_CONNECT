@@ -178,7 +178,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 180s
     deploy:
       replicas: 1
       placement:
@@ -216,7 +216,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 180s
     deploy:
       replicas: 1
       placement:
@@ -254,7 +254,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 180s
     deploy:
       replicas: 1
       resources:
@@ -288,7 +288,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 180s
     deploy:
       replicas: 1
       placement:
@@ -332,7 +332,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 180s
     deploy:
       replicas: 1
       placement:
@@ -368,7 +368,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 180s
     deploy:
       replicas: 1
       placement:
@@ -397,7 +397,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 180s
     deploy:
       replicas: 1
       placement:
@@ -433,7 +433,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 180s
     deploy:
       replicas: 1
       placement:
