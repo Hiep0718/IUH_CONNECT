@@ -14,10 +14,10 @@
 
     <!-- ============ PROJECT INFO ============ -->
     <groupId>com.iuhconnect</groupId>
-    <artifactId>chat-service</artifactId>
+    <artifactId>media-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>chat-service</name>
-    <description>Chat Service for IUH Connect - WebSocket, Kafka Consumer, MongoDB</description>
+    <name>media-service</name>
+    <description>Media Service for IUH Connect - AWS S3 File Upload</description>
 
     <!-- ============ PROPERTIES ============ -->
     <properties>
@@ -72,7 +72,12 @@
             <optional>true</optional>
         </dependency>
 
-
+        <!-- AWS S3 -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.21.29</version>
+        </dependency>
 
         <!-- Spring Cloud OpenFeign -->
         <dependency>

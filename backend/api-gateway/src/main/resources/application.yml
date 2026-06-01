@@ -106,7 +106,7 @@ spring:
 
         # -------- File Upload (User-based, strict — heavy IO/S3) --------
         - id: file-service
-          uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
+          uri: ${MEDIA_SERVICE_HTTP_URL:http://localhost:8089}
           predicates:
             - Path=/api/v1/files/**
           filters:

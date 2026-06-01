@@ -1,4 +1,4 @@
-package com.iuhconnect.chatservice.controller;
+package com.iuhconnect.mediaservice.controller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
