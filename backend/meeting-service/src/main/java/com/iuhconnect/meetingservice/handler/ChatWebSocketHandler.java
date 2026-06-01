@@ -30,16 +30,13 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private static final String TOPIC = "chat-messages";
 
     private final WebSocketSessionManager sessionManager;
-    private final com.iuhconnect.meetingservice.service.PresenceService presenceService;
     private final ObjectMapper objectMapper;
     private final Map<String, WsMessageStrategy> strategies;
 
     public ChatWebSocketHandler(WebSocketSessionManager sessionManager,
-                                com.iuhconnect.meetingservice.service.PresenceService presenceService,
                                 ObjectMapper objectMapper,
                                 List<WsMessageStrategy> strategyList) {
         this.sessionManager = sessionManager;
-        this.presenceService = presenceService;
         this.objectMapper = objectMapper;
         // Map Strategy beans into a dictionary by their getType() identifier
         this.strategies = strategyList.stream()
@@ -50,9 +47,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) {
         String username = (String) session.getAttributes().get("username");
         sessionManager.registerSession(username, session);
-        if (username != null) {
-            presenceService.userConnected(username);
-        }
         log.info("🔗 WebSocket connected [username={}, sessionId={}]", username, session.getId());
     }
 
@@ -82,7 +76,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         String username = (String) session.getAttributes().get("username");
         if (username != null) {
             sessionManager.removeSession(username);
-            presenceService.userDisconnected(username);
         }
         log.info("🔌 WebSocket disconnected [username={}, status={}]", username, status);
     }

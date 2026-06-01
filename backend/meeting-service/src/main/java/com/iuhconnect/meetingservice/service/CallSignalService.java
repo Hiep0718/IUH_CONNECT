@@ -31,26 +31,20 @@ public class CallSignalService {
 
     private final WebSocketSessionManager sessionManager;
     private final MeetingSessionService meetingSessionService;
-    private final PresenceService presenceService;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.meetingservice.dto.ChatMessageDto> kafkaTemplate;
-    private final com.iuhconnect.meetingservice.repository.ConversationRepository conversationRepository;
 
     public CallSignalService(WebSocketSessionManager sessionManager,
                              MeetingSessionService meetingSessionService,
-                             PresenceService presenceService,
                              StringRedisTemplate redisTemplate,
                              ObjectMapper objectMapper,
-                             org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.meetingservice.dto.ChatMessageDto> kafkaTemplate,
-                             com.iuhconnect.meetingservice.repository.ConversationRepository conversationRepository) {
+                             org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.meetingservice.dto.ChatMessageDto> kafkaTemplate) {
         this.sessionManager = sessionManager;
         this.meetingSessionService = meetingSessionService;
-        this.presenceService = presenceService;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.kafkaTemplate = kafkaTemplate;
-        this.conversationRepository = conversationRepository;
     }
 
     /**
@@ -130,16 +124,9 @@ public class CallSignalService {
      * CALL_REJECT: Kết thúc meeting (chỉ khi là cuộc gọi 1-1), relay tới caller.
      */
     private void handleReject(CallSignalDto signal) {
-        // Chỉ end meeting nếu KHÔNG phải nhóm
-        com.iuhconnect.meetingservice.model.ConversationEntity conv = null;
-        if (signal.getConversationId() != null) {
-            conv = conversationRepository.findById(signal.getConversationId()).orElse(null);
-        }
-        
-        if (conv == null || !"GROUP".equals(conv.getType().name())) {
-            if (signal.getMeetingId() != null) {
-                meetingSessionService.endMeeting(signal.getMeetingId());
-            }
+        // FIXME: Group check was removed because ConversationRepository was removed in refactoring
+        if (signal.getMeetingId() != null) {
+            meetingSessionService.endMeeting(signal.getMeetingId());
         }
         
         signal.setTimestamp(System.currentTimeMillis());
@@ -180,17 +167,8 @@ public class CallSignalService {
         try {
             String payload = objectMapper.writeValueAsString(signal);
 
-            com.iuhconnect.meetingservice.model.ConversationEntity conv = conversationRepository.findById(receiverId).orElse(null);
-            
-            if (conv != null && "GROUP".equals(conv.getType().name())) {
-                log.info("Relaying call signal to group members of {}", receiverId);
-                for (com.iuhconnect.meetingservice.model.GroupMember member : conv.getMembers()) {
-                    if (member.getUserId().equals(signal.getSenderId())) continue;
-                    sendSignalToUser(member.getUserId(), signal, payload);
-                }
-            } else {
-                sendSignalToUser(receiverId, signal, payload);
-            }
+            // FIXME: Group relay was removed because ConversationRepository was removed in refactoring
+            sendSignalToUser(receiverId, signal, payload);
         } catch (Exception e) {
             log.error("❌ Failed to relay call signal [to={}, signalType={}]: {}",
                     receiverId, signal.getSignalType(), e.getMessage(), e);
@@ -225,7 +203,7 @@ public class CallSignalService {
             }
 
             // Ưu tiên 2: Route qua Redis Pub/Sub tới instance khác
-            String targetInstance = presenceService.getUserInstanceId(targetUserId);
+            String targetInstance = redisTemplate.opsForValue().get("user_session:" + targetUserId);
             if (targetInstance != null) {
                 redisTemplate.convertAndSend("signaling:" + targetInstance, payload);
                 log.info("📡 Call Signal routed via Redis [to={}, instance={}]", targetUserId, targetInstance);
