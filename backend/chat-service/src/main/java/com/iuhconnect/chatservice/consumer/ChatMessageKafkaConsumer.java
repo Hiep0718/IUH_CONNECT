@@ -75,6 +75,12 @@ public class ChatMessageKafkaConsumer {
             if (Boolean.FALSE.equals(isNewMessage)) {
                 log.debug("Duplicate message received [id={}], skipping DB save.", messageId);
             } else {
+                if (message.getConversationId() == null && message.getReceiverId() != null) {
+                    String[] ids = {message.getSenderId(), message.getReceiverId()};
+                    java.util.Arrays.sort(ids);
+                    message.setConversationId(ids[0] + "-" + ids[1]);
+                }
+
                 MessageEntity entity = MessageEntity.builder()
                     .senderId(message.getSenderId())
                     .receiverId(message.getReceiverId())
@@ -106,8 +112,10 @@ public class ChatMessageKafkaConsumer {
                 conversationReadModelService.updateReadModel(message);
             }
 
-            com.iuhconnect.chatservice.model.ConversationEntity convVal = 
-                    conversationClient.getConversation(message.getConversationId());
+            com.iuhconnect.chatservice.model.ConversationEntity convVal = null;
+            if (isGroupConversation(message.getConversationId())) {
+                convVal = conversationClient.getConversation(message.getConversationId());
+            }
             Optional<com.iuhconnect.chatservice.model.ConversationEntity> convOpt = Optional.ofNullable(convVal);
 
             chatUserRepository.findByUsername(message.getSenderId()).ifPresent(user -> {
@@ -155,5 +163,10 @@ public class ChatMessageKafkaConsumer {
         } catch (Exception e) {
             log.error("Failed to process chat message: {}", e.getMessage(), e);
         }
+    }
+
+    private boolean isGroupConversation(String conversationId) {
+        if (conversationId == null) return false;
+        return conversationId.length() == 24 && conversationId.matches("^[0-9a-fA-F]{24}$");
     }
 }

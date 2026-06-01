@@ -160,8 +160,10 @@ public class MessageService {
         }
 
         // Try to find conversation (only GROUP chats have a ConversationEntity)
-        com.iuhconnect.chatservice.model.ConversationEntity optConversationVal =
-                conversationClient.getConversation(conversationId);
+        com.iuhconnect.chatservice.model.ConversationEntity optConversationVal = null;
+        if (isGroupConversation(conversationId)) {
+            optConversationVal = conversationClient.getConversation(conversationId);
+        }
         java.util.Optional<com.iuhconnect.chatservice.model.ConversationEntity> optConversation = 
                 java.util.Optional.ofNullable(optConversationVal);
 
@@ -223,5 +225,10 @@ public class MessageService {
 
     public java.util.List<MessageEntity> getPinnedMessages(String conversationId) {
         return messageRepository.findByConversationIdAndPinnedTrue(conversationId);
+    }
+
+    private boolean isGroupConversation(String conversationId) {
+        if (conversationId == null) return false;
+        return conversationId.length() == 24 && conversationId.matches("^[0-9a-fA-F]{24}$");
     }
 }

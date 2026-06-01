@@ -61,6 +61,18 @@ public class ConversationReadModelService {
      */
     public void updateReadModel(ChatMessageDto message) {
         try {
+            // Generate synthetic conversationId for 1-1 chat if null
+            if (message.getConversationId() == null) {
+                if (message.getReceiverId() != null) {
+                    String[] ids = {message.getSenderId(), message.getReceiverId()};
+                    Arrays.sort(ids);
+                    message.setConversationId(ids[0] + "-" + ids[1]);
+                } else {
+                    log.warn("❌ CQRS: message has no conversationId and no receiverId. Message: {}", message.getId());
+                    return;
+                }
+            }
+            
             // Build summary từ tin nhắn mới
             ConversationSummaryDto summary = new ConversationSummaryDto();
             summary.setId(message.getId());
@@ -218,7 +230,10 @@ public class ConversationReadModelService {
         List<String> participants = new ArrayList<>();
 
         // Kiểm tra xem đây là group chat hay 1-1
-        ConversationEntity convEntity = conversationClient.getConversation(message.getConversationId());
+        ConversationEntity convEntity = null;
+        if (isGroupConversation(message.getConversationId())) {
+            convEntity = conversationClient.getConversation(message.getConversationId());
+        }
         Optional<ConversationEntity> convOpt = Optional.ofNullable(convEntity);
 
         if (convOpt.isPresent() && convOpt.get().getType() == ConversationType.GROUP) {
@@ -235,5 +250,10 @@ public class ConversationReadModelService {
         }
 
         return participants;
+    }
+
+    private boolean isGroupConversation(String conversationId) {
+        if (conversationId == null) return false;
+        return conversationId.length() == 24 && conversationId.matches("^[0-9a-fA-F]{24}$");
     }
 }
