@@ -350,6 +350,8 @@ services:
       - presence-service
     environment:
       AUTH_SERVICE_URL: http://auth-service:8085
+      CHAT_SERVICE_HTTP_URL: http://chat-service:8082
+      CHAT_SERVICE_WS_URL: ws://chat-service:8082
       CONVERSATION_SERVICE_HTTP_URL: http://conversation-service:8090
       MEDIA_SERVICE_HTTP_URL: http://media-service:8089
       MEETING_SERVICE_HTTP_URL: http://meeting-service:8088
