@@ -54,6 +54,10 @@ resilience4j:
     instances:
       user-service:
         baseConfig: default
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 5s
 
 # ---------- JWT Configuration (shared secret with auth-service) ----------
 jwt:
