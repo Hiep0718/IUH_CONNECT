@@ -26,9 +26,9 @@ interface WebSocketContextType {
 }
 
 const WebSocketContext = createContext<WebSocketContextType>({
-  sendMessage: () => {},
-  addListener: () => {},
-  removeListener: () => {},
+  sendMessage: () => { },
+  addListener: () => { },
+  removeListener: () => { },
   isConnected: false,
   wasReconnected: false,
 });
@@ -142,7 +142,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       try {
         globalRingtone.pause();
         globalRingtone.setCurrentTime(0);
-      } catch {}
+      } catch { }
     }
 
     if (incomingCallData) {
@@ -166,7 +166,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       try {
         globalRingtone.pause();
         globalRingtone.setCurrentTime(0);
-      } catch {}
+      } catch { }
     }
 
     if (incomingCallData) {
@@ -192,7 +192,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       if (eventType === 'FRIEND_REQUEST_SENT') {
         // Chỉ hiện thông báo cho người nhận
         if (data.senderUsername === currentUser) return;
-        
+
         showNotification({
           id: `contact-${Date.now()}`,
           title: '👋 Lời mời kết bạn mới',
@@ -209,9 +209,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         // data.receiverUsername: Người vừa bấm chấp nhận
         // Do đó, nếu mình là người bấm chấp nhận thì không hiện thông báo cho mình.
         if (data.receiverUsername === currentUser) return;
-        
+
         const acceptorName = data.receiverFullName || data.receiverUsername || 'Người dùng';
-        
+
         showNotification({
           id: `contact-${Date.now()}`,
           title: '🎉 Đã trở thành bạn bè',
@@ -275,7 +275,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         if (wsRef.current !== ws || !isMountedRef.current) return;
         try {
           const data = JSON.parse(event.data);
-          
+
           // Ignore heartbeat PONG responses
           if (data.type === 'PONG') {
             return;
@@ -296,7 +296,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
                 try {
                   globalRingtone.pause();
                   globalRingtone.setCurrentTime(0);
-                } catch {}
+                } catch { }
               }
               setIncomingCallData(null);
             }
@@ -334,10 +334,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
             const senderLabel = data.senderName || data.senderId;
             const msgPreview = data.messageType === 'IMAGE' ? '📷 Hình ảnh'
               : data.messageType === 'VIDEO' ? '🎬 Video'
-              : data.messageType === 'FILE' ? '📎 Tệp đính kèm'
-              : data.messageType === 'STICKER' ? '😄 Sticker'
-              : data.messageType === 'AUTO_REPLY' ? '🤖 ' + (data.content || 'Phản hồi tự động')
-              : data.content || 'Tin nhắn mới';
+                : data.messageType === 'FILE' ? '📎 Tệp đính kèm'
+                  : data.messageType === 'STICKER' ? '😄 Sticker'
+                    : data.messageType === 'AUTO_REPLY' ? '🤖 ' + (data.content || 'Phản hồi tự động')
+                      : data.content || 'Tin nhắn mới';
 
             showNotification({
               id: `chat-${Date.now()}`,
@@ -439,7 +439,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     const unsubscribe = NetInfo.addEventListener(state => {
       const currentSocket = wsRef.current;
       const isActuallyConnected = currentSocket?.readyState === WebSocket.OPEN;
-      
+
       if (state.isConnected && !isActuallyConnected && shouldReconnectRef.current && isMountedRef.current) {
         console.log('📶 [WSProvider] Network restored — reconnecting immediately');
         reconnectAttemptsRef.current = 0;
@@ -499,7 +499,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           notification={notification}
           onDismiss={handleNotificationDismiss}
         />
-        
+
         {/* Modal thông báo cuộc gọi đến */}
         <Modal visible={!!incomingCallData} transparent animationType="slide">
           <View style={styles.callModalContainer}>

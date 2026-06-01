@@ -2,10 +2,8 @@ package com.iuhconnect.chatservice.handler.strategy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.iuhconnect.chatservice.handler.WebSocketSessionManager;
-import com.iuhconnect.chatservice.service.PresenceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -15,15 +13,12 @@ public class ReadReceiptStrategy implements WsMessageStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(ReadReceiptStrategy.class);
     private final WebSocketSessionManager sessionManager;
-    private final PresenceService presenceService;
-    private final StringRedisTemplate redisTemplate;
+    private final com.iuhconnect.chatservice.service.RealtimeEventService realtimeEventService;
 
     public ReadReceiptStrategy(WebSocketSessionManager sessionManager,
-                               PresenceService presenceService,
-                               StringRedisTemplate redisTemplate) {
+                               com.iuhconnect.chatservice.service.RealtimeEventService realtimeEventService) {
         this.sessionManager = sessionManager;
-        this.presenceService = presenceService;
-        this.redisTemplate = redisTemplate;
+        this.realtimeEventService = realtimeEventService;
     }
 
     @Override
@@ -43,10 +38,7 @@ public class ReadReceiptStrategy implements WsMessageStrategy {
                 if (receiverSession != null && receiverSession.isOpen()) {
                     receiverSession.sendMessage(new TextMessage(rawMessage));
                 } else {
-                    String targetInstance = presenceService.getUserInstanceId(receiverId);
-                    if (targetInstance != null) {
-                        redisTemplate.convertAndSend("signaling:" + targetInstance, rawMessage);
-                    }
+                    realtimeEventService.sendToUser(receiverId, payload);
                 }
             }
         } catch (Exception e) {
