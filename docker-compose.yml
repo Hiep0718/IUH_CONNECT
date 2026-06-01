@@ -18,6 +18,9 @@ services:
     networks:
       - iuh-connect-network
     restart: always
+    deploy:
+      placement:
+        constraints: [node.role == manager]
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -40,6 +43,9 @@ services:
     networks:
       - iuh-connect-network
     restart: always
+    deploy:
+      placement:
+        constraints: [node.role == manager]
 
   # =============================================
   # DATABASES
@@ -59,6 +65,9 @@ services:
     networks:
       - iuh-connect-network
     restart: always
+    deploy:
+      placement:
+        constraints: [node.role == manager]
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
@@ -79,6 +88,9 @@ services:
     networks:
       - iuh-connect-network
     restart: always
+    deploy:
+      placement:
+        constraints: [node.role == manager]
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -96,6 +108,9 @@ services:
     networks:
       - iuh-connect-network
     restart: always
+    deploy:
+      placement:
+        constraints: [node.role == manager]
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
@@ -117,6 +132,9 @@ services:
     networks:
       - iuh-connect-network
     restart: always
+    deploy:
+      placement:
+        constraints: [node.role == manager]
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 30s
@@ -169,13 +187,13 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  chat-service:
+  conversation-service:
     build:
-      context: ./backend/chat-service
+      context: ./backend/conversation-service
       dockerfile: Dockerfile
-    container_name: iuh-chat-service
+    container_name: iuh-conversation-service
     ports:
-      - "8082:8082"
+      - "8090:8090"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -189,16 +207,84 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      AWS_REGION: ${AWS_REGION:-ap-southeast-1}
-      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-iuh-connect-chat-media}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      JWT_SECRET: ${JWT_SECRET}
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     networks:
       - iuh-connect-network
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+  media-service:
+    build:
+      context: ./backend/media-service
+      dockerfile: Dockerfile
+    container_name: iuh-media-service
+    ports:
+      - "8089:8089"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-iuh-connect-chat-media}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    networks:
+      - iuh-connect-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+  meeting-service:
+    build:
+      context: ./backend/meeting-service
+      dockerfile: Dockerfile
+    container_name: iuh-meeting-service
+    ports:
+      - "8088:8088"
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    networks:
+      - iuh-connect-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -219,12 +305,15 @@ services:
       - "8080:8080"
     depends_on:
       - auth-service
-      - chat-service
+      - conversation-service
+      - media-service
+      - meeting-service
       - presence-service
     environment:
       AUTH_SERVICE_URL: http://auth-service:8085
-      CHAT_SERVICE_HTTP_URL: http://chat-service:8082
-      CHAT_SERVICE_WS_URL: ws://chat-service:8082
+      CONVERSATION_SERVICE_HTTP_URL: http://conversation-service:8090
+      MEDIA_SERVICE_HTTP_URL: http://media-service:8089
+      MEETING_SERVICE_HTTP_URL: http://meeting-service:8088
       PRESENCE_SERVICE_URL: http://presence-service:8083
       PRESENCE_SERVICE_WS_URL: ws://presence-service:8083
       SPRING_DATA_REDIS_HOST: redis
@@ -361,4 +450,4 @@ volumes:
 # =============================================
 networks:
   iuh-connect-network:
-    driver: bridge
+    driver: overlay
