@@ -17,16 +17,16 @@ public class RealtimeEventService {
 
     private final WebSocketSessionManager sessionManager;
     private final ObjectMapper objectMapper;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final KafkaTemplate<String, Object> presenceKafkaTemplate;
 
     public RealtimeEventService(
             WebSocketSessionManager sessionManager,
             ObjectMapper objectMapper,
-            KafkaTemplate<String, Object> kafkaTemplate
+            KafkaTemplate<String, Object> presenceKafkaTemplate
     ) {
         this.sessionManager = sessionManager;
         this.objectMapper = objectMapper;
-        this.kafkaTemplate = kafkaTemplate;
+        this.presenceKafkaTemplate = presenceKafkaTemplate;
     }
 
     public void sendToUser(String receiverId, Object payload) {
@@ -43,7 +43,7 @@ public class RealtimeEventService {
             }
 
             // If not connected locally, broadcast to other instances via Kafka
-            kafkaTemplate.send("ws-events", new WsEventDto(receiverId, payload));
+            presenceKafkaTemplate.send("ws-events", new WsEventDto(receiverId, payload));
         } catch (Exception e) {
             log.error("Failed to deliver realtime event to [{}]: {}", receiverId, e.getMessage(), e);
         }

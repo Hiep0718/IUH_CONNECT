@@ -11,10 +11,10 @@ public class RealtimeEventService {
 
     private static final Logger log = LoggerFactory.getLogger(RealtimeEventService.class);
 
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final KafkaTemplate<String, Object> presenceKafkaTemplate;
 
-    public RealtimeEventService(KafkaTemplate<String, Object> kafkaTemplate) {
-        this.kafkaTemplate = kafkaTemplate;
+    public RealtimeEventService(KafkaTemplate<String, Object> presenceKafkaTemplate) {
+        this.presenceKafkaTemplate = presenceKafkaTemplate;
     }
 
     public void sendToUser(String receiverId, Object payload) {
@@ -23,7 +23,7 @@ public class RealtimeEventService {
         }
 
         try {
-            kafkaTemplate.send("ws-events", new WsEventDto(receiverId, payload));
+            presenceKafkaTemplate.send("ws-events", new WsEventDto(receiverId, payload));
         } catch (Exception e) {
             log.error("Failed to deliver realtime event to [{}]: {}", receiverId, e.getMessage(), e);
         }

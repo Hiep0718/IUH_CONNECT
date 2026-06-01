@@ -5,7 +5,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 public interface WsMessageStrategy {
     /**
-     * @return type of message (e.g. "PING", "CHAT", "CALL_SIGNAL")
+     * @return type of message (e.g. "PING", "CHAT", "READ_RECEIPT")
      */
     String getType();
 

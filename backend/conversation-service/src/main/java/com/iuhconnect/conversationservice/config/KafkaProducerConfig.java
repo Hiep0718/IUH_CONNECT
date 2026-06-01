@@ -59,5 +59,10 @@ public class KafkaProducerConfig {
     public NewTopic chatMessagesTopic() {
         return new NewTopic("chat-messages", 3, (short) 1);
     }
+
+    @Bean
+    public NewTopic wsEventsTopic() {
+        return new NewTopic("ws-events", 3, (short) 1);
+    }
 }
 
