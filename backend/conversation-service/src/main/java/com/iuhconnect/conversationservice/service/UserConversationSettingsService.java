@@ -1,7 +1,7 @@
-package com.iuhconnect.chatservice.service;
+package com.iuhconnect.conversationservice.service;
 
-import com.iuhconnect.chatservice.model.UserConversationSettings;
-import com.iuhconnect.chatservice.repository.UserConversationSettingsRepository;
+import com.iuhconnect.conversationservice.model.UserConversationSettings;
+import com.iuhconnect.conversationservice.repository.UserConversationSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

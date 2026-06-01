@@ -1,7 +1,7 @@
-package com.iuhconnect.chatservice.controller;
+package com.iuhconnect.conversationservice.controller;
 
-import com.iuhconnect.chatservice.model.UserConversationSettings;
-import com.iuhconnect.chatservice.service.UserConversationSettingsService;
+import com.iuhconnect.conversationservice.model.UserConversationSettings;
+import com.iuhconnect.conversationservice.service.UserConversationSettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

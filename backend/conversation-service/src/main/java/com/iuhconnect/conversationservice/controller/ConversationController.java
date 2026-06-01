@@ -1,9 +1,9 @@
-package com.iuhconnect.chatservice.controller;
+package com.iuhconnect.conversationservice.controller;
 
-import com.iuhconnect.chatservice.dto.CreateGroupRequest;
-import com.iuhconnect.chatservice.dto.GroupSettingsRequest;
-import com.iuhconnect.chatservice.model.ConversationEntity;
-import com.iuhconnect.chatservice.service.ConversationService;
+import com.iuhconnect.conversationservice.dto.CreateGroupRequest;
+import com.iuhconnect.conversationservice.dto.GroupSettingsRequest;
+import com.iuhconnect.conversationservice.model.ConversationEntity;
+import com.iuhconnect.conversationservice.service.ConversationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -70,7 +70,7 @@ public class ConversationController {
             @PathVariable String conversationId,
             @PathVariable String targetUserId,
             @RequestParam String requesterId,
-            @RequestParam com.iuhconnect.chatservice.model.GroupRole newRole) {
+            @RequestParam com.iuhconnect.conversationservice.model.GroupRole newRole) {
         return ResponseEntity.ok(conversationService.assignRole(conversationId, requesterId, targetUserId, newRole));
     }
 

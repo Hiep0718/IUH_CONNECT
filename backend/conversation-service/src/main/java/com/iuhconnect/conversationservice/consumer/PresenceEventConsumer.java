@@ -1,10 +1,10 @@
-package com.iuhconnect.chatservice.consumer;
+package com.iuhconnect.conversationservice.consumer;
 
-import com.iuhconnect.chatservice.dto.PresenceEventDto;
-import com.iuhconnect.chatservice.model.ConversationEntity;
-import com.iuhconnect.chatservice.model.GroupMember;
-import com.iuhconnect.chatservice.client.ConversationClient;
-import com.iuhconnect.chatservice.service.RealtimeEventService;
+import com.iuhconnect.conversationservice.dto.PresenceEventDto;
+import com.iuhconnect.conversationservice.model.ConversationEntity;
+import com.iuhconnect.conversationservice.model.GroupMember;
+import com.iuhconnect.conversationservice.repository.ConversationRepository;
+import com.iuhconnect.conversationservice.service.RealtimeEventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -19,12 +19,12 @@ public class PresenceEventConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(PresenceEventConsumer.class);
 
-    private final ConversationClient conversationClient;
+    private final ConversationRepository conversationRepository;
     private final RealtimeEventService realtimeEventService;
 
-    public PresenceEventConsumer(ConversationClient conversationClient,
+    public PresenceEventConsumer(ConversationRepository conversationRepository,
                                  RealtimeEventService realtimeEventService) {
-        this.conversationClient = conversationClient;
+        this.conversationRepository = conversationRepository;
         this.realtimeEventService = realtimeEventService;
     }
 
@@ -40,7 +40,7 @@ public class PresenceEventConsumer {
         log.info("🌐 Received presence event: user {} is {}", event.getUserId(), event.getStatus());
 
         // Find all conversations the user is in
-        List<ConversationEntity> conversations = conversationClient.getUserConversations(event.getUserId());
+        List<ConversationEntity> conversations = conversationRepository.findByMembersUserId(event.getUserId());
 
         // Prepare WS payload
         Map<String, Object> wsPayload = new HashMap<>();

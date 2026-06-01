@@ -1,4 +1,4 @@
-package com.iuhconnect.chatservice.model;
+package com.iuhconnect.conversationservice.model;
 
 import lombok.*;
 import org.springframework.data.annotation.Id;

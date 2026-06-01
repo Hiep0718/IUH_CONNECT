@@ -1,6 +1,6 @@
-package com.iuhconnect.chatservice.repository;
+package com.iuhconnect.conversationservice.repository;
 
-import com.iuhconnect.chatservice.model.UserConversationSettings;
+import com.iuhconnect.conversationservice.model.UserConversationSettings;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 

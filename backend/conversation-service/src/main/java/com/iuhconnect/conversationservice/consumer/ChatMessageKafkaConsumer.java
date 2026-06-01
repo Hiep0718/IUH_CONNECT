@@ -1,12 +1,13 @@
-package com.iuhconnect.chatservice.consumer;
+package com.iuhconnect.conversationservice.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.iuhconnect.chatservice.dto.ChatMessageDto;
-import com.iuhconnect.chatservice.model.MessageEntity;
-import com.iuhconnect.chatservice.repository.MessageRepository;
-import com.iuhconnect.chatservice.service.RealtimeEventService;
-import com.iuhconnect.chatservice.service.AutoReplyService;
-import com.iuhconnect.chatservice.service.ConversationReadModelService;
+import com.iuhconnect.conversationservice.dto.ChatMessageDto;
+import com.iuhconnect.conversationservice.model.MessageEntity;
+import com.iuhconnect.conversationservice.repository.MessageRepository;
+import com.iuhconnect.conversationservice.repository.ConversationRepository;
+import com.iuhconnect.conversationservice.service.RealtimeEventService;
+import com.iuhconnect.conversationservice.service.AutoReplyService;
+import com.iuhconnect.conversationservice.service.ConversationReadModelService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,8 +21,8 @@ public class ChatMessageKafkaConsumer {
     private static final Logger log = LoggerFactory.getLogger(ChatMessageKafkaConsumer.class);
 
     private final MessageRepository messageRepository;
-    private final com.iuhconnect.chatservice.client.ConversationClient conversationClient;
-    private final com.iuhconnect.chatservice.repository.ChatUserRepository chatUserRepository;
+    private final ConversationRepository conversationRepository;
+    private final com.iuhconnect.conversationservice.repository.ChatUserRepository chatUserRepository;
     private final RealtimeEventService realtimeEventService;
     private final AutoReplyService autoReplyService;
     private final ConversationReadModelService conversationReadModelService;
@@ -32,15 +33,15 @@ public class ChatMessageKafkaConsumer {
 
     public ChatMessageKafkaConsumer(
             MessageRepository messageRepository,
-            com.iuhconnect.chatservice.client.ConversationClient conversationClient,
-            com.iuhconnect.chatservice.repository.ChatUserRepository chatUserRepository,
+            ConversationRepository conversationRepository,
+            com.iuhconnect.conversationservice.repository.ChatUserRepository chatUserRepository,
             RealtimeEventService realtimeEventService,
             AutoReplyService autoReplyService,
             ConversationReadModelService conversationReadModelService,
             StringRedisTemplate redisTemplate
     ) {
         this.messageRepository = messageRepository;
-        this.conversationClient = conversationClient;
+        this.conversationRepository = conversationRepository;
         this.chatUserRepository = chatUserRepository;
         this.realtimeEventService = realtimeEventService;
         this.autoReplyService = autoReplyService;
@@ -106,17 +107,16 @@ public class ChatMessageKafkaConsumer {
                 conversationReadModelService.updateReadModel(message);
             }
 
-            com.iuhconnect.chatservice.model.ConversationEntity convVal = 
-                    conversationClient.getConversation(message.getConversationId());
-            Optional<com.iuhconnect.chatservice.model.ConversationEntity> convOpt = Optional.ofNullable(convVal);
+            Optional<com.iuhconnect.conversationservice.model.ConversationEntity> convOpt = 
+                    conversationRepository.findById(message.getConversationId());
 
             chatUserRepository.findByUsername(message.getSenderId()).ifPresent(user -> {
                 message.setSenderName(user.getUsername());
                 message.setSenderAvatar(user.getAvatarUrl());
             });
 
-            if (convOpt.isPresent() && convOpt.get().getType() == com.iuhconnect.chatservice.model.ConversationType.GROUP) {
-                for (com.iuhconnect.chatservice.model.GroupMember member : convOpt.get().getMembers()) {
+            if (convOpt.isPresent() && convOpt.get().getType() == com.iuhconnect.conversationservice.model.ConversationType.GROUP) {
+                for (com.iuhconnect.conversationservice.model.GroupMember member : convOpt.get().getMembers()) {
                     if (!member.getUserId().equals(message.getSenderId())) {
                         realtimeEventService.sendToUser(member.getUserId(), message);
                     }

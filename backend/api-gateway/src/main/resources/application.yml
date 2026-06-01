@@ -62,7 +62,26 @@ spring:
         - id: chat-service-http
           uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
           predicates:
-            - Path=/api/v1/chat/**
+            - Path=/api/v1/chat/messages/**,/api/v1/chat/search/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
+            - name: CircuitBreaker
+              args:
+                name: chatServiceCircuitBreaker
+                fallbackUri: forward:/fallback/chat
+
+        # ======== CONVERSATION SERVICE ========
+        
+        # -------- Conversation Service HTTP (User-based) --------
+        - id: conversation-service-http
+          uri: ${CONVERSATION_SERVICE_HTTP_URL:http://localhost:8090}
+          predicates:
+            - Path=/api/v1/chat/conversations/**,/api/v1/chat/settings/**
           filters:
             - name: RequestRateLimiter
               args:

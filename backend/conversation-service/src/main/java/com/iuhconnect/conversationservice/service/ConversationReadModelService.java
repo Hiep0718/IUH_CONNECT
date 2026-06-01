@@ -1,11 +1,12 @@
-package com.iuhconnect.chatservice.service;
+package com.iuhconnect.conversationservice.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.iuhconnect.chatservice.dto.ChatMessageDto;
-import com.iuhconnect.chatservice.dto.ConversationSummaryDto;
-import com.iuhconnect.chatservice.model.ConversationEntity;
-import com.iuhconnect.chatservice.model.ConversationType;
+import com.iuhconnect.conversationservice.dto.ChatMessageDto;
+import com.iuhconnect.conversationservice.dto.ConversationSummaryDto;
+import com.iuhconnect.conversationservice.model.ConversationEntity;
+import com.iuhconnect.conversationservice.model.ConversationType;
+import com.iuhconnect.conversationservice.repository.ConversationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -37,13 +38,13 @@ public class ConversationReadModelService {
     private static final String UNREAD_KEY_PREFIX = "conv_unread:";
 
     private final StringRedisTemplate redisTemplate;
-    private final com.iuhconnect.chatservice.client.ConversationClient conversationClient;
+    private final ConversationRepository conversationRepository;
     private final ObjectMapper objectMapper;
 
     public ConversationReadModelService(StringRedisTemplate redisTemplate,
-                                         com.iuhconnect.chatservice.client.ConversationClient conversationClient) {
+                                         ConversationRepository conversationRepository) {
         this.redisTemplate = redisTemplate;
-        this.conversationClient = conversationClient;
+        this.conversationRepository = conversationRepository;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -218,8 +219,8 @@ public class ConversationReadModelService {
         List<String> participants = new ArrayList<>();
 
         // Kiểm tra xem đây là group chat hay 1-1
-        ConversationEntity convEntity = conversationClient.getConversation(message.getConversationId());
-        Optional<ConversationEntity> convOpt = Optional.ofNullable(convEntity);
+        Optional<ConversationEntity> convOpt =
+                conversationRepository.findById(message.getConversationId());
 
         if (convOpt.isPresent() && convOpt.get().getType() == ConversationType.GROUP) {
             // Group chat: lấy tất cả members

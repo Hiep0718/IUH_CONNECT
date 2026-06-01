@@ -1,13 +1,13 @@
-package com.iuhconnect.chatservice.service;
+package com.iuhconnect.conversationservice.service;
 
-import com.iuhconnect.chatservice.dto.CreateGroupRequest;
-import com.iuhconnect.chatservice.model.ConversationEntity;
-import com.iuhconnect.chatservice.model.ConversationType;
-import com.iuhconnect.chatservice.model.GroupMember;
-import com.iuhconnect.chatservice.model.GroupRole;
-import com.iuhconnect.chatservice.repository.ConversationRepository;
-import com.iuhconnect.chatservice.exception.AppException;
-import com.iuhconnect.chatservice.exception.ErrorCode;
+import com.iuhconnect.conversationservice.dto.CreateGroupRequest;
+import com.iuhconnect.conversationservice.model.ConversationEntity;
+import com.iuhconnect.conversationservice.model.ConversationType;
+import com.iuhconnect.conversationservice.model.GroupMember;
+import com.iuhconnect.conversationservice.model.GroupRole;
+import com.iuhconnect.conversationservice.repository.ConversationRepository;
+import com.iuhconnect.conversationservice.exception.AppException;
+import com.iuhconnect.conversationservice.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.kafka.core.KafkaTemplate;
-import com.iuhconnect.chatservice.dto.ChatMessageDto;
+import com.iuhconnect.conversationservice.dto.ChatMessageDto;
 import java.util.UUID;
 
 @Service
@@ -392,7 +392,7 @@ public class ConversationService {
     }
 
     @CacheEvict(value = "conversations", key = "#conversationId")
-    public ConversationEntity updateGroupSettings(String conversationId, String requesterId, com.iuhconnect.chatservice.dto.GroupSettingsRequest settings) {
+    public ConversationEntity updateGroupSettings(String conversationId, String requesterId, com.iuhconnect.conversationservice.dto.GroupSettingsRequest settings) {
         ConversationEntity group = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
 

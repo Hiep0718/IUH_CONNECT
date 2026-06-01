@@ -22,7 +22,7 @@ public class MessageService {
     private static final Logger log = LoggerFactory.getLogger(MessageService.class);
 
     private final MessageRepository messageRepository;
-    private final com.iuhconnect.chatservice.repository.ConversationRepository conversationRepository;
+    private final com.iuhconnect.chatservice.client.ConversationClient conversationClient;
     private final org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
     private final ConversationReadModelService conversationReadModelService;
     private final RealtimeEventService realtimeEventService;
@@ -64,7 +64,7 @@ public class MessageService {
      * Aggregation pipeline gốc từ MongoDB (giữ lại làm fallback).
      */
     private List<ConversationSummaryDto> getRecentConversationsFromMongo(String username) {
-        List<String> groupIds = conversationRepository.findByMembersUserId(username)
+        List<String> groupIds = conversationClient.getUserConversations(username)
                 .stream().map(com.iuhconnect.chatservice.model.ConversationEntity::getId).toList();
 
         org.springframework.data.mongodb.core.aggregation.Aggregation aggregation = org.springframework.data.mongodb.core.aggregation.Aggregation.newAggregation(
@@ -160,8 +160,10 @@ public class MessageService {
         }
 
         // Try to find conversation (only GROUP chats have a ConversationEntity)
-        java.util.Optional<com.iuhconnect.chatservice.model.ConversationEntity> optConversation =
-                conversationRepository.findById(conversationId);
+        com.iuhconnect.chatservice.model.ConversationEntity optConversationVal =
+                conversationClient.getConversation(conversationId);
+        java.util.Optional<com.iuhconnect.chatservice.model.ConversationEntity> optConversation = 
+                java.util.Optional.ofNullable(optConversationVal);
 
         // For GROUP chats: only ADMIN or DEPUTY can pin
         if (optConversation.isPresent() && 
