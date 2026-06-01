@@ -20,7 +20,7 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.role == manager]
+        constraints: [node.hostname == vps0]
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -45,7 +45,7 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.role == manager]
+        constraints: [node.hostname == vps0]
 
   # =============================================
   # DATABASES
@@ -67,7 +67,7 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.role == manager]
+        constraints: [node.hostname == vps0]
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
@@ -90,7 +90,7 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.role == manager]
+        constraints: [node.hostname == vps0]
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -110,7 +110,7 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.role == manager]
+        constraints: [node.hostname == vps0]
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
@@ -134,7 +134,7 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.role == manager]
+        constraints: [node.hostname == vps0]
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 30s
