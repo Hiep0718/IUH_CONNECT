@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IUH Connect - Chuyển thiết bị</title>
+    <!-- Include QR Code library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 48px 40px;
+            text-align: center;
+            max-width: 440px;
+            width: 90%;
+            backdrop-filter: blur(10px);
+        }
+        .logo { font-size: 40px; margin-bottom: 8px; }
+        h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+        .subtitle { color: rgba(255, 255, 255, 0.6); font-size: 14px; margin-bottom: 32px; }
+        .qr-container {
+            background: #fff;
+            padding: 20px;
+            border-radius: 16px;
+            display: inline-block;
+            margin-bottom: 24px;
+        }
+        .instruction {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 15px;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            border-top-color: #0077CC;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .success-text {
+            color: #4CAF50;
+            font-weight: 600;
+            display: none;
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: none;
+            padding: 16px 36px;
+            background: linear-gradient(135deg, #0077CC, #004A82);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 20px rgba(0, 119, 204, 0.3);
+        }
+        .btn:hover { transform: scale(1.04); box-shadow: 0 6px 28px rgba(0, 119, 204, 0.4); }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="logo">📱➡️💻</div>
+    <h1>IUH Connect</h1>
+    <p class="subtitle">Chuyển cuộc gọi sang máy tính</p>
+
+    <div class="qr-container" id="qrcode"></div>
+    
+    <div id="loading-state">
+        <div class="spinner"></div>
+        <p class="instruction">
+            Đang chờ kết nối...<br>
+            Hãy mở tính năng "Mở trên máy tính" trên điện thoại và quét mã QR này.
+        </p>
+    </div>
+
+    <div id="success-state" style="display: none;">
+        <h2 class="success-text" style="display: block;">✅ Đã quét thành công!</h2>
+        <a id="join-btn" class="btn" href="#" onclick="onJoinClick(event)">
+            🎥 Tham gia cuộc họp
+        </a>
+    </div>
+</div>
+
+<script>
+    // Generate UUID
+    function generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    const sessionId = generateUUID();
+    let meetingData = null;
+    let pollInterval = null;
+
+    // Create QR Code containing JSON: {"type": "HANDOFF", "desktopId": "uuid"}
+    const qrPayload = JSON.stringify({
+        type: "HANDOFF",
+        desktopId: sessionId
+    });
+
+    new QRCode(document.getElementById("qrcode"), {
+        text: qrPayload,
+        width: 200,
+        height: 200,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
+    });
+
+    // Poll API
+    async function checkStatus() {
+        try {
+            const res = await fetch('/api/v1/meetings/desktop-session/' + sessionId);
+            if (res.ok) {
+                // Success! The mobile has linked the session
+                meetingData = await res.json();
+                
+                // Stop polling
+                clearInterval(pollInterval);
+                
+                // Update UI
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('success-state').style.display = 'block';
+                document.getElementById('join-btn').style.display = 'inline-block';
+                document.getElementById('join-btn').href = meetingData.jitsiUrl;
+                
+                // Auto join directly
+                await onJoinClick();
+            }
+        } catch (e) {
+            console.error('Polling error', e);
+        }
+    }
+
+    pollInterval = setInterval(checkStatus, 2000);
+
+    async function onJoinClick(e) {
+        if (e) e.preventDefault(); // Ngăn hành vi mở link mặc định nếu người dùng bấm nút
+        if (meetingData && meetingData.meetingId) {
+            try {
+                // Inform backend that this device has joined
+                await fetch('/api/v1/meetings/' + meetingData.meetingId + '/device-joined', { method: 'POST' });
+            } catch (e) {
+                console.warn('device-joined callback failed:', e);
+            }
+            // Điều hướng thẳng trang hiện tại sang Jitsi sau khi API gọi xong
+            window.location.href = meetingData.jitsiUrl;
+        }
+    }
+</script>
+</body>
+</html>

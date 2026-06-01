@@ -1,11 +1,11 @@
-package com.iuhconnect.chatservice.controller;
+package com.iuhconnect.meetingservice.controller;
 
-import com.iuhconnect.chatservice.dto.HandoffTokenResponse;
-import com.iuhconnect.chatservice.dto.MeetingJoinInfoResponse;
-import com.iuhconnect.chatservice.model.MeetingSession;
-import com.iuhconnect.chatservice.service.CallSignalService;
-import com.iuhconnect.chatservice.service.MeetingSessionService;
-import com.iuhconnect.chatservice.dto.CallSignalDto;
+import com.iuhconnect.meetingservice.dto.HandoffTokenResponse;
+import com.iuhconnect.meetingservice.dto.MeetingJoinInfoResponse;
+import com.iuhconnect.meetingservice.model.MeetingSession;
+import com.iuhconnect.meetingservice.service.CallSignalService;
+import com.iuhconnect.meetingservice.service.MeetingSessionService;
+import com.iuhconnect.meetingservice.dto.CallSignalDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;

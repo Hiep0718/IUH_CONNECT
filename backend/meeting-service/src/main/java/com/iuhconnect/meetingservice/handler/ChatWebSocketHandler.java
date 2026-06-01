@@ -1,12 +1,14 @@
-package com.iuhconnect.chatservice.handler;
+package com.iuhconnect.meetingservice.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.iuhconnect.chatservice.dto.ChatMessageDto;
+import com.iuhconnect.meetingservice.dto.CallSignalDto;
+import com.iuhconnect.meetingservice.dto.ChatMessageDto;
+import com.iuhconnect.meetingservice.service.CallSignalService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.iuhconnect.chatservice.handler.strategy.WsMessageStrategy;
+import com.iuhconnect.meetingservice.handler.strategy.WsMessageStrategy;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -28,12 +30,12 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private static final String TOPIC = "chat-messages";
 
     private final WebSocketSessionManager sessionManager;
-    private final com.iuhconnect.chatservice.service.PresenceService presenceService;
+    private final com.iuhconnect.meetingservice.service.PresenceService presenceService;
     private final ObjectMapper objectMapper;
     private final Map<String, WsMessageStrategy> strategies;
 
     public ChatWebSocketHandler(WebSocketSessionManager sessionManager,
-                                com.iuhconnect.chatservice.service.PresenceService presenceService,
+                                com.iuhconnect.meetingservice.service.PresenceService presenceService,
                                 ObjectMapper objectMapper,
                                 List<WsMessageStrategy> strategyList) {
         this.sessionManager = sessionManager;

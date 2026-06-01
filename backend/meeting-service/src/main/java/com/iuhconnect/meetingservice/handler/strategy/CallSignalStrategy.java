@@ -1,9 +1,9 @@
-package com.iuhconnect.chatservice.handler.strategy;
+package com.iuhconnect.meetingservice.handler.strategy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.iuhconnect.chatservice.dto.CallSignalDto;
-import com.iuhconnect.chatservice.service.CallSignalService;
+import com.iuhconnect.meetingservice.dto.CallSignalDto;
+import com.iuhconnect.meetingservice.service.CallSignalService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;

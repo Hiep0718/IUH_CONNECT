@@ -1,9 +1,9 @@
-package com.iuhconnect.chatservice.service;
+package com.iuhconnect.meetingservice.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.iuhconnect.chatservice.model.MeetingSession;
-import com.iuhconnect.chatservice.model.MeetingStatus;
+import com.iuhconnect.meetingservice.model.MeetingSession;
+import com.iuhconnect.meetingservice.model.MeetingStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;

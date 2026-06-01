@@ -1,9 +1,9 @@
-package com.iuhconnect.chatservice.service;
+package com.iuhconnect.meetingservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.iuhconnect.chatservice.dto.CallSignalDto;
-import com.iuhconnect.chatservice.handler.WebSocketSessionManager;
-import com.iuhconnect.chatservice.model.MeetingSession;
+import com.iuhconnect.meetingservice.dto.CallSignalDto;
+import com.iuhconnect.meetingservice.handler.WebSocketSessionManager;
+import com.iuhconnect.meetingservice.model.MeetingSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -34,16 +34,16 @@ public class CallSignalService {
     private final PresenceService presenceService;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-    private final org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.chatservice.dto.ChatMessageDto> kafkaTemplate;
-    private final com.iuhconnect.chatservice.repository.ConversationRepository conversationRepository;
+    private final org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.meetingservice.dto.ChatMessageDto> kafkaTemplate;
+    private final com.iuhconnect.meetingservice.repository.ConversationRepository conversationRepository;
 
     public CallSignalService(WebSocketSessionManager sessionManager,
                              MeetingSessionService meetingSessionService,
                              PresenceService presenceService,
                              StringRedisTemplate redisTemplate,
                              ObjectMapper objectMapper,
-                             org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.chatservice.dto.ChatMessageDto> kafkaTemplate,
-                             com.iuhconnect.chatservice.repository.ConversationRepository conversationRepository) {
+                             org.springframework.kafka.core.KafkaTemplate<String, com.iuhconnect.meetingservice.dto.ChatMessageDto> kafkaTemplate,
+                             com.iuhconnect.meetingservice.repository.ConversationRepository conversationRepository) {
         this.sessionManager = sessionManager;
         this.meetingSessionService = meetingSessionService;
         this.presenceService = presenceService;
@@ -131,7 +131,7 @@ public class CallSignalService {
      */
     private void handleReject(CallSignalDto signal) {
         // Chỉ end meeting nếu KHÔNG phải nhóm
-        com.iuhconnect.chatservice.model.ConversationEntity conv = null;
+        com.iuhconnect.meetingservice.model.ConversationEntity conv = null;
         if (signal.getConversationId() != null) {
             conv = conversationRepository.findById(signal.getConversationId()).orElse(null);
         }
@@ -180,11 +180,11 @@ public class CallSignalService {
         try {
             String payload = objectMapper.writeValueAsString(signal);
 
-            com.iuhconnect.chatservice.model.ConversationEntity conv = conversationRepository.findById(receiverId).orElse(null);
+            com.iuhconnect.meetingservice.model.ConversationEntity conv = conversationRepository.findById(receiverId).orElse(null);
             
             if (conv != null && "GROUP".equals(conv.getType().name())) {
                 log.info("Relaying call signal to group members of {}", receiverId);
-                for (com.iuhconnect.chatservice.model.GroupMember member : conv.getMembers()) {
+                for (com.iuhconnect.meetingservice.model.GroupMember member : conv.getMembers()) {
                     if (member.getUserId().equals(signal.getSenderId())) continue;
                     sendSignalToUser(member.getUserId(), signal, payload);
                 }
@@ -201,7 +201,7 @@ public class CallSignalService {
         try {
             // LUÔN LUÔN gửi Push Notification cho CALL_INVITE để đề phòng "Ghost Socket"
             if ("CALL_INVITE".equals(signal.getSignalType())) {
-                com.iuhconnect.chatservice.dto.ChatMessageDto fakeMsg = new com.iuhconnect.chatservice.dto.ChatMessageDto();
+                com.iuhconnect.meetingservice.dto.ChatMessageDto fakeMsg = new com.iuhconnect.meetingservice.dto.ChatMessageDto();
                 fakeMsg.setSenderId(signal.getSenderId());
                 fakeMsg.setReceiverId(targetUserId);
                 fakeMsg.setConversationId(signal.getReceiverId()); // Lấy ID gốc (group ID hoặc user ID)

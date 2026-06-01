@@ -1,4 +1,4 @@
-package com.iuhconnect.chatservice.dto;
+package com.iuhconnect.meetingservice.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;

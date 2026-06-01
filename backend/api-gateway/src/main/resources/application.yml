@@ -85,7 +85,7 @@ spring:
 
         # -------- Meeting Service HTTP (User-based) --------
         - id: meeting-service-http
-          uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
+          uri: ${MEETING_SERVICE_HTTP_URL:http://localhost:8088}
           predicates:
             - Path=/api/v1/meetings/**
           filters:
@@ -98,7 +98,7 @@ spring:
 
         # -------- Meeting Web (Static page — no rate limit) --------
         - id: meeting-web
-          uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
+          uri: ${MEETING_SERVICE_HTTP_URL:http://localhost:8088}
           predicates:
             - Path=/meeting/**
 

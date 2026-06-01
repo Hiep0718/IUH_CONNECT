@@ -1,4 +1,4 @@
-package com.iuhconnect.chatservice.model;
+package com.iuhconnect.meetingservice.model;
 
 public enum MeetingStatus {
     INVITING,
