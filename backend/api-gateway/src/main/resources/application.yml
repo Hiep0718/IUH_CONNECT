@@ -56,13 +56,13 @@ spring:
                 name: authServiceCircuitBreaker
                 fallbackUri: forward:/fallback/auth
 
-        # ======== CHAT SERVICE ========
-
-        # -------- Chat Service HTTP (User-based) --------
-        - id: chat-service-http
-          uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
+        # ======== CONVERSATION SERVICE ========
+        
+        # -------- Conversation Service HTTP (User-based) --------
+        - id: conversation-service-http
+          uri: ${CONVERSATION_SERVICE_HTTP_URL:http://localhost:8090}
           predicates:
-            - Path=/api/v1/chat/messages/**,/api/v1/chat/search/**
+            - Path=/api/v1/chat/conversations/group/**,/api/v1/chat/conversations/user/**,/api/v1/chat/settings/**
           filters:
             - name: RequestRateLimiter
               args:
@@ -75,13 +75,13 @@ spring:
                 name: chatServiceCircuitBreaker
                 fallbackUri: forward:/fallback/chat
 
-        # ======== CONVERSATION SERVICE ========
-        
-        # -------- Conversation Service HTTP (User-based) --------
-        - id: conversation-service-http
-          uri: ${CONVERSATION_SERVICE_HTTP_URL:http://localhost:8090}
+        # ======== CHAT SERVICE ========
+
+        # -------- Chat Service HTTP (User-based) --------
+        - id: chat-service-http
+          uri: ${CHAT_SERVICE_HTTP_URL:http://localhost:8082}
           predicates:
-            - Path=/api/v1/chat/conversations/**,/api/v1/chat/settings/**
+            - Path=/api/v1/chat/messages/**,/api/v1/chat/search/**,/api/v1/chat/history/**,/api/v1/chat/conversations/**
           filters:
             - name: RequestRateLimiter
               args:
