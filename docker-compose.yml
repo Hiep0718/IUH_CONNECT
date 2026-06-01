@@ -158,7 +158,7 @@ services:
       context: ./backend/auth-service
       dockerfile: Dockerfile
     container_name: iuh-auth-service
-    image: iuhconnect-auth-service
+    image: 127.0.0.1:5000/iuhconnect-auth-service
     ports:
       - "8085:8085"
     depends_on:
@@ -191,7 +191,7 @@ services:
       context: ./backend/conversation-service
       dockerfile: Dockerfile
     container_name: iuh-conversation-service
-    image: iuhconnect-conversation-service
+    image: 127.0.0.1:5000/iuhconnect-conversation-service
     ports:
       - "8090:8090"
     depends_on:
@@ -227,7 +227,7 @@ services:
       context: ./backend/media-service
       dockerfile: Dockerfile
     container_name: iuh-media-service
-    image: iuhconnect-media-service
+    image: 127.0.0.1:5000/iuhconnect-media-service
     ports:
       - "8089:8089"
     depends_on:
@@ -263,7 +263,7 @@ services:
       context: ./backend/meeting-service
       dockerfile: Dockerfile
     container_name: iuh-meeting-service
-    image: iuhconnect-meeting-service
+    image: 127.0.0.1:5000/iuhconnect-meeting-service
     ports:
       - "8088:8088"
     depends_on:
@@ -297,7 +297,7 @@ services:
       context: ./backend/api-gateway
       dockerfile: Dockerfile
     container_name: iuh-api-gateway
-    image: iuhconnect-api-gateway
+    image: 127.0.0.1:5000/iuhconnect-api-gateway
     ports:
       - "8080:8080"
     depends_on:
@@ -339,7 +339,7 @@ services:
       context: ./backend/presence-service
       dockerfile: Dockerfile
     container_name: iuh-presence-service
-    image: iuhconnect-presence-service
+    image: 127.0.0.1:5000/iuhconnect-presence-service
     ports:
       - "8083:8083"
     depends_on:
@@ -373,7 +373,7 @@ services:
       context: ./backend/notification-service
       dockerfile: Dockerfile
     container_name: iuh-notification-service
-    image: iuhconnect-notification-service
+    image: 127.0.0.1:5000/iuhconnect-notification-service
     depends_on:
       - kafka
     environment:
@@ -400,7 +400,7 @@ services:
       context: ./backend/ai-service
       dockerfile: Dockerfile
     container_name: iuh-ai-service
-    image: iuhconnect-ai-service
+    image: 127.0.0.1:5000/iuhconnect-ai-service
     ports:
       - "8084:8084"
     depends_on:
