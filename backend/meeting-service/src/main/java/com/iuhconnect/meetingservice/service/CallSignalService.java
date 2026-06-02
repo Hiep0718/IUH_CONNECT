@@ -203,7 +203,7 @@ public class CallSignalService {
             }
 
             // Ưu tiên 2: Route qua Redis Pub/Sub tới instance khác
-            String targetInstance = redisTemplate.opsForValue().get("user_session:" + targetUserId);
+            String targetInstance = redisTemplate.opsForValue().get("presence:user:" + targetUserId);
             if (targetInstance != null) {
                 redisTemplate.convertAndSend("signaling:" + targetInstance, payload);
                 log.info("📡 Call Signal routed via Redis [to={}, instance={}]", targetUserId, targetInstance);
