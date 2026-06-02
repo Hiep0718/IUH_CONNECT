@@ -20,7 +20,7 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.hostname == vps0]
+        constraints: [ node.hostname == vps0 ]
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -45,7 +45,7 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.hostname == vps0]
+        constraints: [ node.hostname == vps0 ]
 
   # =============================================
   # DATABASES
@@ -67,9 +67,9 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.hostname == vps0]
+        constraints: [ node.hostname == vps0 ]
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -90,9 +90,9 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.hostname == vps0]
+        constraints: [ node.hostname == vps0 ]
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -110,9 +110,9 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.hostname == vps0]
+        constraints: [ node.hostname == vps0 ]
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -134,9 +134,9 @@ services:
     restart: always
     deploy:
       placement:
-        constraints: [node.hostname == vps0]
+        constraints: [ node.hostname == vps0 ]
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: [ "CMD", "mc", "ready", "local" ]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -174,7 +174,7 @@ services:
       - iuh-connect-network
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8085/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -211,7 +211,7 @@ services:
       - iuh-connect-network
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8082/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -247,7 +247,7 @@ services:
       - iuh-connect-network
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8090/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -284,7 +284,7 @@ services:
       - iuh-connect-network
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8089/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8089/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -319,7 +319,7 @@ services:
       - iuh-connect-network
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8088/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8088/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -327,7 +327,7 @@ services:
     deploy:
       replicas: 1
       placement:
-        constraints: [node.hostname == vps0]
+        constraints: [ node.hostname == vps0 ]
       resources:
         limits:
           cpus: '0.5'
@@ -366,7 +366,7 @@ services:
       - iuh-connect-network
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -400,7 +400,7 @@ services:
       - iuh-connect-network
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8083/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -427,7 +427,7 @@ services:
       - iuh-connect-network
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'java' || exit 1"]
+      test: [ "CMD-SHELL", "pgrep -f 'java' || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -451,9 +451,9 @@ services:
       - kafka
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      OLLAMA_HOST: http://host.docker.internal:11434
-      OLLAMA_MODEL: qwen2:1.5b
-      CHROMADB_HOST: http://host.docker.internal:8000
+      OLLAMA_HOST: ${OLLAMA_HOST_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2:1.5b}
+      CHROMADB_HOST: ${CHROMADB_HOST_URL:-http://host.docker.internal:8000}
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -461,7 +461,7 @@ services:
       - iuh-connect-network
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8084/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -485,9 +485,9 @@ volumes:
   redis-data:
   minio-data:
 
-# =============================================
-# NETWORKS
-# =============================================
+    # =============================================
+    # NETWORKS
+    # =============================================
 networks:
   iuh-connect-network:
     driver: overlay
