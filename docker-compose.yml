@@ -220,8 +220,8 @@ services:
       replicas: 1
       resources:
         limits:
-          cpus: '0.25'
-          memory: 256M
+          cpus: '0.5'
+          memory: 512M
 
   conversation-service:
     build:
@@ -470,8 +470,8 @@ services:
       replicas: 1
       resources:
         limits:
-          cpus: '0.25'
-          memory: 256M
+          cpus: '0.5'
+          memory: 512M
 
 # =============================================
 # VOLUMES
